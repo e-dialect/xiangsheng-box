@@ -86,7 +86,7 @@
     "@vitejs/plugin-vue": "5.2.4",
     "@vue/compiler-dom": "3.4.21",
     "@vue/runtime-core": "3.4.21",
-    "@vue/test-utils": "^2.4.11",
+    "@vue/test-utils": "^2.5.0",
     "eslint": "^8.31.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-import-resolver-alias": "^1.1.2",
