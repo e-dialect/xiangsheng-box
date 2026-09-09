@@ -10,7 +10,7 @@ pyjwt~=2.4.0
 django-environ==0.14.0
 
 # Data Processing
-numpy>=2.5.2,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
+numpy>=2.5.3,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
 requests
 requests_toolbelt==1.0.0
 
