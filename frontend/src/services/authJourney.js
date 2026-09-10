@@ -24,10 +24,18 @@ export function resolveAuthDestination(intent) {
   }
 
   if (intent.action === 'interact_entry' && context.entryId) {
-    return routeDestination(ROUTES.entryDetail, { id: context.entryId });
+    return routeDestination(ROUTES.entryDetail, {
+      id: context.entryId,
+      comment: context.commentId,
+      root: context.rootId,
+    });
   }
   if (intent.action === 'interact_recording' && context.recordingId) {
-    return routeDestination(ROUTES.recordingDetail, { id: context.recordingId });
+    return routeDestination(ROUTES.recordingDetail, {
+      id: context.recordingId,
+      comment: context.commentId,
+      root: context.rootId,
+    });
   }
   if (intent.action === 'manage_collection') {
     if (context.recordingId) {
