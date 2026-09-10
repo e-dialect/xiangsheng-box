@@ -12,6 +12,7 @@ from .models import (
     CollectionRecording,
     CollectionEntry,
     RecordingComment,
+    RecordingCommentLike,
     DailyRecordingSelection,
 )
 
@@ -168,11 +169,20 @@ class RestorationTests(TestCase):
         )
         self.assertEqual(bad.status_code, 404)
         self.client.delete(f'/recording-comments/{first.data["id"]}/')
+        thread = self.client.get(
+            "/recording-comments/", {"recording_id": self.recording.id}
+        ).data
+        # A hidden root keeps its replies reachable, so it stays as a tombstone.
+        self.assertEqual(thread["count"], 1)
+        self.assertTrue(thread["results"][0]["deleted"])
+        self.assertEqual(thread["results"][0]["body"], "")
+        self.assertEqual(thread["results"][0]["reply_count"], 1)
         self.assertEqual(
             self.client.get(
-                "/recording-comments/", {"recording_id": self.recording.id}
+                "/recording-comments/",
+                {"recording_id": self.recording.id, "parent_id": first.data["id"]},
             ).data["count"],
-            0,
+            1,
         )
 
     def test_search_daily_following_and_hidden_entry_link(self):
@@ -307,11 +317,16 @@ class RestorationTests(TestCase):
         self.assertEqual(
             self.client.delete(f"/entry-comments/{first.data['id']}/").status_code, 204
         )
+        thread = self.client.get("/entry-comments/", {"entry_id": self.entry.id}).data
+        self.assertEqual(thread["count"], 1)
+        self.assertTrue(thread["results"][0]["deleted"])
+        self.assertIsNone(thread["results"][0]["author_id"])
         self.assertEqual(
-            self.client.get("/entry-comments/", {"entry_id": self.entry.id}).data[
-                "count"
-            ],
-            0,
+            self.client.get(
+                "/entry-comments/",
+                {"entry_id": self.entry.id, "parent_id": first.data["id"]},
+            ).data["count"],
+            1,
         )
 
     def test_discussion_requires_exactly_one_target_and_hidden_targets_reject_writes(
@@ -379,4 +394,204 @@ class RestorationTests(TestCase):
         )
         self.assertEqual(
             self.client.delete(f"/entry-comments/{comment.id}/").status_code, 403
+        )
+
+    def test_comment_reply_count_and_parent_filter_paginate_top_level(self):
+        root = RecordingComment.objects.create(
+            recording=self.recording,
+            author=self.other,
+            body="顶层留言",
+            client_id=uuid.uuid4(),
+        )
+        for index in range(4):
+            RecordingComment.objects.create(
+                recording=self.recording,
+                author=self.user,
+                parent=root,
+                body=f"回复{index}",
+                client_id=uuid.uuid4(),
+            )
+        thread = self.client.get(
+            "/recording-comments/", {"recording_id": self.recording.id}
+        ).data
+        self.assertEqual(thread["count"], 1)
+        self.assertEqual(thread["results"][0]["body"], "顶层留言")
+        self.assertEqual(thread["results"][0]["reply_count"], 4)
+        self.assertEqual(len(thread["results"][0]["recent_replies"]), 3)
+        self.assertEqual(thread["results"][0]["recent_replies"][0]["body"], "回复0")
+        replies_response = self.client.get(
+            "/recording-comments/",
+            {"recording_id": self.recording.id, "parent_id": root.id},
+        )
+        self.assertEqual(
+            replies_response.status_code, 200, replies_response.content[:400]
+        )
+        replies = replies_response.data
+        self.assertEqual(replies["count"], 4)
+        self.assertTrue(
+            all(item["parent_id"] == root.id for item in replies["results"])
+        )
+        for index in range(15):
+            RecordingComment.objects.create(
+                recording=self.recording,
+                author=self.user,
+                body=f"顶层{index}",
+                client_id=uuid.uuid4(),
+            )
+        paged = self.client.get(
+            "/recording-comments/", {"recording_id": self.recording.id}
+        ).data
+        self.assertEqual(paged["count"], 16)
+        self.assertIsNotNone(paged["next"])
+        self.assertEqual(len(paged["results"]), 15)
+
+    def test_reply_to_must_share_root_target(self):
+        root = self.client.post(
+            "/recording-comments/",
+            {
+                "recording_id": self.recording.id,
+                "body": "顶层",
+                "client_id": str(uuid.uuid4()),
+            },
+            format="json",
+        ).data
+        first_reply = self.client.post(
+            "/recording-comments/",
+            {
+                "recording_id": self.recording.id,
+                "parent_id": root["id"],
+                "body": "第一条回复",
+                "client_id": str(uuid.uuid4()),
+            },
+            format="json",
+        ).data
+        payload = {
+            "recording_id": self.recording.id,
+            "parent_id": root["id"],
+            "reply_to_id": first_reply["id"],
+            "body": "回复第一条回复",
+            "client_id": str(uuid.uuid4()),
+        }
+        response = self.client.post("/recording-comments/", payload, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["reply_to_id"], first_reply["id"])
+        self.assertEqual(response.data["reply_to_author_name"], self.user.username)
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/", payload, format="json"
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/",
+                {**payload, "body": "同一请求编号换了内容"},
+                format="json",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/",
+                {**payload, "reply_to_id": None},
+                format="json",
+            ).status_code,
+            400,
+        )
+        without_parent = {
+            "recording_id": self.recording.id,
+            "reply_to_id": first_reply["id"],
+            "body": "缺一级评论",
+            "client_id": str(uuid.uuid4()),
+        }
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/", without_parent, format="json"
+            ).status_code,
+            400,
+        )
+        other_root = RecordingComment.objects.create(
+            recording=self.recording,
+            author=self.other,
+            body="另一串",
+            client_id=uuid.uuid4(),
+        )
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/",
+                {
+                    **payload,
+                    "parent_id": other_root.id,
+                    "client_id": str(uuid.uuid4()),
+                },
+                format="json",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/recording-comments/",
+                {
+                    **payload,
+                    "reply_to_id": root["id"],
+                    "client_id": str(uuid.uuid4()),
+                },
+                format="json",
+            ).status_code,
+            400,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/entry-comments/",
+                {
+                    "entry_id": self.entry.id,
+                    "parent_id": root["id"],
+                    "reply_to_id": first_reply["id"],
+                    "body": "跨对象",
+                    "client_id": str(uuid.uuid4()),
+                },
+                format="json",
+            ).status_code,
+            404,
+        )
+
+    def test_duplicate_comment_client_id_race_recovers_as_idempotent(self):
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        data = {
+            "recording_id": self.recording.id,
+            "body": "并发同号",
+            "client_id": str(uuid.uuid4()),
+        }
+        first = self.client.post("/recording-comments/", data, format="json")
+        self.assertEqual(first.status_code, 201, first.data)
+        with patch(
+            "guantou.models.RecordingComment.objects.get_or_create",
+            side_effect=IntegrityError,
+        ):
+            response = self.client.post("/recording-comments/", data, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["id"], first.data["id"])
+        self.assertEqual(RecordingComment.objects.count(), 1)
+
+    def test_comment_like_race_does_not_duplicate_notification(self):
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
+        comment = RecordingComment.objects.create(
+            entry=self.entry, author=self.other, body="点赞", client_id=uuid.uuid4()
+        )
+        RecordingCommentLike.objects.create(comment=comment, user=self.user)
+        with patch(
+            "guantou.models.RecordingCommentLike.objects.get_or_create",
+            side_effect=IntegrityError,
+        ):
+            response = self.client.put(f"/entry-comments/{comment.id}/like/")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["like_count"], 1)
+        self.assertFalse(
+            Notification.objects.filter(verb="entry.comment_like").exists()
         )
