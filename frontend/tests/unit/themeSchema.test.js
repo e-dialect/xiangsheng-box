@@ -251,13 +251,31 @@ describe('themeSchema contract', () => {
     expect(flattenStyleJson({
       cardBackground: 'var(--page-color)',
       cardBorderRadius: '4px',
+      cardTextureImage: 'var(--grain-paper)',
+      cardTextureOpacity: '0.16',
+      cardTagBackground: 'var(--accent-subtle-color)',
+      cardTagBorderRadius: '999rpx',
       grainImage: 'var(--grain-paper)',
       letterSpacing: '0.06em',
     }).vars).toMatchObject({
       '--dress-card-background': 'var(--page-color)',
       '--dress-card-border-radius': '4px',
+      '--dress-card-texture-image': 'var(--grain-paper)',
+      '--dress-card-texture-opacity': '0.16',
+      '--dress-card-tag-background': 'var(--accent-subtle-color)',
+      '--dress-card-tag-border-radius': '999rpx',
       '--dress-grain-image': 'var(--grain-paper)',
       '--dress-letter-spacing': '0.06em',
+    });
+
+    expect(flattenStyleJson({
+      avatarBorderRadius: '24%',
+      avatarBackground: 'var(--surface-color)',
+      avatarShadow: '0 0 8px var(--accent-color)',
+    }, 'avatar_frame').vars).toMatchObject({
+      '--dress-avatar-frame-border-radius': '24%',
+      '--dress-avatar-frame-background': 'var(--surface-color)',
+      '--dress-avatar-frame-shadow': '0 0 8px var(--accent-color)',
     });
 
     const tabBar = flattenStyleJson({

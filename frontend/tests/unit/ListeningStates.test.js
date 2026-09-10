@@ -69,6 +69,7 @@ vi.mock('@/utils/audio', () => ({ stopAudio: vi.fn(), onExternalStop: vi.fn(() =
 const entryRecording = await import('@/services/entryRecording');
 const { requireAuth } = await import('@/services/authGuard');
 const { goRecord, goSearch } = await import('@/services/navigation');
+const { getAppliedOutfitVars } = await import('@/services/themeSchema');
 
 const scrollViewStub = {
   template: '<div><slot /></div>',
@@ -151,6 +152,27 @@ describe('listening feed visual states', () => {
     wrapper.unmount();
   });
 
+  it('renders paginated recordings through the same themed card component', async () => {
+    entryRecording.listRecordings
+      .mockResolvedValueOnce({
+        results: [{ id: 11, entry_links: [] }],
+        next: '/recordings/?page=2',
+      })
+      .mockResolvedValueOnce({
+        results: [{ id: 12, entry_links: [] }],
+        next: null,
+      });
+
+    const wrapper = mountFeed();
+    await flushPromises();
+    await wrapper.vm.loadMore();
+    await flushPromises();
+
+    expect(wrapper.findAllComponents(EntryRecordingCard)).toHaveLength(2);
+    expect(wrapper.vm.items.map((item) => item.id)).toEqual([11, 12]);
+    wrapper.unmount();
+  });
+
   it('turns off the looping skeleton animation for reduced motion', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/home/RecordingFeed.vue'),
@@ -182,6 +204,25 @@ describe('listening maintenance state', () => {
     await wrapper.vm.$nextTick();
 
     expect(goSearch).toHaveBeenCalledWith();
+    wrapper.unmount();
+  });
+
+  it('updates outfit variables without rebuilding cached feeds', async () => {
+    getAppliedOutfitVars.mockReturnValue({
+      '--dress-card-background': 'var(--accent-subtle-color)',
+    });
+    const wrapper = shallowMount(HomePage);
+    wrapper.vm.visitedTabs = ['today', 'recommended'];
+    wrapper.vm.feedRevision = 3;
+
+    wrapper.vm.handleThemeChange({ accent: 'tea' });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.feedRevision).toBe(3);
+    expect(wrapper.vm.visitedTabs).toEqual(['today', 'recommended']);
+    expect(wrapper.vm.outfitVars).toEqual({
+      '--dress-card-background': 'var(--accent-subtle-color)',
+    });
     wrapper.unmount();
   });
 });

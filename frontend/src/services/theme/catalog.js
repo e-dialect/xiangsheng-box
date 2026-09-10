@@ -3253,11 +3253,22 @@ const BUILTIN_DRESS_STYLES = {
   },
   'cards-member': { borderColor: 'var(--accent-color)' },
   'avatar-creator': { borderWidth: '4px' },
+  'cards-tag-chip': {
+    cardTagBackground: 'var(--accent-subtle-color)',
+    cardTagColor: 'var(--accent-color)',
+    cardTagBorderColor: 'var(--accent-color)',
+    cardTagBorderWidth: '1px',
+    cardTagBorderRadius: '999rpx',
+    cardTagPadding: '6rpx 16rpx',
+  },
   'cards-paper': {
     borderRadius: '4px',
     borderColor: 'var(--border-color)',
     shadow: '0 8rpx 20rpx var(--border-color)',
     background: 'var(--surface-color)',
+    cardTextureImage: 'var(--grain-paper)',
+    cardTextureSize: '14rpx 14rpx',
+    cardTextureOpacity: '0.16',
   },
   'profile-mist': {
     background: 'var(--surface-subtle-color)',
@@ -3276,6 +3287,9 @@ const BUILTIN_DRESS_STYLES = {
     borderWidth: '2px',
     borderColor: 'var(--accent-color)',
     background: 'var(--surface-subtle-color)',
+    cardTextureImage: 'var(--grain-grid)',
+    cardTextureSize: '24rpx 24rpx',
+    cardTextureOpacity: '0.12',
   },
   'cards-round': {
     borderRadius: '24px',
@@ -3452,6 +3466,7 @@ const BUILTIN_DRESS_STYLES = {
 };
 
 const FREE_LIVE_DRESS_IDS = new Set([
+  'cards-tag-chip',
   'cards-paper',
   'cards-brick',
   'cards-round',
