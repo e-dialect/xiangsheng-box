@@ -555,6 +555,63 @@ class RestorationTests(TestCase):
             404,
         )
 
+    def test_reply_notification_carries_comment_anchor_and_verb(self):
+        listener = User.objects.create_user("listener")
+        root = self.client.post(
+            "/entry-comments/",
+            {
+                "entry_id": self.entry.id,
+                "body": "顶层留言",
+                "client_id": str(uuid.uuid4()),
+            },
+            format="json",
+        ).data
+        self.client.force_authenticate(listener)
+        reply = self.client.post(
+            "/entry-comments/",
+            {
+                "entry_id": self.entry.id,
+                "parent_id": root["id"],
+                "body": "回复顶层",
+                "client_id": str(uuid.uuid4()),
+            },
+            format="json",
+        ).data
+        notification = Notification.objects.get(verb="comment.reply")
+        self.assertEqual(notification.recipient, self.user)
+        self.assertEqual(notification.actor, listener)
+        self.assertEqual(notification.metadata["comment_id"], reply["id"])
+        self.assertEqual(notification.metadata["root_id"], root["id"])
+        self.assertEqual(notification.metadata["anchor"], f"comment-{reply['id']}")
+        self.assertEqual(
+            notification.metadata["target_url"],
+            f"/pages/entries/details?id={self.entry.id}",
+        )
+        # Replying to a reply targets that author, not the root author.
+        self.client.force_authenticate(self.user)
+        follow_up = self.client.post(
+            "/entry-comments/",
+            {
+                "entry_id": self.entry.id,
+                "parent_id": root["id"],
+                "reply_to_id": reply["id"],
+                "body": "回复那条回复",
+                "client_id": str(uuid.uuid4()),
+            },
+            format="json",
+        )
+        self.assertEqual(follow_up.status_code, 201, follow_up.data)
+        latest = (
+            Notification.objects.filter(verb="comment.reply").order_by("-id").first()
+        )
+        self.assertEqual(latest.recipient, listener)
+        self.assertEqual(latest.metadata["comment_id"], follow_up.data["id"])
+        self.assertEqual(latest.metadata["root_id"], root["id"])
+        # 每条新评论（含回复）仍会给内容作者一条 entry.comment，回复另给被回复者
+        # 一条 comment.reply。
+        self.assertEqual(Notification.objects.filter(verb="entry.comment").count(), 3)
+        self.assertEqual(Notification.objects.filter(verb="comment.reply").count(), 2)
+
     def test_duplicate_comment_client_id_race_recovers_as_idempotent(self):
         from unittest.mock import patch
 

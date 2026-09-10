@@ -327,6 +327,15 @@ def event_once(actor, recipient, verb, recording, comment=None):
         "target_id": recording.id,
         "target_url": f"/pages/{'entries' if target_type == 'entry' else 'recordings'}/details?id={recording.id}",
     }
+    if comment is not None:
+        # Enough routing to reopen the discussion and highlight the comment.
+        metadata.update(
+            {
+                "comment_id": comment.id,
+                "root_id": comment.parent_id or comment.id,
+                "anchor": f"comment-{comment.id}",
+            }
+        )
     obj = comment or recording
     # One notification per actor/object/verb, including unlike/re-like.
     from django.contrib.contenttypes.models import ContentType
@@ -691,7 +700,7 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
                 event_once(
                     request.user,
                     reply_recipient.author,
-                    f"{self.target_type}.reply",
+                    Notification.Verb.REPLY,
                     recording,
                     comment,
                 )

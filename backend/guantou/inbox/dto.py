@@ -9,6 +9,10 @@ def notification_normal(notification: Notification) -> dict:
         "type": metadata.get("target_type", ""),
         "id": metadata.get("target_id"),
         "url": metadata.get("target_url", ""),
+        # Discussion anchors let the client reopen the exact comment thread.
+        "comment_id": metadata.get("comment_id"),
+        "root_id": metadata.get("root_id"),
+        "anchor": metadata.get("anchor", ""),
     }
     return {
         "id": notification.id,
