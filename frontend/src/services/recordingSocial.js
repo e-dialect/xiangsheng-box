@@ -1,9 +1,12 @@
 import request from '@/utils/request';
 
 export const likeRecording = (id, liked) => (liked ? request.put(`/recordings/${id}/like/`, {}) : request.del(`/recordings/${id}/like/`));
-export const listComments = (recordingId, page = 1, targetType = 'recording') => request.get(`/${targetType}-comments/`, {
+/* parentId: 取该一级评论下的回复；不传则取顶层评论。pageSize: 0 用服务端默认值。 */
+export const listComments = (recordingId, page = 1, targetType = 'recording', parentId = null, pageSize = 0) => request.get(`/${targetType}-comments/`, {
   [`${targetType}_id`]: recordingId,
   page,
+  parent_id: parentId || undefined,
+  page_size: pageSize || undefined,
 }, true, {
   loading: false,
 });
