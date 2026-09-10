@@ -81,6 +81,25 @@ describe('auth journey', () => {
     });
   });
 
+  it('keeps the comment anchor when returning to an interrupted discussion', () => {
+    expect(resolveAuthDestination({
+      action: 'interact_entry',
+      context: { page: 'entry_detail', entryId: 21, commentId: 31, rootId: 30 },
+    })).toEqual({
+      kind: 'url',
+      route: 'pages/entries/details',
+      url: '/pages/entries/details?id=21&comment=31&root=30',
+    });
+    expect(resolveAuthDestination({
+      action: 'interact_recording',
+      context: { page: 'recording_detail', recordingId: 7 },
+    })).toEqual({
+      kind: 'url',
+      route: 'pages/recordings/details',
+      url: '/pages/recordings/details?id=7',
+    });
+  });
+
   it('returns V2 recording and attestation intents to the Entry context', () => {
     expect(resolveAuthDestination({
       action: 'record_recording',

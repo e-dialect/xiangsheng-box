@@ -199,7 +199,10 @@ export default {
     },
     bindKeyboard() {
       // #ifdef MP-WEIXIN
-      uni.onKeyboardHeightChange(this.onKeyboardHeight);
+      /* 条件编译在单测环境不会裁剪，运行时再确认一次原生能力 */
+      if (typeof uni !== 'undefined' && typeof uni.onKeyboardHeightChange === 'function') {
+        uni.onKeyboardHeightChange(this.onKeyboardHeight);
+      }
       // #endif
       // #ifdef H5
       if (typeof window !== 'undefined') {
@@ -215,7 +218,9 @@ export default {
     },
     unbindKeyboard() {
       // #ifdef MP-WEIXIN
-      uni.offKeyboardHeightChange(this.onKeyboardHeight);
+      if (typeof uni !== 'undefined' && typeof uni.offKeyboardHeightChange === 'function') {
+        uni.offKeyboardHeightChange(this.onKeyboardHeight);
+      }
       // #endif
       // #ifdef H5
       if (typeof window !== 'undefined' && this.viewportHandler) {

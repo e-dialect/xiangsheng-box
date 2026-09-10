@@ -28,10 +28,11 @@
       </text>
     </template>
     <view
-      v-if="!comment.deleted"
+      v-if="!comment.deleted || comment.reply_count > 0"
       class="box-actions"
     >
       <BaseButton
+        v-if="!comment.deleted"
         size="small"
         variant="ghost"
         :text="`${comment.liked ? '已赞' : '赞'} ${comment.like_count}`"
@@ -39,7 +40,7 @@
         @click="$emit('like', comment)"
       />
       <BaseButton
-        v-if="!comment.parent_id"
+        v-if="!comment.deleted && !comment.parent_id"
         size="small"
         variant="ghost"
         text="回复"
@@ -55,7 +56,7 @@
         @click="$emit('open-thread', comment)"
       />
       <BaseButton
-        v-if="comment.editable"
+        v-if="!comment.deleted && comment.editable"
         size="small"
         variant="danger-ghost"
         text="删除留言"
