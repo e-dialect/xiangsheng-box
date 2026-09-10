@@ -238,11 +238,14 @@
         </view>
       </view>
 
-      <DiscussionThread
-        :key="entry.id"
-        target-type="entry"
-        :target-id="entry.id"
-      />
+      <view data-detail-section="discussion">
+        <DiscussionSummary
+          ref="summary"
+          target-type="entry"
+          :target-id="entry.id"
+          @open="openPanel({})"
+        />
+      </view>
       <view
         class="detail-actions"
         data-detail-section="actions"
@@ -274,11 +277,20 @@
         </view>
       </view>
     </view>
+    <DiscussionPanel
+      v-if="panelOpen"
+      :scopes="discussionScopes"
+      :initial-root="panelRoot"
+      :initial-comment="panelComment"
+      @close="panelOpen = false"
+      @sent="refreshSummary"
+    />
   </PageShell>
 </template>
 
 <script>
-import DiscussionThread from '@/components/DiscussionThread.vue';
+import DiscussionSummary from '@/components/DiscussionSummary.vue';
+import DiscussionPanel from '@/components/DiscussionPanel.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
@@ -303,7 +315,8 @@ import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
 export default {
   components: {
-    DiscussionThread,
+    DiscussionSummary,
+    DiscussionPanel,
     CollectionPicker,
     BaseButton,
     BaseLoading,
@@ -320,17 +333,54 @@ export default {
       loading: true,
       errorMessage: '',
       attestedDialects: new Set(),
+      panelOpen: false,
+      panelRoot: null,
+      panelComment: null,
     };
+  },
+  computed: {
+    /* 「词条讨论」+ 该词条各关联录音的讨论 */
+    discussionScopes() {
+      const scopes = [{ type: 'entry', id: this.id, label: '词条讨论' }];
+      this.recordings.forEach((item) => {
+        if (!item.id) return;
+        scopes.push({
+          type: 'recording',
+          id: item.id,
+          label: item.original_gloss || '一段乡音',
+          subtitle: item.usage_dialect?.name || '',
+        });
+      });
+      return scopes;
+    },
   },
   onLoad(options = {}) {
     this.id = Number(options.id) || null;
+    this.panelComment = Number(options.comment) || null;
+    this.panelRoot = Number(options.root) || null;
     this.load();
   },
   onShow() {
     if (this.id && this.entry) this.load();
   },
+  onBackPress() {
+    if (!this.panelOpen) return false;
+    this.panelOpen = false;
+    return true;
+  },
+  onHide() {
+    this.panelOpen = false;
+  },
   methods: {
     entryTitle,
+    openPanel({ root = null, comment = null } = {}) {
+      this.panelRoot = root || this.panelComment || null;
+      if (comment) this.panelComment = comment;
+      this.panelOpen = true;
+    },
+    refreshSummary() {
+      if (this.$refs.summary) this.$refs.summary.reload();
+    },
     statusLabel(status) {
       return {
         draft: '初稿',
@@ -364,6 +414,10 @@ export default {
         ]);
         this.entry = entry;
         this.recordings = pageResults(recordings);
+        /* 通知深链：等 scope 就绪后再打开面板，直接落在那条讨论上 */
+        if (this.panelComment || this.panelRoot) {
+          this.openPanel({ root: this.panelRoot, comment: this.panelComment });
+        }
       } catch (error) {
         this.errorMessage = '词条暂时无法读取';
       } finally {

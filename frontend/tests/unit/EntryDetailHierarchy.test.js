@@ -101,6 +101,7 @@ describe('entry detail information hierarchy', () => {
       'pronunciation',
       'recordings',
       'evidence',
+      'discussion',
       'actions',
     ]);
   });
