@@ -217,6 +217,34 @@ export function getAppliedOutfitVars() {
   return { ...lastAppliedVars };
 }
 
+export function cloneSkinStyle(style) {
+  if (!style || typeof style !== 'object' || Array.isArray(style)) return {};
+  return { ...style };
+}
+
+export function cloneCatalogItem(item) {
+  if (!item || typeof item !== 'object') return null;
+  const copy = {
+    ...item,
+    style_json: cloneSkinStyle(item.style_json),
+  };
+  if (Array.isArray(item.support_terminal)) {
+    copy.support_terminal = [...item.support_terminal];
+  }
+  if (Array.isArray(item.style_tags)) {
+    copy.style_tags = [...item.style_tags];
+  }
+  return copy;
+}
+
+function copyFlattenedStyle(computed) {
+  return {
+    ...computed,
+    vars: { ...(computed.vars || {}) },
+    appearance: { ...(computed.appearance || {}) },
+  };
+}
+
 export function currentTerminal() {
   return isWechatMiniProgram() ? TERMINAL_MP : TERMINAL_H5;
 }
@@ -313,7 +341,7 @@ export function toThemeItem(item) {
     cover_img: item.cover_img || item.preview || 'default',
     detail_img: item.detail_img || '',
     poster_img: item.poster_img || '',
-    style_json: item.style_json && typeof item.style_json === 'object' ? item.style_json : {},
+    style_json: cloneSkinStyle(item.style_json),
     style_tags: styleTagsOf(item),
     dialect_tags: dialectTagsOf(item),
     privilege_type: toPrivilegeType(item.privilege_type || item.access),
@@ -339,7 +367,7 @@ export function toDecorationItem(item, group) {
     cover_img: item.cover_img || item.preview || 'default',
     detail_img: item.detail_img || '',
     poster_img: item.poster_img || '',
-    style_json: item.style_json && typeof item.style_json === 'object' ? item.style_json : {},
+    style_json: cloneSkinStyle(item.style_json),
     component_type: item.component_type || componentTypeOf(item.group || group?.id),
     group: item.group || group?.id || '',
     style_tags: styleTagsOf(item, group),
@@ -558,19 +586,19 @@ export function flattenStyleJson(style, componentType = '') {
       byType = new Map();
       styleObjectCache.set(style, byType);
     }
-    if (byType.has(componentType)) return byType.get(componentType);
+    if (byType.has(componentType)) return copyFlattenedStyle(byType.get(componentType));
     // Function declarations are hoisted; keeping the public cache wrapper first aids discovery.
     // eslint-disable-next-line no-use-before-define
     const computed = computeFlattenStyleJson(style, componentType);
     byType.set(componentType, computed);
-    return computed;
+    return copyFlattenedStyle(computed);
   }
   const key = `${componentType}:${typeof style === 'string' ? style : ''}`;
   if (styleStringCache.has(key)) {
     const hit = styleStringCache.get(key);
     styleStringCache.delete(key);
     styleStringCache.set(key, hit);
-    return hit;
+    return copyFlattenedStyle(hit);
   }
   // eslint-disable-next-line no-use-before-define
   const computed = computeFlattenStyleJson(style, componentType);
@@ -579,7 +607,7 @@ export function flattenStyleJson(style, componentType = '') {
     const oldest = styleStringCache.keys().next().value;
     styleStringCache.delete(oldest);
   }
-  return computed;
+  return copyFlattenedStyle(computed);
 }
 
 export function clearThemeStyleCache() {
@@ -660,7 +688,7 @@ export function applyOutfitStyle(resolved) {
     applyTheme();
     return { ok: false, fallback: 'default', skipped: resolved?.skipped || [] };
   }
-  lastAppliedVars = resolved.vars || {};
+  lastAppliedVars = { ...(resolved.vars || {}) };
   writeDocumentVars(lastAppliedVars);
   if (resolved.appearance && Object.keys(resolved.appearance).length) {
     writeAppearancePreference(resolved.appearance);

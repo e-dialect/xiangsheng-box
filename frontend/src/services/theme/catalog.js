@@ -9,6 +9,7 @@ import {
 } from '@/services/theme/contracts';
 import { themeResourceHealth } from '@/services/themeFault';
 import {
+  cloneSkinStyle,
   componentTypeOf,
   defaultSupportTerminal,
   supportsTerminal,
@@ -1761,6 +1762,8 @@ function styleFamily(overrides = {}) {
   };
 }
 
+export const DEFAULT_FAMILY_STYLE = cloneSkinStyle(styleFamily());
+
 const STYLE_FAMILIES = {
   simple: styleFamily({
     radius: '12px',
@@ -2747,7 +2750,7 @@ GLOBAL_THEMES.forEach((item, index) => {
   const extra = PACK_SURFACES[item.id] || {};
   GLOBAL_THEMES[index] = {
     ...item,
-    style_json: { ...(item.style_json || {}), ...family, ...extra },
+    style_json: cloneSkinStyle({ ...(item.style_json || {}), ...family, ...extra }),
   };
 });
 
@@ -3588,9 +3591,11 @@ LOCAL_DRESS_ITEMS.forEach((item, index) => {
     ...item,
     support_terminal: item.support_terminal || defaultSupportTerminal(Boolean(def?.mpBlocked)),
     component_type: item.component_type || componentTypeOf(item.group),
-    style_json: (item.style_json && Object.keys(item.style_json).length)
-      ? item.style_json
-      : builtinStyle,
+    style_json: cloneSkinStyle(
+      (item.style_json && Object.keys(item.style_json).length)
+        ? item.style_json
+        : builtinStyle,
+    ),
     ...(styleTag ? { style_tags: [styleTag] } : {}),
   };
 });
@@ -3599,7 +3604,7 @@ GLOBAL_THEMES.forEach((item, index) => {
   GLOBAL_THEMES[index] = {
     ...item,
     support_terminal: item.support_terminal || defaultSupportTerminal(false),
-    style_json: item.style_json || {},
+    style_json: cloneSkinStyle(item.style_json),
   };
 });
 
@@ -4155,7 +4160,10 @@ export function mergeRemoteCatalog({ themes = [], dresses = [] } = {}) {
     current.blurb = remote.blurb || current.blurb;
     current.description = remote.description || current.description;
     if (remote.style_json && Object.keys(remote.style_json).length) {
-      current.style_json = { ...(current.style_json || {}), ...remote.style_json };
+      current.style_json = cloneSkinStyle({
+        ...(current.style_json || {}),
+        ...remote.style_json,
+      });
     }
     if ('collect_count' in remote) current.collect_count = Number(remote.collect_count || 0);
     if ('share_count' in remote) current.share_count = Number(remote.share_count || 0);
@@ -4172,7 +4180,10 @@ export function mergeRemoteCatalog({ themes = [], dresses = [] } = {}) {
     current.eventStatus = remote.eventStatus;
     if (remote.group) current.group = remote.group;
     if (remote.style_json && Object.keys(remote.style_json).length) {
-      current.style_json = { ...(current.style_json || {}), ...remote.style_json };
+      current.style_json = cloneSkinStyle({
+        ...(current.style_json || {}),
+        ...remote.style_json,
+      });
     }
     if ('collect_count' in remote) current.collect_count = Number(remote.collect_count || 0);
     if ('share_count' in remote) current.share_count = Number(remote.share_count || 0);

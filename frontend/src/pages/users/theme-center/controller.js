@@ -48,6 +48,7 @@ import {
   claimSkin,
   cleanSearchKeyword,
   clearLocalDress,
+  cloneCatalogItem,
   composePreviewOutfit,
   defaultThemeQuery,
   deleteSavedOutfit,
@@ -88,6 +89,7 @@ import {
   setOverlayLocalDress,
   socialStats,
   themeDisplayTags,
+  themePreviewShotClass,
   themePreviewVars,
   THEME_ACCESS_FILTERS,
   THEME_ACCESS_FOOTER,
@@ -293,7 +295,7 @@ export default {
       return this.appliedDress.some((entry) => Boolean(entry.item));
     },
     previewShotClass() {
-      const classes = [`shot-${this.activeTheme.preview}`];
+      const classes = themePreviewShotClass(this.activeTheme);
       this.appliedDress.forEach((entry) => {
         if (entry.effective) classes.push(`dress-${entry.group.id}`);
       });
@@ -382,6 +384,7 @@ export default {
   },
   methods: {
     themePreviewVars,
+    themePreviewShotClass,
     onFilterDraftUpdate({ field, value } = {}) {
       if (!['access', 'category', 'dressCategory', 'sort', 'status'].includes(field)) return;
       this.filterDraft = { ...this.filterDraft, [field]: value };
@@ -397,6 +400,9 @@ export default {
     },
     outfitPreviewVars(outfit) {
       return themePreviewVars(getThemeById(outfit?.themeId));
+    },
+    outfitPreviewShotClass(outfit) {
+      return themePreviewShotClass(getThemeById(outfit?.themeId));
     },
     async bootThemeCenter() {
       await this.retryCatalog();
@@ -1387,6 +1393,14 @@ export default {
       this.previewOpen = true;
       trackThemePreview('theme', getThemeById(outfit?.themeId), 'live');
     },
+    onSkinCardPreview(theme) {
+      if (!theme) return;
+      if (canLivePreview(theme)) {
+        this.openLivePreview('theme', theme);
+        return;
+      }
+      this.openDetail(theme);
+    },
     openLivePreview(kind, item) {
       if (!canLivePreview(item)) {
         notify({ title: '该主题暂未开放，敬请期待' });
@@ -1394,16 +1408,18 @@ export default {
       }
       if (this.previewOpen) return;
       if (!this.guardApply('preview-open')) return;
+      const snapshot = cloneCatalogItem(item);
+      if (!snapshot) return;
       this.previewMode = kind;
-      this.previewItem = item;
+      this.previewItem = snapshot;
       beginThemePreview();
       this.previewModel = composePreviewOutfit({
-        themeId: kind === 'theme' ? item.id : this.activeTheme.id,
-        extraDress: kind === 'dress' ? item : null,
+        themeId: kind === 'theme' ? snapshot.id : this.activeTheme.id,
+        extraDress: kind === 'dress' ? snapshot : null,
         isMiniProgram: this.isMiniProgram,
       });
       this.previewOpen = true;
-      trackThemePreview(kind, item, 'live');
+      trackThemePreview(kind, snapshot, 'live');
     },
     canLivePreviewItem(item) {
       return canLivePreview(item);

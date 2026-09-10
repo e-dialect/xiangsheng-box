@@ -25,6 +25,46 @@
         {{ hint }}
       </view>
       <view
+        v-if="model.skin"
+        class="skin-meta"
+      >
+        <view class="skin-name">
+          {{ model.skin.name }}
+        </view>
+        <view class="swatch-row">
+          <view
+            class="swatch"
+            :style="{ background: model.skin.primary }"
+          >
+            主色
+          </view>
+          <view
+            class="swatch"
+            :style="{ background: model.skin.secondary, color: model.skin.textColor }"
+          >
+            辅色
+          </view>
+          <view
+            class="swatch"
+            :style="{ background: model.skin.background, color: model.skin.textColor }"
+          >
+            背景
+          </view>
+          <view
+            class="swatch"
+            :style="{ color: model.skin.textColor, background: model.skin.secondary }"
+          >
+            文字
+          </view>
+        </view>
+        <image
+          v-if="model.skin.previewImage"
+          class="skin-cover"
+          :src="model.skin.previewImage"
+          mode="aspectFill"
+        />
+      </view>
+      <view
         v-if="model.nativeLocked"
         class="hint-row warn"
       >
@@ -43,7 +83,7 @@
       </view>
       <view
         class="mock-phone"
-        :class="[model.shotClass, { native: model.nativeLocked }]"
+        :class="[model.shotClass, model.accentClass, { native: model.nativeLocked }]"
         :style="model.vars"
       >
         <view
@@ -100,7 +140,7 @@
       </view>
       <view
         class="mock-phone"
-        :class="model.shotClass"
+        :class="[model.shotClass, model.accentClass]"
         :style="model.vars"
       >
         <view class="mock-nav">
@@ -123,7 +163,7 @@
       </view>
       <view
         class="mock-phone"
-        :class="model.shotClass"
+        :class="[model.shotClass, model.accentClass]"
         :style="model.vars"
       >
         <view
@@ -155,7 +195,7 @@
       </view>
       <view
         class="mock-phone mock-comments"
-        :class="model.shotClass"
+        :class="[model.shotClass, model.accentClass]"
         :style="model.vars"
       >
         <view
@@ -185,7 +225,7 @@
       </view>
       <view
         class="mock-phone mock-topics"
-        :class="model.shotClass"
+        :class="[model.shotClass, model.accentClass]"
         :style="model.vars"
       >
         <view
@@ -241,6 +281,8 @@ export default {
         nativeLocked: false,
         sample: THEME_PREVIEW_SAMPLE,
         vars: {},
+        skin: null,
+        accentClass: '',
       }),
     },
   },
@@ -306,6 +348,41 @@ export default {
   color: var(--muted-color);
   font-size: var(--font-size-sm);
   line-height: 1.55;
+}
+
+.skin-meta {
+  margin-top: var(--space-3);
+}
+
+.skin-name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+}
+
+.swatch-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.swatch {
+  flex: 1;
+  min-height: 44px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--on-accent-color);
+  font-size: var(--font-size-xs);
+  text-align: center;
+}
+
+.skin-cover {
+  display: block;
+  width: 100%;
+  height: 96px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-md);
+  object-fit: cover;
 }
 
 .hint-row {

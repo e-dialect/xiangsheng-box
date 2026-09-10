@@ -129,7 +129,7 @@
         <view
           v-if="entry.kind === 'theme'"
           class="shot shot-sm"
-          :class="[`shot-${entry.item.preview}`, { blurred: !entry.item.available }]"
+          :class="[themePreviewShotClass(entry.item), { blurred: !entry.item.available }]"
           :style="themePreviewVars(entry.item)"
         >
           <view class="shot-home">
@@ -259,7 +259,8 @@ export default {
     'catalogFail', 'catalogLoading', 'catalogStale', 'filterSummary', 'hotKeywords',
     'isGreyEntry', 'memberSyncing', 'resultTab', 'searchActionDisabled',
     'searchActionLabel', 'searchActionVariant', 'searchForm', 'searching', 'searchRows',
-    'searchTabs', 'showFilterBar', 'tab', 'tagClass', 'themePreviewVars',
+    'searchTabs', 'showFilterBar', 'tab', 'tagClass', 'themePreviewShotClass',
+    'themePreviewVars',
   ],
   emits: [
     'acquire',

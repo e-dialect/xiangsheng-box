@@ -98,12 +98,14 @@ const viewDefaults = new Map([
     showFilterBar: false,
     tab: 'global',
     tagClass: emptyText,
+    themePreviewShotClass: emptyList,
     themePreviewVars: emptyObject,
   }],
   [ThemeCenterRecentView, {
     recentTagClass: emptyText,
     rows: [],
     themeCoverSrc: emptyText,
+    themePreviewShotClass: emptyList,
     themePreviewVars: emptyObject,
     visible: false,
   }],
@@ -121,6 +123,7 @@ const viewDefaults = new Map([
     themeActionLabel: enable,
     themeActionVariant: primary,
     themeCoverSrc: emptyText,
+    themePreviewShotClass: emptyList,
     themePreviewVars: emptyObject,
     themeTags: emptyList,
     themes: [],
@@ -158,6 +161,7 @@ const viewDefaults = new Map([
     dressStatus: emptyText,
     dressTags: emptyList,
     hasAppliedDress: false,
+    outfitPreviewShotClass: emptyList,
     outfitPreviewVars: emptyObject,
     outfitSummary: emptyText,
     outfitThemePreview: () => 'paper',
@@ -168,6 +172,7 @@ const viewDefaults = new Map([
     tagClass: emptyText,
     themeActionDisabled: noop,
     themeActionVariant: primary,
+    themePreviewShotClass: emptyList,
     themePreviewVars: emptyObject,
     themeTags: emptyList,
     visible: false,
@@ -185,6 +190,7 @@ const viewDefaults = new Map([
     themeActionVariant: primary,
     themeDetailSrc: emptyText,
     themeFeatures: [],
+    themePreviewShotClass: emptyList,
     themePreviewVars: emptyObject,
     themeTags: emptyList,
     zoomHint: '',
@@ -298,6 +304,8 @@ describe('theme center independent views', () => {
     expect(wrapper.emitted('toggle-favorite')?.[0]).toEqual(['theme', theme]);
     expect(wrapper.emitted('share')?.[0]).toEqual(['theme', theme]);
     await wrapper.find('.theme-card').trigger('tap');
+    expect(wrapper.emitted('preview')?.[0]).toEqual([theme]);
+    await wrapper.find('.theme-name').trigger('tap');
     expect(wrapper.emitted('open-detail')?.[0]).toEqual([theme]);
 
     const upcoming = { ...theme, id: 'soon', name: '待上线主题', available: false };

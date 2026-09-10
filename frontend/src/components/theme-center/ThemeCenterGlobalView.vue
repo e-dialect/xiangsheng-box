@@ -28,7 +28,7 @@
       </view>
       <view
         class="shot shot-sm"
-        :class="`shot-${activeTheme.preview}`"
+        :class="themePreviewShotClass(activeTheme)"
         :style="themePreviewVars(activeTheme)"
       >
         <view class="shot-home">
@@ -66,7 +66,7 @@
           placeholder: isGreyTheme(theme),
           active: theme.id === activeTheme.id,
         }"
-        @tap="$emit('open-detail', theme)"
+        @tap="$emit('preview', theme)"
       >
         <view class="shot-wrap">
           <image
@@ -81,7 +81,7 @@
           <view
             v-else
             class="shot"
-            :class="[`shot-${theme.preview}`, { blurred: !theme.available }]"
+            :class="[themePreviewShotClass(theme), { blurred: !theme.available }]"
             :style="themePreviewVars(theme)"
           >
             <view class="shot-home">
@@ -103,7 +103,10 @@
             {{ catalogBadge(theme) }}
           </view>
         </view>
-        <view class="theme-name">
+        <view
+          class="theme-name"
+          @tap.stop="$emit('open-detail', theme)"
+        >
           {{ theme.name }}
         </view>
         <view class="muted">
@@ -193,14 +196,15 @@ export default {
   props: [
     'activeTheme', 'appearance', 'appearanceOptions', 'catalogBadge', 'emptyScene',
     'footerLines', 'isGreyTheme', 'isItemFav', 'statsOf', 'themeActionDisabled',
-    'themeActionLabel', 'themeActionVariant', 'themeCoverSrc', 'themePreviewVars',
-    'themeTags', 'themes', 'visible',
+    'themeActionLabel', 'themeActionVariant', 'themeCoverSrc', 'themePreviewShotClass',
+    'themePreviewVars', 'themeTags', 'themes', 'visible',
   ],
   emits: [
     'appearance',
     'empty-action',
     'enable',
     'open-detail',
+    'preview',
     'preview-error',
     'share',
     'toggle-favorite',

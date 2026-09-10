@@ -36,7 +36,7 @@
           <view
             v-else-if="row.kind === 'theme'"
             class="shot shot-xs"
-            :class="`shot-${row.preview}`"
+            :class="themePreviewShotClass(row.item)"
             :style="themePreviewVars(row.item)"
           >
             <view class="shot-home">
@@ -104,7 +104,7 @@ import ThemeStatusPane from '@/components/ThemeStatusPane.vue';
 export default {
   name: 'ThemeCenterRecentView',
   components: { BaseButton, ThemeStatusPane },
-  props: ['recentTagClass', 'rows', 'themeCoverSrc', 'themePreviewVars', 'visible'],
+  props: ['recentTagClass', 'rows', 'themeCoverSrc', 'themePreviewShotClass', 'themePreviewVars', 'visible'],
   emits: ['apply', 'open', 'preview-error'],
 };
 </script>

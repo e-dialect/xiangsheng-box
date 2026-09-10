@@ -178,7 +178,7 @@
       >
         <view
           class="shot shot-xs"
-          :class="`shot-${outfitThemePreview(outfit)}`"
+          :class="outfitPreviewShotClass(outfit)"
           :style="outfitPreviewVars(outfit)"
         >
           <view class="shot-home">
@@ -410,9 +410,11 @@ export default {
   props: [
     'accountSyncNote', 'acquireOffers', 'activeTheme', 'appliedDress',
     'dressActionDisabled', 'dressActionVariant', 'dressStatus', 'dressTags',
-    'hasAppliedDress', 'outfitPreviewVars', 'outfitSummary', 'outfitThemePreview',
+    'hasAppliedDress', 'outfitPreviewShotClass', 'outfitPreviewVars', 'outfitSummary',
+    'outfitThemePreview',
     'overlay', 'ownedUnused', 'previewShotClass', 'savedOutfits', 'tagClass',
-    'themeActionDisabled', 'themeActionVariant', 'themePreviewVars', 'themeTags', 'visible',
+    'themeActionDisabled', 'themeActionVariant', 'themePreviewShotClass',
+    'themePreviewVars', 'themeTags', 'visible',
   ],
   emits: [
     'apply-outfit',

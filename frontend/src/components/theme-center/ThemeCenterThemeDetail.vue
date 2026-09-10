@@ -45,7 +45,7 @@
           </view>
           <view
             class="shot shot-lg pressable"
-            :class="[`shot-${theme.preview}`, { blurred: !theme.available }]"
+            :class="[themePreviewShotClass(theme), { blurred: !theme.available }]"
             :style="themePreviewVars(theme)"
             @tap="$emit('open-zoom')"
           >
@@ -76,7 +76,7 @@
           </view>
           <view
             class="shot shot-lg pressable"
-            :class="[`shot-${theme.preview}`, { blurred: !theme.available }]"
+            :class="[themePreviewShotClass(theme), { blurred: !theme.available }]"
             :style="themePreviewVars(theme)"
             @tap="$emit('open-zoom')"
           >
@@ -252,7 +252,7 @@
             <view
               v-else
               class="shot shot-xl"
-              :class="`shot-${theme.preview}`"
+              :class="themePreviewShotClass(theme)"
               :style="themePreviewVars(theme)"
             >
               <view class="shot-home">
@@ -284,8 +284,8 @@ export default {
   props: [
     'canLivePreviewItem', 'catalogBadge', 'isItemFav', 'isMiniProgram', 'statsOf',
     'theme', 'themeAccess', 'themeActionDisabled', 'themeActionLabel',
-    'themeActionVariant', 'themeDetailSrc', 'themeFeatures', 'themePreviewVars',
-    'themeTags', 'zoomHint', 'zoomOpen',
+    'themeActionVariant', 'themeDetailSrc', 'themeFeatures', 'themePreviewShotClass',
+    'themePreviewVars', 'themeTags', 'zoomHint', 'zoomOpen',
   ],
   emits: [
     'close',

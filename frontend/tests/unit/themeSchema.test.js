@@ -6,6 +6,8 @@ import {
   clearThemeStyleCache,
   COMPONENT_NAV_BAR,
   defaultSupportTerminal,
+  cloneCatalogItem,
+  cloneSkinStyle,
   flattenStyleJson,
   fromCurrentConfig,
   fromDecorationItem,
@@ -301,6 +303,26 @@ describe('themeSchema contract', () => {
     expect(getAppliedOutfitVars()).toEqual({});
     expect(uni.setStorageSync).toHaveBeenCalledWith('ui_accent', 'tea');
     expect(uni.setStorageSync).toHaveBeenCalledWith('ui_button_style', 'ardent');
+  });
+
+  it('clones skin records and flatten results so callers cannot share mutations', () => {
+    const style = { cardBorderRadius: '8px', accent: 'tea' };
+    const item = {
+      id: 'a',
+      name: 'A',
+      style_json: style,
+      support_terminal: ['h5'],
+    };
+    const copy = cloneCatalogItem(item);
+    expect(copy.style_json).not.toBe(item.style_json);
+    expect(copy.support_terminal).not.toBe(item.support_terminal);
+    copy.style_json.cardBorderRadius = '99px';
+    expect(item.style_json.cardBorderRadius).toBe('8px');
+    expect(cloneSkinStyle(style)).not.toBe(style);
+
+    const first = flattenStyleJson(style).vars;
+    first['--dress-card-border-radius'] = '1px';
+    expect(flattenStyleJson(style).vars['--dress-card-border-radius']).toBe('8px');
   });
 
   it('falls back to default when style_json is corrupt', () => {

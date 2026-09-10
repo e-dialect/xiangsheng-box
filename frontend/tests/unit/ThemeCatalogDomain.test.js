@@ -68,4 +68,24 @@ describe('theme catalog domain', () => {
       tabBorder: 'var(--border-color)',
     });
   });
+
+  it('keeps each skin style_json as an independent copy', () => {
+    const paper = getThemeById('paper');
+    const fallback = getThemeById('default');
+    expect(paper.style_json).not.toBe(fallback.style_json);
+    const paperRadius = paper.style_json.cardBorderRadius;
+    const fallbackRadius = fallback.style_json.cardBorderRadius;
+    paper.style_json.cardBorderRadius = '99px';
+    expect(getThemeById('default').style_json.cardBorderRadius).toBe(fallbackRadius);
+    paper.style_json.cardBorderRadius = paperRadius;
+
+    const cards = getDressItem('cards-plain');
+    const profile = getDressItem('profile-plain');
+    expect(cards.style_json).not.toBe(profile.style_json);
+    const cardsBg = cards.style_json.background;
+    const profileBg = profile.style_json.background;
+    cards.style_json.background = 'magenta';
+    expect(getDressItem('profile-plain').style_json.background).toBe(profileBg);
+    cards.style_json.background = cardsBg;
+  });
 });
