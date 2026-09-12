@@ -72,7 +72,7 @@
     "@dcloudio/uni-ui": "^1.4.24",
     "@rollup/plugin-alias": "^6.0.0",
     "@tdesign/uniapp": "^0.10.3",
-    "marked": "^4.0.18",
+    "marked": "^18.0.12",
     "postcss": "^8.5.28",
     "vue": "3.4.21"
   },

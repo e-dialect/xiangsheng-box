@@ -5050,10 +5050,10 @@ make-dir@^5.1.0:
   resolved "https://registry.yarnpkg.com/make-dir/-/make-dir-5.1.0.tgz#59b2d9acf7ffa543d14238617a697458fa8dd5c9"
   integrity sha512-IfpFq6UM39dUNiphpA6uDezNx/AvWyhwfICWPR3t1VspkgkMZrL+Rk1RbN1bx+aeNYwOrqGJgEgV3yotk+ZUVw==
 
-marked@^4.0.18:
-  version "4.3.0"
-  resolved "https://registry.npmjs.org/marked/-/marked-4.3.0.tgz"
-  integrity sha512-PRsaiG84bK+AMvxziE/lCFss8juXjNaWzVbN5tXAm4XjeaS9NAHhop+PjQxz2A9h8Q4M/xGmzP8vqNwy6JeK0A==
+marked@^18.0.12:
+  version "18.0.12"
+  resolved "https://registry.yarnpkg.com/marked/-/marked-18.0.12.tgz#25840ec9ea7b22f2da48b9260ff5d8c2a6048997"
+  integrity sha512-LEm4ga2YeI2T3GVHj9b0BaDPPk93LLTHMFeMyQbNIzPxc8vCI0y/scy0ZA6z6lXKyT9j9Nhl/OC6ZYKYGuFScA==
 
 math-intrinsics@^1.1.0:
   version "1.1.0"
