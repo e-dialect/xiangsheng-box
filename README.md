@@ -16,6 +16,7 @@
 ## 文档
 
 - [产品路线](docs/PRODUCT_ROADMAP.md)
+- [2027 春节冲刺](docs/SPRING_FESTIVAL_2027.md)
 - [乡声共创计划](docs/CONTRIBUTOR_TRACK_EXPERIENCE.md)
 - [方言数字基建计划](docs/CONTRIBUTOR_TRACK_COMMONS.md)
 - [AI-native Contributor](docs/AI_NATIVE_CONTRIBUTION.md)

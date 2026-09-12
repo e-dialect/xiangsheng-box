@@ -49,6 +49,9 @@ GitHub 是正式任务真源：
 ## 完成证据
 PR / 截图 / 测试日志 / 数据报告 / 原型 / ADR。
 
+## Demo Moment
+验收者执行什么步骤，可以直接看到什么结果。
+
 ## 依赖
 - blocked by #...
 - parent #...
@@ -80,3 +83,12 @@ UX audit、原型、真机 QA、数据质量报告、migration rehearsal、ADR�
 ```text
 明确问题 + 可复核产物 + 验证/依据 + 后续可复用
 ```
+
+## 7. 能力分级
+
+- L0 Executor
+- L1 AI-native Developer
+- L2 Work Package Owner
+- L3 Lead
+
+目标是让每位成员至少逐步进入 L1。能力不足时由 Lead 缩小 Leaf 的范围与判断面，不降低 Acceptance、Evidence 或 Demo Moment 标准；Epic → Leaf 的拆解属于 Lead 责任。
