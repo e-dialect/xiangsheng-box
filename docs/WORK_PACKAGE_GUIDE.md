@@ -8,8 +8,24 @@ GitHub 是正式任务真源：
 
 ## 1. Issue 类型
 
-- **Tracking / Epic**：只做范围、依赖和决策汇总，不认领实现。
+- **Tracking / Epic**：汇总范围、依赖和决策，不作为一个整体实现任务。
 - **Leaf Work Package**：唯一可认领的实现/调研/QA/数据任务。
+
+## Ownership
+
+GitHub 原生 Assignee 是 ownership 真源，但不同层级含义不同：
+
+- **Tracking / Epic Assignee：Accountable Owner**
+  - 负责 scope、拆分、优先级、风险、证据与 Gate；
+  - 不表示该人亲自实现全部子任务。
+- **Leaf Assignee：Implementation Owner**
+  - 表示当前实际推进实现、调研、QA 或数据工作的负责人。
+
+因此：
+
+- Epic 可以有 Assignee；
+- “Tracking / Epic 不直接认领实现”指的是不能把整个 Epic 当一个实现任务做完；
+- Leaf 才是普通 contributor 实际认领的执行单元。
 
 ## 2. Size
 

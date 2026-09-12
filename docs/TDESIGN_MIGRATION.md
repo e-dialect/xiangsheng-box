@@ -8,58 +8,58 @@
 
 本轮 H5 视觉基线保存在 [`docs/assets/tdesign-migration/`](assets/tdesign-migration/)（390×844，含浅色、暗色、旧表单兼容与 404 空态）。
 
-V2 全站聚合验收由 [#346](https://github.com/e-dialect/guantou/issues/346) 跟踪；33 个当前注册页面、核心界面明暗/身份组合、四种数据状态以及微信真机待验项见 [`V2_VISUAL_REGRESSION.md`](V2_VISUAL_REGRESSION.md)。
+V2 全站聚合验收由 [#346](https://github.com/e-dialect/xiangsheng-box/issues/346) 跟踪；33 个当前注册页面、核心界面明暗/身份组合、四种数据状态以及微信真机待验项见 [`V2_VISUAL_REGRESSION.md`](V2_VISUAL_REGRESSION.md)。
 
-共享 `BaseButton` 的 ghost / outline 按压态由 [#381](https://github.com/e-dialect/guantou/issues/381) 固定为当前强调色边界与文字、强调浅色背景；避免 TDesign 固定深色 active token 在暗色主题中形成伪禁用，同时不改变 primary、danger、disabled 或 loading 状态。
+共享 `BaseButton` 的 ghost / outline 按压态由 [#381](https://github.com/e-dialect/xiangsheng-box/issues/381) 固定为当前强调色边界与文字、强调浅色背景；避免 TDesign 固定深色 active token 在暗色主题中形成伪禁用，同时不改变 primary、danger、disabled 或 loading 状态。
 
 | 页面/共享区域 | 状态 | 后续工作或 Issue |
 | --- | --- | --- |
 | `components/BaseButton/BaseForm/BaseField/BaseLoading` | done | 项目级原语；BaseField 在 BaseForm 内转发真实表单关系，独立使用时提供无 DOM 的安全关系，页面切换不触发 FormItem 卸载错误 |
-| `components/EmptyState` | done | 所有现有消费者自动迁移；[#385](https://github.com/e-dialect/guantou/issues/385) 移除 192rpx 装饰性信息图标，统一为标题、说明、动作的内容优先节奏 |
-| `components/PageShell` / `components/AppShell` / `components/home/HomeTabBar` | done | 已接入按钮原语与反馈 Host；[#340](https://github.com/e-dialect/guantou/issues/340) 收敛主入口标题区、普通页面顶栏与底部导航层级，底栏始终只有一个选中态，“录”在未选中时保留独立行动入口语义；PageShell 返回动作也使用具名的项目圆形按钮，不再局部仿制 |
+| `components/EmptyState` | done | 所有现有消费者自动迁移；[#385](https://github.com/e-dialect/xiangsheng-box/issues/385) 移除 192rpx 装饰性信息图标，统一为标题、说明、动作的内容优先节奏 |
+| `components/PageShell` / `components/AppShell` / `components/home/HomeTabBar` | done | 已接入按钮原语与反馈 Host；[#340](https://github.com/e-dialect/xiangsheng-box/issues/340) 收敛主入口标题区、普通页面顶栏与底部导航层级，底栏始终只有一个选中态，“录”在未选中时保留独立行动入口语义；PageShell 返回动作也使用具名的项目圆形按钮，不再局部仿制 |
 | `components/PlatformScroll` | done | PageShell、AppShell 与首页录音流共用垂直滚动语义；H5 条件编译为原生可滚动 `view`，规避页面重新激活时 `scroll-view` 访问已卸载节点，小程序继续编译为原生 `scroll-view`；三种 shell 变体在组件内持有各端容器几何，避免跨组件 scoped 样式失效 |
 | `components/CommentThread` | done | 表单、按钮、加载与空态使用项目原语 |
-| `pages/error/not-found` | done | [#362](https://github.com/e-dialect/guantou/issues/362)：低饱和 404 说明、脱敏的长路径回显与唯一首页恢复动作 |
-| `pages/users/settings/username` | done | [#344](https://github.com/e-dialect/guantou/issues/344) / [PR #348](https://github.com/e-dialect/guantou/pull/348)：共享账户设置面板与单字段表单 |
-| `pages/users/settings/nickname` | done | [#344](https://github.com/e-dialect/guantou/issues/344) / [PR #348](https://github.com/e-dialect/guantou/pull/348)：共享账户设置面板与单字段表单 |
-| `pages/users/settings/telephone` | done | [#344](https://github.com/e-dialect/guantou/issues/344) / [PR #348](https://github.com/e-dialect/guantou/pull/348)：共享账户设置面板与单字段表单 |
-| `pages/mails/send` | done | [#195](https://github.com/e-dialect/guantou/issues/195) / [PR #216](https://github.com/e-dialect/guantou/pull/216)：标准表单、字段错误与 payload 回归测试；[#356](https://github.com/e-dialect/guantou/issues/356) / [#398](https://github.com/e-dialect/guantou/issues/398)：按用户任务重整收件人发现、身份确认与发送反馈 |
-| `pages/login/login` | done | [#238](https://github.com/e-dialect/guantou/issues/238) / [PR #309](https://github.com/e-dialect/guantou/pull/309)（源自关闭的 [#209](https://github.com/e-dialect/guantou/pull/209)）：BaseField/BaseButton、双登录模式独立校验、字段错误与提交状态；[#388](https://github.com/e-dialect/guantou/issues/388) 将查词、找回密码与注册入口收敛为 TDesign 文字按钮，扩大触控热区并保留登录恢复与统一路由转场 |
-| `pages/nameplates/create` | done | [#237](https://github.com/e-dialect/guantou/issues/237)：BaseForm/BaseField/BaseButton、与装罐页一致的 Cascader/Picker、联合校验、加载重试与防重复提交；H5 浅暗主题已验收，小程序构建通过，真机验收待补 |
-| `pages/users/settings/information` | done | [#225](https://github.com/e-dialect/guantou/issues/225) / [#344](https://github.com/e-dialect/guantou/issues/344)：头像开放能力、无头像回退、日期与方言 Picker；[#386](https://github.com/e-dialect/guantou/issues/386) 将用户名、昵称、安全字段与选择器入口统一为带箭头和点击反馈的 TDesign Cell |
-| `pages/users/settings/password` | done | [#229](https://github.com/e-dialect/guantou/issues/229) / [#344](https://github.com/e-dialect/guantou/issues/344)：密码显示、表单提交与账户安全视觉层级 |
-| `pages/users/settings/email` | done | [#227](https://github.com/e-dialect/guantou/issues/227) / [#344](https://github.com/e-dialect/guantou/issues/344)：验证码、邮箱绑定流程与账户安全视觉层级 |
-| `pages/login/register` | done | [#228](https://github.com/e-dialect/guantou/issues/228) / [PR #309](https://github.com/e-dialect/guantou/pull/309)（源自关闭的 [#209](https://github.com/e-dialect/guantou/pull/209)）：邮箱注册迁移到 BaseField/BaseButton，保留既有 API 契约并补字段错误与提交状态；[#389](https://github.com/e-dialect/guantou/issues/389) 统一第二步返回修改账号的文字按钮语义与草稿保留 |
-| `pages/login/register/wechat` | done | [#230](https://github.com/e-dialect/guantou/issues/230) / [PR #308](https://github.com/e-dialect/guantou/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/guantou/pull/209)）：BaseField/BaseButton、昵称确认、行内错误及可等待的微信授权注册 |
-| `pages/login/forget` | done | [#226](https://github.com/e-dialect/guantou/issues/226) / [PR #308](https://github.com/e-dialect/guantou/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/guantou/pull/209)）：分步找回、字段校验、提交状态与错误映射；[#389](https://github.com/e-dialect/guantou/issues/389) 补齐第二步返回修改用户名动作并清理敏感重置草稿；不引入演示验证码 |
-| `pages/cans/create` | done | [#232](https://github.com/e-dialect/guantou/issues/232) / [PR #282](https://github.com/e-dialect/guantou/pull/282)：BaseForm / BaseField、按钮、加载、空态与共享反馈；保留方言级联、枚举 Picker、录音及草稿业务，见下方验收记录 |
-| `pages/pronunciations/create` | done | [#234](https://github.com/e-dialect/guantou/issues/234)：PageShell + BaseForm/BaseField/BaseButton、统一加载/重试/反馈；保留写法 Picker、方言级联、联合校验、字段错误定位与成功返回 |
-| `pages/shelves/index` | issue | [#231](https://github.com/e-dialect/guantou/issues/231)：创建表单与列表状态 |
-| `pages/shelves/details` | issue | [#235](https://github.com/e-dialect/guantou/issues/235)：编辑、双搜索和成员管理 |
-| `pages/search` | done | Entry-first 搜索使用 BaseField/BaseButton 与 TDesign 折叠、级联和选择器；[#342](https://github.com/e-dialect/guantou/issues/342) 将主路径收敛为“输入 → 状态/结果摘要 → 高级筛选 → 独立词条”，同形异义不合并，失败、空结果与能力维护态都有明确下一步 |
-| `pages/entries/details` | done | [#342](https://github.com/e-dialect/guantou/issues/342) 按“写法与释义 → 地区与读音 → 录音 → 证据与状态 → 参与操作”呈现，保留地区确认、收藏与接龙录音契约 |
-| `pages/users/onboarding` | done | [#233](https://github.com/e-dialect/guantou/issues/233) / [PR #310](https://github.com/e-dialect/guantou/pull/310)（源自关闭的 [#209](https://github.com/e-dialect/guantou/pull/209)）：BaseField/BaseButton、方言树加载重试与真实乡音样本；保留登录中断恢复 |
-| `pages/cans/drafts` | done | [#195](https://github.com/e-dialect/guantou/issues/195) / [PR #216](https://github.com/e-dialect/guantou/pull/216)：加载、空态、错误、继续编辑与删除反馈 |
+| `pages/error/not-found` | done | [#362](https://github.com/e-dialect/xiangsheng-box/issues/362)：低饱和 404 说明、脱敏的长路径回显与唯一首页恢复动作 |
+| `pages/users/settings/username` | done | [#344](https://github.com/e-dialect/xiangsheng-box/issues/344) / [PR #348](https://github.com/e-dialect/xiangsheng-box/pull/348)：共享账户设置面板与单字段表单 |
+| `pages/users/settings/nickname` | done | [#344](https://github.com/e-dialect/xiangsheng-box/issues/344) / [PR #348](https://github.com/e-dialect/xiangsheng-box/pull/348)：共享账户设置面板与单字段表单 |
+| `pages/users/settings/telephone` | done | [#344](https://github.com/e-dialect/xiangsheng-box/issues/344) / [PR #348](https://github.com/e-dialect/xiangsheng-box/pull/348)：共享账户设置面板与单字段表单 |
+| `pages/mails/send` | done | [#195](https://github.com/e-dialect/xiangsheng-box/issues/195) / [PR #216](https://github.com/e-dialect/xiangsheng-box/pull/216)：标准表单、字段错误与 payload 回归测试；[#356](https://github.com/e-dialect/xiangsheng-box/issues/356) / [#398](https://github.com/e-dialect/xiangsheng-box/issues/398)：按用户任务重整收件人发现、身份确认与发送反馈 |
+| `pages/login/login` | done | [#238](https://github.com/e-dialect/xiangsheng-box/issues/238) / [PR #309](https://github.com/e-dialect/xiangsheng-box/pull/309)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：BaseField/BaseButton、双登录模式独立校验、字段错误与提交状态；[#388](https://github.com/e-dialect/xiangsheng-box/issues/388) 将查词、找回密码与注册入口收敛为 TDesign 文字按钮，扩大触控热区并保留登录恢复与统一路由转场 |
+| `pages/nameplates/create` | done | [#237](https://github.com/e-dialect/xiangsheng-box/issues/237)：BaseForm/BaseField/BaseButton、与装罐页一致的 Cascader/Picker、联合校验、加载重试与防重复提交；H5 浅暗主题已验收，小程序构建通过，真机验收待补 |
+| `pages/users/settings/information` | done | [#225](https://github.com/e-dialect/xiangsheng-box/issues/225) / [#344](https://github.com/e-dialect/xiangsheng-box/issues/344)：头像开放能力、无头像回退、日期与方言 Picker；[#386](https://github.com/e-dialect/xiangsheng-box/issues/386) 将用户名、昵称、安全字段与选择器入口统一为带箭头和点击反馈的 TDesign Cell |
+| `pages/users/settings/password` | done | [#229](https://github.com/e-dialect/xiangsheng-box/issues/229) / [#344](https://github.com/e-dialect/xiangsheng-box/issues/344)：密码显示、表单提交与账户安全视觉层级 |
+| `pages/users/settings/email` | done | [#227](https://github.com/e-dialect/xiangsheng-box/issues/227) / [#344](https://github.com/e-dialect/xiangsheng-box/issues/344)：验证码、邮箱绑定流程与账户安全视觉层级 |
+| `pages/login/register` | done | [#228](https://github.com/e-dialect/xiangsheng-box/issues/228) / [PR #309](https://github.com/e-dialect/xiangsheng-box/pull/309)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：邮箱注册迁移到 BaseField/BaseButton，保留既有 API 契约并补字段错误与提交状态；[#389](https://github.com/e-dialect/xiangsheng-box/issues/389) 统一第二步返回修改账号的文字按钮语义与草稿保留 |
+| `pages/login/register/wechat` | done | [#230](https://github.com/e-dialect/xiangsheng-box/issues/230) / [PR #308](https://github.com/e-dialect/xiangsheng-box/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：BaseField/BaseButton、昵称确认、行内错误及可等待的微信授权注册 |
+| `pages/login/forget` | done | [#226](https://github.com/e-dialect/xiangsheng-box/issues/226) / [PR #308](https://github.com/e-dialect/xiangsheng-box/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：分步找回、字段校验、提交状态与错误映射；[#389](https://github.com/e-dialect/xiangsheng-box/issues/389) 补齐第二步返回修改用户名动作并清理敏感重置草稿；不引入演示验证码 |
+| `pages/cans/create` | done | [#232](https://github.com/e-dialect/xiangsheng-box/issues/232) / [PR #282](https://github.com/e-dialect/xiangsheng-box/pull/282)：BaseForm / BaseField、按钮、加载、空态与共享反馈；保留方言级联、枚举 Picker、录音及草稿业务，见下方验收记录 |
+| `pages/pronunciations/create` | done | [#234](https://github.com/e-dialect/xiangsheng-box/issues/234)：PageShell + BaseForm/BaseField/BaseButton、统一加载/重试/反馈；保留写法 Picker、方言级联、联合校验、字段错误定位与成功返回 |
+| `pages/shelves/index` | issue | [#231](https://github.com/e-dialect/xiangsheng-box/issues/231)：创建表单与列表状态 |
+| `pages/shelves/details` | issue | [#235](https://github.com/e-dialect/xiangsheng-box/issues/235)：编辑、双搜索和成员管理 |
+| `pages/search` | done | Entry-first 搜索使用 BaseField/BaseButton 与 TDesign 折叠、级联和选择器；[#342](https://github.com/e-dialect/xiangsheng-box/issues/342) 将主路径收敛为“输入 → 状态/结果摘要 → 高级筛选 → 独立词条”，同形异义不合并，失败、空结果与能力维护态都有明确下一步 |
+| `pages/entries/details` | done | [#342](https://github.com/e-dialect/xiangsheng-box/issues/342) 按“写法与释义 → 地区与读音 → 录音 → 证据与状态 → 参与操作”呈现，保留地区确认、收藏与接龙录音契约 |
+| `pages/users/onboarding` | done | [#233](https://github.com/e-dialect/xiangsheng-box/issues/233) / [PR #310](https://github.com/e-dialect/xiangsheng-box/pull/310)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：BaseField/BaseButton、方言树加载重试与真实乡音样本；保留登录中断恢复 |
+| `pages/cans/drafts` | done | [#195](https://github.com/e-dialect/xiangsheng-box/issues/195) / [PR #216](https://github.com/e-dialect/xiangsheng-box/pull/216)：加载、空态、错误、继续编辑与删除反馈 |
 | `pages/cans/index` / `library` | queued | 每页独立 PR |
 | `pages/cans/details` / `comments` | done | 普通控件已收敛；分享开放能力及低频 Cell/Textarea 直接使用 TDesign |
 | `pages/nameplates/details` / `comments` | done | 普通按钮与加载已收敛；低频 Cell 直接使用 TDesign |
-| `pages/posts/compose` | done | [#195](https://github.com/e-dialect/guantou/issues/195) / [PR #216](https://github.com/e-dialect/guantou/pull/216)：来源锁定、发布状态、字段错误与成功跳转 |
+| `pages/posts/compose` | done | [#195](https://github.com/e-dialect/xiangsheng-box/issues/195) / [PR #216](https://github.com/e-dialect/xiangsheng-box/pull/216)：来源锁定、发布状态、字段错误与成功跳转 |
 | `pages/posts/details` | queued | 独立 PR |
 | `pages/flavors/index` / `details` | queued | 搜索、列表与详情操作 |
 | `pages/packages/index` / `details` | queued | 搜索、加载与详情操作 |
-| `pages/circles/index` / `details` | done | [#355](https://github.com/e-dialect/guantou/issues/355)：地区社群说明、单列搜索、低干扰加入/查看动作及圈内录音加载、空、局部失败和正常态；录音失败不再抹掉已加载的圈子资料 |
+| `pages/circles/index` / `details` | done | [#355](https://github.com/e-dialect/xiangsheng-box/issues/355)：地区社群说明、单列搜索、低干扰加入/查看动作及圈内录音加载、空、局部失败和正常态；录音失败不再抹掉已加载的圈子资料 |
 | `pages/discovery/index` | queued | 操作按钮与加载状态 |
-| `pages/users/me` | done | [#344](https://github.com/e-dialect/guantou/issues/344) / [PR #348](https://github.com/e-dialect/guantou/pull/348)：完整账户中心与游客身份入口；[#373](https://github.com/e-dialect/guantou/issues/373) 消除 TDesign `.page` 品牌色覆盖；[#376](https://github.com/e-dialect/guantou/issues/376) 补齐无头像文字回退；[#393](https://github.com/e-dialect/guantou/issues/393) 让作品面板成为唯一贡献入口，并把收藏与关注收为紧凑档案导航；[#394](https://github.com/e-dialect/guantou/issues/394) 把游客听、查、主题入口统一为具备完整触区与键盘语义的 TDesign Cell |
-| `pages/users/details` | done | [#355](https://github.com/e-dialect/guantou/issues/355)：他人主页使用统一档案面、无头像回退、主次关注/私信操作和具备 tab 语义的公开贡献状态 |
-| `pages/curation/index` / `apply` | done | [#360](https://github.com/e-dialect/guantou/issues/360)：整理权限申请、授权公开记录与审核待办统一为范围 → 资料 → 判断 → 依据的可信工作流 |
-| `pages/users/contributions` / `bookmarks` | done | [#361](https://github.com/e-dialect/guantou/issues/361)：贡献概览、地区足迹、最近参与与私人词条书签统一为可浏览的个人资料档案 |
-| `pages/users/recommend-follow` | done | [#344](https://github.com/e-dialect/guantou/issues/344) / [PR #348](https://github.com/e-dialect/guantou/pull/348)：延续身份旅程，并保留统一加载、空态、重试及关注结果反馈 |
-| `pages/users/theme-center` | done | 总览 THEME_CENTER.md；[#369](https://github.com/e-dialect/guantou/issues/369) 将路由入口拆为可独立验证的搜索、目录、最近、收藏、搭配与弹层视图，边界见 [THEME_CENTER_VIEW_ARCHITECTURE.md](THEME_CENTER_VIEW_ARCHITECTURE.md)；[#375](https://github.com/e-dialect/guantou/issues/375) 将次要的“最近使用”无记录提示收为 opt-in 紧凑状态，保留共享完整空态与曝光语义；[#387](https://github.com/e-dialect/guantou/issues/387) 收敛正文与弹层重复的筛选入口，并按全局主题、局部装扮、搜索上下文只展示有效维度；[#392](https://github.com/e-dialect/guantou/issues/392) 将筛选标题、当前摘要与箭头收为同一整行 TDesign Cell 触区。三期不在本页做投稿社区。跳转 NAV |
+| `pages/users/me` | done | [#344](https://github.com/e-dialect/xiangsheng-box/issues/344) / [PR #348](https://github.com/e-dialect/xiangsheng-box/pull/348)：完整账户中心与游客身份入口；[#373](https://github.com/e-dialect/xiangsheng-box/issues/373) 消除 TDesign `.page` 品牌色覆盖；[#376](https://github.com/e-dialect/xiangsheng-box/issues/376) 补齐无头像文字回退；[#393](https://github.com/e-dialect/xiangsheng-box/issues/393) 让作品面板成为唯一贡献入口，并把收藏与关注收为紧凑档案导航；[#394](https://github.com/e-dialect/xiangsheng-box/issues/394) 把游客听、查、主题入口统一为具备完整触区与键盘语义的 TDesign Cell |
+| `pages/users/details` | done | [#355](https://github.com/e-dialect/xiangsheng-box/issues/355)：他人主页使用统一档案面、无头像回退、主次关注/私信操作和具备 tab 语义的公开贡献状态 |
+| `pages/curation/index` / `apply` | done | [#360](https://github.com/e-dialect/xiangsheng-box/issues/360)：整理权限申请、授权公开记录与审核待办统一为范围 → 资料 → 判断 → 依据的可信工作流 |
+| `pages/users/contributions` / `bookmarks` | done | [#361](https://github.com/e-dialect/xiangsheng-box/issues/361)：贡献概览、地区足迹、最近参与与私人词条书签统一为可浏览的个人资料档案 |
+| `pages/users/recommend-follow` | done | [#344](https://github.com/e-dialect/xiangsheng-box/issues/344) / [PR #348](https://github.com/e-dialect/xiangsheng-box/pull/348)：延续身份旅程，并保留统一加载、空态、重试及关注结果反馈 |
+| `pages/users/theme-center` | done | 总览 THEME_CENTER.md；[#369](https://github.com/e-dialect/xiangsheng-box/issues/369) 将路由入口拆为可独立验证的搜索、目录、最近、收藏、搭配与弹层视图，边界见 [THEME_CENTER_VIEW_ARCHITECTURE.md](THEME_CENTER_VIEW_ARCHITECTURE.md)；[#375](https://github.com/e-dialect/xiangsheng-box/issues/375) 将次要的“最近使用”无记录提示收为 opt-in 紧凑状态，保留共享完整空态与曝光语义；[#387](https://github.com/e-dialect/xiangsheng-box/issues/387) 收敛正文与弹层重复的筛选入口，并按全局主题、局部装扮、搜索上下文只展示有效维度；[#392](https://github.com/e-dialect/xiangsheng-box/issues/392) 将筛选标题、当前摘要与箭头收为同一整行 TDesign Cell 触区。三期不在本页做投稿社区。跳转 NAV |
 | `pages/users/theme-dress` | done | 单组局部装扮：免费/会员/活动/创作者权限、待上线占位；不覆盖其它分组 |
-| `pages/users/theme-acquire` | done | 装扮获取聚合：会员、活动、创作任务与方言主题福利；[#391](https://github.com/e-dialect/guantou/issues/391) 让游客保留本地已核验进度且不请求登录态贡献接口 |
+| `pages/users/theme-acquire` | done | 装扮获取聚合：会员、活动、创作任务与方言主题福利；[#391](https://github.com/e-dialect/xiangsheng-box/issues/391) 让游客保留本地已核验进度且不请求登录态贡献接口 |
 | `pages/users/theme-member` | done | 开通会员，权益 H5/小程序同步 |
 | `pages/users/theme-event` | done | 活动领取与已绝版提示 |
-| `pages/mails/index` / `details` | done | [#356](https://github.com/e-dialect/guantou/issues/356)：消息概览与未读层级、加载/空白/失败状态、关联内容与回复闭环；[#358](https://github.com/e-dialect/guantou/issues/358)：用项目加载原语替换未解析的隐式分页组件 |
+| `pages/mails/index` / `details` | done | [#356](https://github.com/e-dialect/xiangsheng-box/issues/356)：消息概览与未读层级、加载/空白/失败状态、关联内容与回复闭环；[#358](https://github.com/e-dialect/xiangsheng-box/issues/358)：用项目加载原语替换未解析的隐式分页组件 |
 
 ## 站内消息体验 #356 / #398
 
@@ -186,7 +186,7 @@ V2 全站聚合验收由 [#346](https://github.com/e-dialect/guantou/issues/346)
 ## Entry / Recording V2 核心路径（#320）
 
 - 一级导航收敛为“听 / 查 / 录 / 我”；单字只作视觉标签，交互控件使用完整无障碍名称。
-- [#341](https://github.com/e-dialect/guantou/issues/341) 将“听”页收敛为连续的深色乡音舞台：正常卡片按“当前录音—词条—地区/读音证据—操作”排序，加载、空、错误与维护状态使用稳定骨架和明确下一步；骨架循环动效尊重 reduced-motion。
+- [#341](https://github.com/e-dialect/xiangsheng-box/issues/341) 将“听”页收敛为连续的深色乡音舞台：正常卡片按“当前录音—词条—地区/读音证据—操作”排序，加载、空、错误与维护状态使用稳定骨架和明确下一步；骨架循环动效尊重 reduced-motion。
 - “听”直接读取 Recording 资源并保留主要 Entry 关联，支持播放、进入词条、确认本地用法和发起地区对比接龙。
 - “查”以 Entry 为结果单位；相同写法不会自动合并，专业筛选在同页逐层展开。
 - “录”最低只要求音频、已知使用地区和用户自己的大意；写法、读音、已有词条、来源和授权说明均为可选补充。
@@ -220,7 +220,7 @@ V2 全站聚合验收由 [#346](https://github.com/e-dialect/guantou/issues/346)
 BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用现有组件，不恢复旧表单控件。
 主题预览更新为“听／查／录／我”并增加集盒预览。
 
-实施依据：[已确认计划](plans/2026-09-06-v2-restoration.md)，实现见 [PR #408](https://github.com/e-dialect/guantou/pull/408)；功能去向见
+实施依据：[已确认计划](plans/2026-09-06-v2-restoration.md)，实现见 [PR #408](https://github.com/e-dialect/xiangsheng-box/pull/408)；功能去向见
 [回归记录](audits/2026-09-06-v1-feature-restoration.md)。浏览器测试为 `frontend/tests/e2e/restoration.spec.js`。
 
 ### 二次补缺：词条讨论与草稿生命周期

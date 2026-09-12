@@ -18,8 +18,8 @@
 ## 2. 产品与实体边界
 
 - E-Dialect 是开放 GitHub 工程社区；乡声万语是社区内的长期计划，不等同于整个社区。
-- 北京塔聚科技有限责任公司可承接部分商业合同、交付和付款，但不等同于 E-Dialect 或乡声万语。权利边界以 `LICENSE`、CLA、合同及知识产权文件为准。
-- **乡声集盒（X）**是本地语言工具、互动与可信众包产品，本身应值得用户使用；不是被“游戏化”的标注后台。
+- 目前乡声万语相关商业合作、签约与交付由北京塔聚科技有限责任公司作为商业/法律承载主体；具体权利义务以实际合同、许可证、CLA 和知识产权文件为准。E-Dialect GitHub Organization 不等同于北京塔聚科技有限责任公司，也不等同于乡声万语。
+- **乡声集盒（X）**是地方语言工具、互动与可信众包产品，本身应值得用户使用；不是被“游戏化”的标注后台。
 - **兴化语记**保留为莆仙语旗舰 Distribution Profile / Language Space，不建设第三套后端。
 - **万语校坊（W）**是面向方言、地方语言与民族语言资料的独立智能协同校勘产品，具有独立部署、使用和商业价值；在乡声万语内部也承担 Candidate → Trusted / Gold 的专业工作台职责。它不是 X 的管理后台。
 - X/W 保持独立部署、数据库、认证与权限模型。稳定的 X identity 只通过显式 external identity mapping 对应 W local user，不共享用户表。
@@ -48,9 +48,9 @@
 | W4 | 协同校勘与志愿者运营 | @3964419257-cyber |
 | W5 | 数据融合与发布衔接 | 由 @L8848-Li 后续细分 |
 
-人员池还包括 @duskeditor、@Lulu-999-deer、@BUPTCXX、@xiaodiwend、@ohhgali。@xiang-fy 不参加本轮 X 组冲刺，不自动分配。赖济涛对应 @3964419257-cyber；夏鸿斌对应 @xiaodiwend，二者不得混用。
-
 Sprint Tracking 的 Assignee 表示 accountable owner，不表示一人实现全部 Epic。@aB0T-bupt / @L8848-Li 负责各自的 Epic → Leaf；Codex 和 @lin594 均不预先永久分完全部 Leaf。
+
+具体任务主责以 GitHub native Assignee 与 Project #7 为执行真源；本文不维护完整人员 roster，避免与 GitHub 状态重复和漂移。
 
 ## 4. 执行节奏与能力分级
 
@@ -119,7 +119,7 @@ Wow B：用户输入一句话 → 莆仙表达 → 莆仙正字 → TTS → AI �
 
 至少追踪 Campaign、Task、Visitor、User、Speaker、Operator、Recording、Correction、Candidate、Validation、Language Space、linguistic background、model version、AI confidence、AI feedback、trusted ratio 与 funnel。
 
-Dashboard 同时服务 Steering、产品复盘、B/G Demo 与 investor evidence。
+Dashboard 同时服务 Steering、产品复盘、B/G Demo 与合作证据。
 
 **Demo Moment**：用真实试点数据展示从 Campaign 曝光到有效 Candidate/Trusted 数据的漏斗，并能按 Language Space、speaker background 与模型版本解释差异。
 
@@ -187,7 +187,7 @@ X export Review Bundle
 
 ### TTS 数据路线
 
-- @lin594 的江口腔 20–30 分钟仅作 dev corpus，跑通工程 pipeline，不作春节正式 Anchor。
+- 小规模非 Anchor 材料仅作 dev corpus，用于跑通工程 pipeline，不作春节正式评估基线。
 - 正式 pilot 优先莆田城里腔 reference speaker：先录 30–60 分钟 continuous speech；验证有效后再扩到 3–5 小时。
 - 单字/语素录音定位为 Citation Pronunciation，用于字典真人发音、IPA/拼音验证、diagnostic 和教学，不替代连续句 TTS corpus。
 
@@ -203,27 +203,39 @@ Active Learning 复用通用 ContributionTask Engine，首版仅使用规则：A
 
 ## 10. 外部准备、发布与运营
 
-`SF-STEERING · External Resources & Acceptance` 由 @lin594 负责外部资源与 Gate，包括城里腔 reference speaker、江口腔 dev corpus、历史媒体与 TTS 合成授权、IPA/phonology expert、B/G Discovery Kit、图书馆/学校联系准备、investor evidence、Release Gate 及 Steering Decision/Directive。
+`SF-STEERING · External Resources & Acceptance` 负责外部资源与 Gate。资源类别包括：
 
-B/G Discovery Kit 至少包含一页介绍、3 分钟线上 Demo、能力图、合作菜单、访谈问题和可分享链接；优先微信/在线/warm introduction，GitHub 不保存不必要的个人信息。
+- Anchor reference speaker；
+- dev corpus；
+- historical-media authorization；
+- voice-synthesis authorization；
+- phonology / IPA expert；
+- B/G Discovery Kit。
 
-现有种子渠道约 1200 名高相关用户：莆仙乡音社 QQ 约 500、微信群约 200、疯灯书店 community 约 500。按 `30 → 200 → 1000 → public` 放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio。
+具体人员、材料、授权和准备状态统一记录在 `.github #2` 与 Project #7，不在 Charter 维护易漂移的个人资源表。
+
+B/G Discovery Kit 至少包含一页介绍、3 分钟线上 Demo、能力图、合作菜单、访谈问题和可分享链接；优先微信或在线沟通，GitHub 不保存不必要的个人信息。
+
+按 `30 → 200 → 1000 → public` 分阶段放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio。
 
 Campaign 覆盖春节前预热、除夕/正月初、元宵、莆田特色长元宵和农历二月长尾，不只押注正月初一。
 
-公开放量前必须通过 Parent Test：@lin594 自己愿意发给父母，且 2–3 位未参与开发的中老年莆仙用户无需讲解可完成查、听、录音或代理录音，否则 Release Gate fail。
+公开放量前必须通过 Parent Test：验收者愿意把产品发给家人，且 2–3 位未参与开发的中老年莆仙用户无需讲解可完成查、听、录音或代理录音，否则 Release Gate fail。
 
 放量前进入 Feature Freeze。允许 bug、performance、真机、内容、Campaign、数据修复和不改变 contract 的模型替换；禁止大 schema migration、大 UI 重写、新社交系统或突发大功能。
 
 考试期从 Build 转向 Data / Test / Content，优先 speaker recruitment、Gold recording、corpus cleaning、baseline、Campaign content、true-device QA 与 user testing。
 
-春节核心传播期由 @aB0T-bupt 负责乡声集盒值班安排、@L8848-Li 负责万语校坊值班安排。@lin594 不进入普通 on-call，只接收重大数据丢失、法律/隐私、严重公开事件与 stop-service decision。
+春节核心传播期由两个 accountable owner 分别安排各产品值班；重大数据丢失、法律/隐私、严重公开事件与 stop-service decision 按治理路径升级。
 
-## 11. 明确不做
+## 11. 明确不做 / Scope Guardrails
 
-- 合并三个治理 PR；
-- 真正训练 ASR/TTS 或扩大为全模型研究；
-- 大规模产品实现或一次性拆完所有 Leaf；
-- X/W 后端、数据库、用户表合并；
-- realtime Review API、webhook、message queue、full OIDC；
-- 因仓库改名而重命名内部全部 package/module。
+- 不把春节 Sprint 扩成无边界的全模型研究或论文级模型搜索；
+- 不为了追求模型指标无限扩大训练、实验或工程范围；
+- 不把 AI 输出当作语言事实自动裁判；
+- 不合并 X/W 后端、数据库、用户表或权限模型；
+- 不在春节阶段建设 realtime Review API、webhook、message queue、distributed transaction 或 full OIDC；
+- 不建立第三套“兴化语记”后端；
+- 不在 Feature Freeze 后进行大型 schema migration、大 UI 重构、新社交系统或突发大功能；
+- 不一次性实现长期 Roadmap 中所有 Community / Theme / Collection / Infrastructure 能力；
+- 不因仓库 rename 而重命名内部稳定 package、module 或 migration。

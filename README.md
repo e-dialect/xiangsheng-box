@@ -1,10 +1,14 @@
 # 乡声集盒
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/e-dialect/guantou)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/e-dialect/xiangsheng-box)
 
-乡声集盒是一个多方言语音采集与校验客户端。
+乡声集盒是“乡声万语”面向普通用户的地方语言工具、互动与可信共建平台。
 
-产品以“词条（Entry）—录音（Recording）”为核心：词条可以先于录音存在，录音也可以先以原始大意提交，再由整理员补充写法、编号义、地区读音和证据。词条与录音通过带角色的多对多关系连接，不以投票权重自动裁定唯一解释。
+用户首先因为“有用、好玩、值得表达和分享”而来：查一个家乡词、听真人怎么说、录下自己或家人的说法、比较不同地方的表达、体验 ASR/TTS。正常使用过程同时沉淀为带来源、地区/语言背景和证据链的语言资料。
+
+当前 2027 春节旗舰 Language Space 是莆仙方言（兴化语记），但核心产品与数据模型面向多种方言、地方语言与民族语言扩展。
+
+Entry / Recording V2 是当前领域模型：词条可以先于录音存在，录音也可以先以原始大意提交，再由整理员补充写法、编号义、语言背景、地区读音和证据。词条与录音通过带角色的多对多关系连接，不以投票权重自动裁定唯一解释。
 
 ## 当前结构
 
@@ -15,22 +19,33 @@
 
 ## 文档
 
-- [产品路线](docs/PRODUCT_ROADMAP.md)
-- [2027 春节冲刺](docs/SPRING_FESTIVAL_2027.md)
-- [乡声共创计划](docs/CONTRIBUTOR_TRACK_EXPERIENCE.md)
-- [方言数字基建计划](docs/CONTRIBUTOR_TRACK_COMMONS.md)
+你不需要在第一天读完全部文档。按当前目标从以下入口开始。
+
+### 第一次了解项目
+
+1. [长期产品路线](docs/PRODUCT_ROADMAP.md)
+2. [2027 春节冲刺](docs/SPRING_FESTIVAL_2027.md)
+3. [Contributor Onboarding](docs/CONTRIBUTOR_ONBOARDING.md)
+
+### 开始认领任务
+
 - [AI-native Contributor](docs/AI_NATIVE_CONTRIBUTION.md)
-- [Work Package 规则](docs/WORK_PACKAGE_GUIDE.md)
-- [兴化语记迁移](docs/HINGHWA_STATION_MIGRATION.md)
+- [Work Package Guide](docs/WORK_PACKAGE_GUIDE.md)
+- [乡声共创 / Dialect Experience](docs/CONTRIBUTOR_TRACK_EXPERIENCE.md)
+- [方言数字基建 / Dialect Commons](docs/CONTRIBUTOR_TRACK_COMMONS.md)
+
+### 工程参考
+
 - [产品设计](docs/PRODUCT_DESIGN.md)
-- [历史视觉/交互参考](docs/references/README.md)
 - [架构说明](docs/ARCHITECTURE.md)
 - [API 约定](docs/API.md)
 - [身份、游客与审计开发指南](docs/AUTH_AUDIT_GUIDE.md)
 - [开发指南](docs/DEVELOPMENT.md)
 - [测试说明](docs/TESTING.md)
 - [部署说明](docs/DEPLOYMENT.md)
+- [兴化语记迁移](docs/HINGHWA_STATION_MIGRATION.md)
 - [兴化语记](docs/HINGHWA.md)
+- [历史视觉/交互参考](docs/references/README.md)
 - [贡献说明](CONTRIBUTING.md)
 
 协作提交请遵循 [贡献说明](CONTRIBUTING.md) 中的 Conventional Commits 风格提交信息：`type: summary` 或 `type(scope): summary`。
