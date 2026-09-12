@@ -27,8 +27,8 @@
 ## 3. 负责人、沟通与长期 Work Package
 
 - Steering / Acceptance / Gatekeeper：[@lin594](https://github.com/lin594)
-- 乡声集盒负责人：张至钧（[@aB0T-bupt](https://github.com/aB0T-bupt)）
-- 万语校坊负责人：李天元（[@L8848-Li](https://github.com/L8848-Li)）
+- [@aB0T-bupt](https://github.com/aB0T-bupt)：乡声集盒 Sprint Tracking 与 Epic 拆解
+- [@L8848-Li](https://github.com/L8848-Li)：万语校坊 Sprint Tracking 与 Epic 拆解
 - X 指导教师：杨树杰；W 指导教师：杨树杰、周赞双。
 
 默认沟通链是 `Member → @aB0T-bupt / @L8848-Li → @lin594`。Shared 只是 Project workstream，不是第三个直属团队；@lin594 日常只与 @aB0T-bupt、@L8848-Li 对接。
@@ -149,7 +149,7 @@ W Sprint Tracking：`SF-W · 2027 春节万语校坊 Sprint Tracking`，Accounta
 
 ### SF-W-E6 · Gold / Trusted Corpus / Phonology
 
-覆盖 Gold Test、expert annotation、IPA、trusted corpus、corpus QA 和 phonology diagnostic。Project 中 `Team=Shared`，owner-of-record 为 W。
+覆盖 Gold Test、expert annotation、IPA、trusted corpus、corpus QA 和 phonology diagnostic。Project 中 `Team=Shared`，owner-of-record 为 @L8848-Li。
 
 以上 W Epic 的共同 Demo Moment 是：真实材料可被导入、独立校对/仲裁并产生可审计结果；各 Epic 的 Leaf 由 @L8848-Li 定义具体样本、规模与 Gate。
 
@@ -170,7 +170,7 @@ X export Review Bundle
 
 原则是“**先打通语义，再打通网络**”。春节不做 webhook、distributed sync、message queue、shared database、复杂 service account 或 full OIDC。
 
-X owner-of-record：ASR/TTS inference、adapter、model serving、Active Learning engine 与产品集成。W owner-of-record：Gold Test、corpus QA、IPA、expert annotation、trusted corpus 与 Review Bundle。
+@aB0T-bupt 的 owner-of-record 范围：ASR/TTS inference、adapter、model serving、Active Learning engine 与产品集成。@L8848-Li 的 owner-of-record 范围：Gold Test、corpus QA、IPA、expert annotation、trusted corpus 与 Review Bundle。
 
 ## 8. Gold、发音与 TTS 基线
 
