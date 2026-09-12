@@ -27,36 +27,36 @@
 ## 3. 负责人、沟通与长期 Work Package
 
 - Steering / Acceptance / Gatekeeper：[@lin594](https://github.com/lin594)
-- X Lead：张至钧（[@aB0T-bupt](https://github.com/aB0T-bupt)）
-- W Lead：李天元（[@L8848-Li](https://github.com/L8848-Li)）
+- 乡声集盒负责人：张至钧（[@aB0T-bupt](https://github.com/aB0T-bupt)）
+- 万语校坊负责人：李天元（[@L8848-Li](https://github.com/L8848-Li)）
 - X 指导教师：杨树杰；W 指导教师：杨树杰、周赞双。
 
-默认沟通链是 `Member → Product Lead → Steering`。Shared 只是 Project workstream，不是第三个直属团队；Steering 日常只与两个 Lead 对接。
+默认沟通链是 `Member → @aB0T-bupt / @L8848-Li → @lin594`。Shared 只是 Project workstream，不是第三个直属团队；@lin594 日常只与 @aB0T-bupt、@L8848-Li 对接。
 
 长期分工编号已有人员主责语义，春节 Epic **不得复用**：
 
 | 长期编号 | 方向 | 当前确认 |
 |---|---|---|
-| X1 | 采集体验与任务设计 | 由 X Lead 后续细分 |
-| X2 | 语音智能与质量控制 | 由 X Lead 后续细分 |
+| X1 | 采集体验与任务设计 | 由 @aB0T-bupt 后续细分 |
+| X2 | 语音智能与质量控制 | 由 @aB0T-bupt 后续细分 |
 | X3 | 语料模型与可信证据 | @Ccc-192 |
-| X4 | 地方站与资料接入 | 由 X Lead 后续细分 |
-| X5 | 社群采集与效果评测 | 由 X Lead 后续细分 |
-| W1 | 文献资产与语料工程 | 由 W Lead 后续细分 |
-| W2 | 文档解析与结构化 | 由 W Lead 后续细分 |
+| X4 | 地方站与资料接入 | 由 @aB0T-bupt 后续细分 |
+| X5 | 社群采集与效果评测 | 由 @aB0T-bupt 后续细分 |
+| W1 | 文献资产与语料工程 | 由 @L8848-Li 后续细分 |
+| W2 | 文档解析与结构化 | 由 @L8848-Li 后续细分 |
 | W3 | 智能校勘与错误发现 | @QIANBAI634 |
 | W4 | 协同校勘与志愿者运营 | @3964419257-cyber |
-| W5 | 数据融合与发布衔接 | 由 W Lead 后续细分 |
+| W5 | 数据融合与发布衔接 | 由 @L8848-Li 后续细分 |
 
 人员池还包括 @duskeditor、@Lulu-999-deer、@BUPTCXX、@xiaodiwend、@ohhgali。@xiang-fy 不参加本轮 X 组冲刺，不自动分配。赖济涛对应 @3964419257-cyber；夏鸿斌对应 @xiaodiwend，二者不得混用。
 
-Sprint Tracking 的 Assignee 表示 accountable owner，不表示一人实现全部 Epic。Lead 负责 Epic → Leaf；Codex 和 Steering 均不预先永久分完全部 Leaf。
+Sprint Tracking 的 Assignee 表示 accountable owner，不表示一人实现全部 Epic。@aB0T-bupt / @L8848-Li 负责各自的 Epic → Leaf；Codex 和 @lin594 均不预先永久分完全部 Leaf。
 
 ## 4. 执行节奏与能力分级
 
-每周由 Lead 异步更新 `Done / Demo / Blocked / Next / Need Steering Decision`。约每两周进行 Demo Gate，必须展示真实页面、真机旅程、数据、模型输出或可复现实验，不能只展示 PPT。
+每周由 @aB0T-bupt、@L8848-Li 分别异步更新 `Done / Demo / Blocked / Next / Need Steering Decision`。约每两周进行 Demo Gate，必须展示真实页面、真机旅程、数据、模型输出或可复现实验，不能只展示 PPT。
 
-成员能力按 L0 Executor、L1 AI-native Developer、L2 Work Package Owner、L3 Lead 支持。目标是让每个人逐步达到至少 L1；能力不足时缩小 Leaf，不降低 Acceptance Gate。每个适合学生执行的 Epic / Work Package 都应定义用户或验收者可以直接看到的 **Demo Moment**。
+成员能力按 L0 Executor、L1 AI-native Developer、L2 Work Package Owner、L3 负责人支持。目标是让每个人逐步达到至少 L1；能力不足时缩小 Leaf，不降低 Acceptance Gate。每个适合学生执行的 Epic / Work Package 都应定义用户或验收者可以直接看到的 **Demo Moment**。
 
 ## 5. X：乡声集盒一级 Epic
 
@@ -151,7 +151,7 @@ W Sprint Tracking：`SF-W · 2027 春节万语校坊 Sprint Tracking`，Accounta
 
 覆盖 Gold Test、expert annotation、IPA、trusted corpus、corpus QA 和 phonology diagnostic。Project 中 `Team=Shared`，owner-of-record 为 W。
 
-以上 W Epic 的共同 Demo Moment 是：真实材料可被导入、独立校对/仲裁并产生可审计结果；各 Epic 的 Leaf 由 W Lead 定义具体样本、规模与 Gate。
+以上 W Epic 的共同 Demo Moment 是：真实材料可被导入、独立校对/仲裁并产生可审计结果；各 Epic 的 Leaf 由 @L8848-Li 定义具体样本、规模与 Gate。
 
 ## 7. Review Contract v0
 
@@ -217,7 +217,7 @@ Campaign 覆盖春节前预热、除夕/正月初、元宵、莆田特色长元�
 
 考试期从 Build 转向 Data / Test / Content，优先 speaker recruitment、Gold recording、corpus cleaning、baseline、Campaign content、true-device QA 与 user testing。
 
-春节核心传播期由 X Lead 负责 X roster、W Lead 负责 W roster。@lin594 不进入普通 on-call，只接收重大数据丢失、法律/隐私、严重公开事件与 stop-service decision。
+春节核心传播期由 @aB0T-bupt 负责乡声集盒值班安排、@L8848-Li 负责万语校坊值班安排。@lin594 不进入普通 on-call，只接收重大数据丢失、法律/隐私、严重公开事件与 stop-service decision。
 
 ## 11. 明确不做
 

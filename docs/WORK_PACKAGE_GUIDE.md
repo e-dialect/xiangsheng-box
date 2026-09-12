@@ -89,6 +89,6 @@ UX audit、原型、真机 QA、数据质量报告、migration rehearsal、ADR�
 - L0 Executor
 - L1 AI-native Developer
 - L2 Work Package Owner
-- L3 Lead
+- L3 负责人
 
-目标是让每位成员至少逐步进入 L1。能力不足时由 Lead 缩小 Leaf 的范围与判断面，不降低 Acceptance、Evidence 或 Demo Moment 标准；Epic → Leaf 的拆解属于 Lead 责任。
+目标是让每位成员至少逐步进入 L1。能力不足时由 @aB0T-bupt 缩小 Leaf 的范围与判断面，不降低 Acceptance、Evidence 或 Demo Moment 标准；乡声集盒 Epic → Leaf 的拆解由 @aB0T-bupt 负责。

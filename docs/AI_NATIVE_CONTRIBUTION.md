@@ -38,7 +38,7 @@ R1 不强制第二名人类逐行审查所有实现；关键是目标旅程和�
 
 适用于 migration、auth、permission、Visitor → User merge、consent、Speaker provenance、deletion、production deployment、destructive import 等高风险变更。
 
-要求：agent review、自动化测试、人类针对关键 contract/文件/失败路径审查、staging / backup / rollback 证据、Product Lead Gate，并记录 Evidence 与 `Not manually verified`。
+要求：agent review、自动化测试、人类针对关键 contract/文件/失败路径审查、staging / backup / rollback 证据、@aB0T-bupt 验收，并记录 Evidence 与 `Not manually verified`。
 
 涉及品牌、隐私/同意、许可证/CLA、商业条款、资金、不可逆架构、破坏性迁移或共享 X/W Contract 重大变化时，还必须按组织治理规则升级 Steering。
 
