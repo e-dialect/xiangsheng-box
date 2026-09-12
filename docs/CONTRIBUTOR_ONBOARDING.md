@@ -16,6 +16,8 @@ Shelf 等旧领域接口或页面；“罐头、盒子”可以是品牌意象�
 
 ## 推荐工作方式
 
+实现任务必须以 Leaf Work Package 形式建立；Tracking / Epic 只负责范围、依赖和决策汇总，不直接认领。使用 AI 协助时必须遵循 [`AI_NATIVE_CONTRIBUTION.md`](AI_NATIVE_CONTRIBUTION.md)。Dialect Experience 与 Dialect Commons 是协作 Track，不构成目录或代码所有权边界。
+
 1. 从用户任务和验收条件开始，确认普通母语者无需专业知识也能完成。
 2. 后端先补模型或接口测试，再实现最小领域变化；只新增 forward migration。
 3. 前端复用现有页面壳、基础组件、语义导航和 service，不在页面散落请求。

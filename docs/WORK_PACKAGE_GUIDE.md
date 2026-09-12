@@ -1,0 +1,82 @@
+# Work Package Guide
+
+GitHub 是正式任务真源：
+
+> 没有 Issue = 没有正式任务。
+>
+> 没有 Assignee = 没有人正式认领。
+
+## 1. Issue 类型
+
+- **Tracking / Epic**：只做范围、依赖和决策汇总，不认领实现。
+- **Leaf Work Package**：唯一可认领的实现/调研/QA/数据任务。
+
+## 2. Size
+
+| Size | 含义 |
+|---|---|
+| XS | 低判断、低风险、局部、验证简单 |
+| S | 一个清晰独立成果，默认工作包 |
+| M | 跨层 / contract / migration / 多端 / 高验证成本 |
+| L | 不允许直接认领，必须继续拆 |
+
+默认每人最多 `1 Primary + 1 Secondary`，同时最多 2 个开放实现 PR。
+
+## 3. 标准模板
+
+```markdown
+## 用户/系统问题
+一句话说明为什么要做。
+
+## 完成后应该发生什么
+从用户或系统行为描述结果。
+
+## 范围
+- ...
+
+## 不在本 Issue 做
+- ...
+
+## 建议修改范围
+- `path/...`
+
+## 验收
+- [ ] 行为/产物
+- [ ] 自动验证
+- [ ] 人工验证/数据核对
+- [ ] 无新增 warning/error（若适用）
+
+## 完成证据
+PR / 截图 / 测试日志 / 数据报告 / 原型 / ADR。
+
+## 依赖
+- blocked by #...
+- parent #...
+
+## Size
+S
+
+## Track
+Dialect Experience / Dialect Commons
+```
+
+## 4. 认领规则
+
+开始前：
+
+1. 将 Issue assign 给自己；
+2. 评论分支名、预计修改文件、首个可 review checkpoint；
+3. 若已有 Assignee，不并行改同一组核心文件；
+4. 7 天无提交、PR 或状态评论时可先询问再释放。
+
+## 5. Ready 标准
+
+`status:ready` 代表 contributor 不需要再次等待 maintainer 澄清即可开始。缺少产品/架构决策时使用 `status:needs-spec`，不是把歧义塞给实现者。
+
+## 6. 非代码贡献
+
+UX audit、原型、真机 QA、数据质量报告、migration rehearsal、ADR、fixture、旧能力盘点、Issue 拆分都可以成为正式 Work Package，只要满足：
+
+```text
+明确问题 + 可复核产物 + 验证/依据 + 后续可复用
+```

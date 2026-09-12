@@ -15,6 +15,12 @@
 
 ## 文档
 
+- [产品路线](docs/PRODUCT_ROADMAP.md)
+- [乡声共创计划](docs/CONTRIBUTOR_TRACK_EXPERIENCE.md)
+- [方言数字基建计划](docs/CONTRIBUTOR_TRACK_COMMONS.md)
+- [AI-native Contributor](docs/AI_NATIVE_CONTRIBUTION.md)
+- [Work Package 规则](docs/WORK_PACKAGE_GUIDE.md)
+- [兴化语记迁移](docs/HINGHWA_STATION_MIGRATION.md)
 - [产品设计](docs/PRODUCT_DESIGN.md)
 - [历史视觉/交互参考](docs/references/README.md)
 - [架构说明](docs/ARCHITECTURE.md)

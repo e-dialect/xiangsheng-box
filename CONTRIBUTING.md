@@ -2,6 +2,11 @@
 
 乡声集盒是由原前后端仓库合并后的单一仓库。新功能应优先围绕 `docs/PRODUCT_DESIGN.md` 和 `guantou` 新实体实现；方言材料处理脚本按地域放在 `tools/materials/`，不进入 Django 运行路径。
 
+产品优先级、Contributor 双 Track、AI-native 责任边界和 Work Package 拆分分别见
+`docs/PRODUCT_ROADMAP.md`、`docs/CONTRIBUTOR_TRACK_EXPERIENCE.md`、
+`docs/CONTRIBUTOR_TRACK_COMMONS.md`、`docs/AI_NATIVE_CONTRIBUTION.md`
+与 `docs/WORK_PACKAGE_GUIDE.md`。
+
 这份文件只保留所有贡献者都需要知道的规则。第一次参与项目，建议按下面顺序阅读：
 
 - `docs/CONTRIBUTOR_ONBOARDING.md`：从选 issue 到发 PR 的新手路线图，也说明不同难度的任务应该读多少代码。
