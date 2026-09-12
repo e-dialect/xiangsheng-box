@@ -13,7 +13,7 @@
 
 这不是 migration sprint，也不是 contributor governance sprint。迁移和治理只为真实产品、数据、技术与商业验证服务。
 
-春节阶段的 Project 是 [乡声万语 · 2027 春节冲刺](https://github.com/orgs/e-dialect/projects/7)。乡声集盒长期 Roadmap 继续由 #423 维护；春节 X/W 分别使用独立 Sprint Tracking。
+春节阶段的 [Project #7 · 乡声万语 · 2027 春节冲刺](https://github.com/orgs/e-dialect/projects/7) 是 Sprint execution cockpit，只收录直接服务本轮 Gate、Demo 或 Journey 的执行项。乡声集盒长期 Roadmap 与技术债继续保留在仓库及 #423，不需要进入 Project #7；春节 X/W 分别使用独立 Sprint Tracking。
 
 ## 2. 产品与实体边界
 
@@ -207,7 +207,7 @@ Active Learning 复用通用 ContributionTask Engine，首版仅使用规则：A
 
 B/G Discovery Kit 至少包含一页介绍、3 分钟线上 Demo、能力图、合作菜单、访谈问题和可分享链接；优先微信/在线/warm introduction，GitHub 不保存不必要的个人信息。
 
-现有种子渠道约 1200 名高相关用户：莆仙乡音社 QQ 约 500、微信群约 200、枫登书店 community 约 500。按 `30 → 200 → 1000 → public` 放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio。
+现有种子渠道约 1200 名高相关用户：莆仙乡音社 QQ 约 500、微信群约 200、疯灯书店 community 约 500。按 `30 → 200 → 1000 → public` 放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio。
 
 Campaign 覆盖春节前预热、除夕/正月初、元宵、莆田特色长元宵和农历二月长尾，不只押注正月初一。
 
