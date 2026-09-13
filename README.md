@@ -145,4 +145,5 @@ AGPL 条款的组织，可以联系项目维护者了解替代商业许可。
 
 软件许可证不自动适用于数据集、语料、词典内容、录音、用户提交、模型权重、商标、
 Logo 或其他单独标识的资产。第三方组件继续适用原许可证。详见
-[`LICENSING.md`](LICENSING.md)。
+[`LICENSING.md`](LICENSING.md)、[`ASSET_BOUNDARIES.md`](ASSET_BOUNDARIES.md) 和
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
