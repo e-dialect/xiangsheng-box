@@ -91,6 +91,10 @@ describe('BaseButton', () => {
     expect(source).toContain(
       '--td-button-primary-outline-active-border-color: var(--accent-color);',
     );
+    expect(source).toContain(
+      '.base-button--ghost.t-button--outline.t-button--primary.t-button--hover',
+    );
+    expect(source).toContain('color: var(--text-color);');
   });
 
   it('emits click on tap but not when disabled or loading', async () => {

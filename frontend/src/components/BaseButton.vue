@@ -168,6 +168,16 @@ export default {
   --td-button-primary-outline-active-border-color: var(--accent-color);
 }
 
+/*
+ * TDesign reuses the active border token as the active outline text color.
+ * Some light accent palettes (notably osmanthus and clay) do not reach WCAG AA
+ * when that accent is drawn on its subtle background, so keep the border as
+ * the selected accent while using the semantic page text color for the label.
+ */
+.base-button--ghost.t-button--outline.t-button--primary.t-button--hover {
+  color: var(--text-color);
+}
+
 .base-button--look-soft {
   --td-brand-color: var(--accent-subtle-color);
   --td-brand-color-active: var(--accent-subtle-color);
