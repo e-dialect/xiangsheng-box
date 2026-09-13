@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 
 const allowedTypes = [
   'feat',
@@ -19,6 +19,23 @@ const pattern = new RegExp(
   `^(${allowedTypes.join('|')})(?:\\([A-Za-z0-9][A-Za-z0-9-]*\\))?!?: .+(?: \\(#\\d+\\))?$`
 );
 const noisyPrefixes = [/^fixup!/i, /^squash!/i, /^wip[: ]/i, /^merge /i];
+
+function isBaseSyncMerge(sha) {
+  const parents = execFileSync(
+    'git',
+    ['show', '-s', '--format=%P', sha],
+    { encoding: 'utf8' }
+  ).trim().split(/\s+/).filter(Boolean);
+
+  if (parents.length < 2) return false;
+
+  // Permit only merges whose additional parents already belong to the PR's
+  // current base. This supports an auditable default-branch sync without
+  // accepting unrelated merge histories.
+  return parents.slice(1).every((parent) => (
+    spawnSync('git', ['merge-base', '--is-ancestor', parent, base]).status === 0
+  ));
+}
 
 function usage() {
   console.error('Usage: node scripts/check-commit-messages.js <base> <head>');
@@ -57,8 +74,9 @@ const invalid = output
     const [sha, subject] = line.split('\0');
     return { sha, subject };
   })
-  .filter(({ subject }) => {
+  .filter(({ sha, subject }) => {
     if (!subject) return true;
+    if (isBaseSyncMerge(sha)) return false;
     if (noisyPrefixes.some((prefix) => prefix.test(subject))) return true;
     return !pattern.test(subject);
   });
@@ -77,5 +95,5 @@ invalid.forEach(({ sha, subject }) => {
   console.error(`- ${sha.slice(0, 12)} ${subject}`);
 });
 console.error('');
-console.error('Please rebase/squash the PR branch so commits describe only this change.');
+console.error('Please clean the PR branch so commits describe only this change.');
 process.exit(1);

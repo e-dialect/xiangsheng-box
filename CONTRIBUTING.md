@@ -23,7 +23,7 @@
 - PR 中的提交信息必须使用 Conventional Commits 风格：`type: summary` 或 `type(scope): summary`，例如 `feat(entries): improve pronunciation evidence` 或 `fix(recordings): preserve draft metadata`。
 - 常用类型：`feat`、`fix`、`docs`、`test`、`refactor`、`build`、`ci`、`chore`、`revert`。
 - 可选 `scope` 使用小写英文、数字或短横线，例如 `frontend`、`backend`、`entries`、`recordings`、`ci`。
-- PR 分支应保持干净：不要包含 `WIP`、`fixup!`、`squash!`、merge commit 或与本次工作无关的历史提交；必要时在提交 PR 前本地 rebase/squash。
+- PR 分支应保持干净：不要包含 `WIP`、`fixup!`、`squash!`、无关 merge commit 或与本次工作无关的历史提交。仅当治理/发布指令明确要求保留可审计历史且禁止 rebase/force-push 时，可以正常合入当前默认分支；CI 只接受额外 parent 已属于当前 base 历史的同步 merge。
 - 仓库初始化提交 `init` 是历史重写时的特例；后续普通提交不使用裸 `init` 或自由格式信息。
 
 ## 本地检查

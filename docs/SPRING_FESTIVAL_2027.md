@@ -70,11 +70,15 @@ X Sprint Tracking：`SF-X · 2027 春节乡声集盒 Sprint Tracking`，Accounta
 
 **Demo Moment**：创建 Campaign → 用户在首页看到 → 完成任务 → contribution 可追踪。
 
-### SF-X-E2 · 莆仙知识库 / Search
+### SF-X-E2 · 莆仙知识库 / Search / 问一句
 
-目标旅程：普通话或莆仙表达搜索 → 正字 → 释义 → 拼音 → 专业层 IPA → 地区差异 → 真人录音 → 可用时的 AI Voice → feedback。普通用户优先看到正字、拼音、意思和真人声音，不要求理解 IPA。
+Search 与“问一句”访问同一套结构化知识库。“问一句”不是第三个 AI 平台，也不新建 RAG 基础设施：自然语言先经过 intent/query parser，再确定性检索 `Entry`、`EntrySense`、`WritingForm`、`PronunciationVariant`、`Recording`、`EvidenceRecord`、`UsageAttestation`、`Dialect`，最后组合可回溯的回答。资料不足时明确说明“目前资料还不足以可靠回答这个问题”，并可进入“你知道怎么说吗？”ContributionTask。
 
-**Demo Moment**：用户搜索一个春节表达，在同一旅程中听真人声音、查看含义并提交有上下文的反馈。
+Spring v0 必须与现有乡声集盒 Web 服务共存于当前 4GB 主机，不新增固定 GPU/LLM 主机，不以独立 Vector DB 或本地生成式 LLM 为运行前提。优先使用规则意图解析和现有数据库、全文检索、alias、synonym、Concept；外部小模型如被采用，只能辅助 query parsing、intent classification 或 wording，必须有额度/成本上限，并在不可用、超时或额度耗尽时无损退化为确定性检索。方言事实始终来自知识库。
+
+`e-dialect/hinghwa-RAG` 上游未明确开源许可证；在权利明确前不得复制或复用其代码、Prompt 或数据资产，只能独立实现通用思想。
+
+**Demo Moment**：用户搜索一个春节表达，或问“害怕莆田话怎么说？”，在同一旅程看到有证据的正字和含义、听到真人声音，并在资料不足时获得诚实降级与可追踪贡献入口。
 
 ### SF-X-E3 · Speech Contribution / Speaker / Elder Proxy
 
@@ -92,9 +96,11 @@ X Sprint Tracking：`SF-X · 2027 春节乡声集盒 Sprint Tracking`，Accounta
 
 ### SF-X-E5 · 兴化语记 Distribution
 
-#424 是本 Epic 的核心 tracking。覆盖品牌连续性、Puxian Language Space、Distribution Profile、账号迁移、旧 URL / deep link、旧内容与旧数据。只做 Legacy → X 单向迁移，不建设第三套后端或双向同步。
+#424 是本 Epic 的核心 tracking。Spring P0 覆盖品牌连续性、旧 URL/deep link、旧 ID/内容映射、Puxian Language Space、Distribution Profile、migration rehearsal、生产副本数据质量检查和 rollback plan。只做 Legacy → X 单向迁移，不建设第三套后端或双向同步。
 
-**Demo Moment**：从一个高频旧链接进入保留“兴化语记”心智的新莆仙页面，并可继续查、听或贡献。
+真实账号或真实生产数据的 destructive cutover 是 Conditional：只有 rehearsal、数据质量、rollback、@aB0T-bupt R2 验收和必要 Steering Decision 全部通过后才执行。生产 cutover 本身不作为春节 Sprint 成功的硬性必要条件。
+
+**Demo Moment**：从一个高频旧链接进入保留“兴化语记”心智的新莆仙页面，并可继续查、听或贡献；未 cutover 时，以生产副本 rehearsal 演示同一旅程与回滚。
 
 ### SF-X-E6 · ASR / TTS Wow Moment
 
@@ -105,9 +111,11 @@ Wow A：用户说莆仙话 → ASR → 莆仙正字 → 普通话含义
 Wow B：用户输入一句话 → 莆仙表达 → 莆仙正字 → TTS → AI 说莆仙话
 ```
 
-本轮只收敛 ASR/TTS adapter、model version、confidence、Teach/Showcase mode、intermediate orthography 与产品接入，不扩成“研究所有模型”。效果不足时进入 Teach AI，足够可靠时才进入 Showcase。
+Prototype Gate 只要求 Wow A / Wow B 至少一条形成可复现实验；Pre-SF / Release Gate 要求两条都形成用户可理解、可复现的真机产品旅程，不能用单 Wow 冒充最终双 Wow。效果不足时进入 Teach AI，足够可靠时才进入 Showcase。
 
-**Demo Moment**：打开小程序 → 说一句莆仙话 → 看到正字和含义；或输入一句话并听到带版本与来源说明的莆仙 AI Voice。
+本 Epic 不在规划阶段预先穷举全部模型训练 Leaf。Gold、baseline、adapter contract 和预算明确后，由 @aB0T-bupt 按必要性拆解有限模型实验；禁止无限扩展模型搜索、训练次数和工程范围。
+
+**Demo Moment**：打开小程序 → 说一句莆仙话 → 看到正字和含义；并且输入一句话 → 莆仙表达/正字 → 听到带版本与来源说明的莆仙 AI Voice。
 
 ### SF-X-E7 · WeChat Release
 
@@ -115,13 +123,13 @@ Wow B：用户输入一句话 → 莆仙表达 → 莆仙正字 → TTS → AI �
 
 **Demo Moment**：一位未参加开发的中老年莆仙用户无需开发者讲解即可在真机完成查、听、录音或代理录音并分享。
 
-### SF-X-E8 · Analytics / Data / B-G Dashboard
+### SF-X-E8 · Minimum Evidence Layer / Analytics
 
-至少追踪 Campaign、Task、Visitor、User、Speaker、Operator、Recording、Correction、Candidate、Validation、Language Space、linguistic background、model version、AI confidence、AI feedback、trusted ratio 与 funnel。
+本轮不是建设 BI 平台。只建立指标字典、Event Contract、Campaign funnel、Recording/Candidate/Trusted 质量状态、model version/confidence、rollout go/no-go 与去标识化的最小 Dashboard 或 report。
 
-Dashboard 同时服务 Steering、产品复盘、B/G Demo 与合作证据。
+不引入大型数仓、实时 OLAP、X/W 共享数据库，也不为 Dashboard 新购长期服务器。X/W 只通过显式 bundle 或去标识化结果聚合交换证据。
 
-**Demo Moment**：用真实试点数据展示从 Campaign 曝光到有效 Candidate/Trusted 数据的漏斗，并能按 Language Space、speaker background 与模型版本解释差异。
+**Demo Moment**：用真实试点数据和最小 dashboard/report 展示从 Campaign 曝光到有效 Candidate/Trusted 数据的漏斗，并能按 Language Space、speaker background 与模型版本解释足以支持 rollout go/no-go 的差异。
 
 ## 6. W：万语校坊一级 Epic
 
@@ -151,9 +159,9 @@ W Sprint Tracking：`SF-W · 2027 春节万语校坊 Sprint Tracking`，Accounta
 
 覆盖 Gold Test、expert annotation、IPA、trusted corpus、corpus QA 和 phonology diagnostic。Project 中 `Team=Shared`，owner-of-record 为 @L8848-Li。
 
-以上 W Epic 的共同 Demo Moment 是：真实材料可被导入、独立校对/仲裁并产生可审计结果；各 Epic 的 Leaf 由 @L8848-Li 定义具体样本、规模与 Gate。
+以上 W Epic 的共同 Demo Moment 是：真实材料可被导入、独立校对/仲裁并产生批量最终结果；当前导出不被夸大为包含逐位校对全过程的完整审计包。各 Epic 的 Leaf 由 @L8848-Li 定义具体样本、规模与 Gate。
 
-## 7. Review Contract v0
+## 7. Review Bundle v0
 
 第一版只打通语义与人工可控批次：
 
@@ -216,7 +224,18 @@ Active Learning 复用通用 ContributionTask Engine，首版仅使用规则：A
 
 B/G Discovery Kit 至少包含一页介绍、3 分钟线上 Demo、能力图、合作菜单、访谈问题和可分享链接；优先微信或在线沟通，GitHub 不保存不必要的个人信息。
 
-按 `30 → 200 → 1000 → public` 分阶段放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio。
+按 `30 → 200 → 1000 → public` 分阶段放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio：
+
+- **2027-01-15 前**：reference speaker / Gold / TTS pilot 资源进入可用状态，核心 P0 contract 基本冻结；
+- **2027-01-16 ～ 2027-01-23**：30 人 internal / close-friend test、Parent Test、微信真机核心旅程；
+- **2027-01-24**：Feature Freeze target；
+- **2027-01-25 ～ 2027-01-29**：约 200 人 seed test；
+- **2027-01-30 ～ 2027-02-05**：约 1000 人 preheat，Campaign 内容就位，只允许 Freeze 白名单改动；
+- **2027-02-06 起**：Spring public campaign；
+- **2027-02-20**：元宵第二波；
+- **2027-02 下旬 ～ 03 月**：莆田长元宵 / 农历二月长尾、数据复盘、B/G Discovery 与模型二轮。
+
+若学校考试或放假冲突，由 @aB0T-bupt / @L8848-Li 提 Decision 给 @lin594 调整；不要为守日期牺牲 Parent Test。
 
 Campaign 覆盖春节前预热、除夕/正月初、元宵、莆田特色长元宵和农历二月长尾，不只押注正月初一。
 
