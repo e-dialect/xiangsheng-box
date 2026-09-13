@@ -15,3 +15,11 @@
 ## Notes
 
 - 
+
+## Contribution
+
+- [ ] I confirm that I have the right to submit this contribution.
+- [ ] Any third-party material is clearly identified with its source and license.
+
+For first-time contributors, the CLA check will guide explicit acceptance of
+the current e-dialect ICLA. These checkboxes do not constitute a CLA signature.
