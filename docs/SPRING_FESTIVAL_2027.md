@@ -20,7 +20,7 @@
 - E-Dialect 是开放 GitHub 工程社区；乡声万语是社区内的长期计划，不等同于整个社区。
 - 目前乡声万语相关商业合作、签约与交付由北京塔聚科技有限责任公司作为商业/法律承载主体；具体权利义务以实际合同、许可证、CLA 和知识产权文件为准。E-Dialect GitHub Organization 不等同于北京塔聚科技有限责任公司，也不等同于乡声万语。
 - **乡声集盒（X）**是地方语言工具、互动与可信众包产品，本身应值得用户使用；不是被“游戏化”的标注后台。
-- **兴化语记**保留为莆仙语旗舰 Distribution Profile / Language Space，不建设第三套后端。
+- **Anchor Language Space = 莆仙方言；Flagship Distribution Profile = 兴化语记。** Language Space 定义缺什么数据，Distribution Profile 定义如何面向用户呈现；二者不合并为同一个模型，也不建设第三套后端。
 - **万语校坊（W）**是面向方言、地方语言与民族语言资料的独立智能协同校勘产品，具有独立部署、使用和商业价值；在乡声万语内部也承担 Candidate → Trusted / Gold 的专业工作台职责。它不是 X 的管理后台。
 - X/W 保持独立部署、数据库、认证与权限模型。稳定的 X identity 只通过显式 external identity mapping 对应 W local user，不共享用户表。
 

@@ -90,7 +90,11 @@ Dialect Experience / Dialect Commons
 
 ## 5. Ready 标准
 
-`status:ready` 代表 contributor 不需要再次等待 maintainer 澄清即可开始。缺少产品/架构决策时使用 `status:needs-spec`，不是把歧义塞给实现者。
+- `status:needs-spec`：缺少产品或架构决策，必须先澄清规格。
+- `status:blocked`：规格已经清楚，但存在必须等待的明确前置依赖。
+- `status:ready`：规格和依赖都已满足，contributor 无需再次等待即可开始。
+
+不要把规格歧义标为 `status:blocked`，也不要把仍在等待依赖的任务标为 `status:ready`。
 
 ## 6. 非代码贡献
 
