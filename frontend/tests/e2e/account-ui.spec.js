@@ -300,7 +300,21 @@ async function mockSignedInCollector(page) {
   });
   await page.route('**/users/7/password', async (route) => {
     if (route.request().method() === 'PUT') {
-      await route.fulfill({ json: { user: { id: 7 }, token: 'fresh-token' } });
+      await route.fulfill({
+        json: {
+          user: {
+            id: 7,
+            username: 'collector',
+            nickname: '采集者',
+            email: 'c@example.com',
+            telephone: '13900000001',
+            birthday: '1991-02-03',
+            wechat: false,
+            primary_dialect: { id: 3, name: '四川话', qualified_code: '西南官话.四川' },
+          },
+          token: 'fresh-token',
+        },
+      });
       return;
     }
     await route.continue();
