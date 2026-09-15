@@ -13,6 +13,11 @@ rights chain: an alternative license can cover only rights that Beijing Taju
 owns or is sufficiently authorized to relicense, not every historical
 contribution, third-party component, or user-supplied asset in the repository.
 
+**Alternative commercial relicensing status: PARTIAL.** This audit label
+reflects incomplete repository-wide, path-by-path evidence for historical and
+excluded material; it does not limit the AGPL rights already granted for
+covered code.
+
 The software license does not automatically apply to datasets, dictionary or
 corpus content, recordings, user submissions, model weights, generated
 artifacts, trademarks, logos, or other separately identified assets. Those
@@ -38,6 +43,9 @@ AGPL 允许包括商业场景在内的使用，但使用者必须遵守其全部
 AGPL 条款的组织可以联系项目维护者了解替代商业许可；替代许可是否可提供及其范围，
 取决于相应权利链。替代商业许可由北京塔聚科技有限责任公司在其拥有版权或已取得充分
 再许可权的范围内提供，不会重新授权仓库内全部历史贡献、第三方内容或用户资产。
+
+**替代商业重许可状态：PARTIAL（部分）。**该审计标记表示尚无覆盖全部历史贡献及排除
+材料的逐路径完整权利证据；它不限制已就适用代码授予的 AGPL 权利。
 
 软件许可证不自动适用于数据集、词典或语料内容、录音、用户提交、模型权重、生成物、
 商标、Logo 或其他单独标识的资产；具体路径边界见
