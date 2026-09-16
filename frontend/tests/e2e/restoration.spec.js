@@ -71,7 +71,7 @@ for (const theme of ['light', 'dark']) {
     await expect(page.getByText('词条讨论', { exact: true })).toBeVisible();
     await page.getByRole('textbox').fill('这个词在家乡也这样用');
     await page.getByText('发送留言', { exact: true }).click();
-    await expect(page.locator('.box-recording').getByText('这个词在家乡也这样用', { exact: true })).toBeVisible();
+    await expect(page.locator('.comment-card').getByText('这个词在家乡也这样用', { exact: true })).toBeVisible();
     await expect(page.getByRole('textbox')).toHaveValue('');
     await page.screenshot({ path: testInfo.outputPath(`entry-discussion-${theme}.png`), fullPage: true });
     expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);

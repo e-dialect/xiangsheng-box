@@ -33,26 +33,18 @@
           aria-label="消息筛选"
         >
           <button
-            :class="['filter', { active: filter === 'all' }]"
+            v-for="option in filterOptions"
+            :key="option.key"
+            :class="['filter', { active: filter === option.key }]"
             role="tab"
-            :aria-selected="filter === 'all'"
+            :aria-selected="filter === option.key"
             :disabled="loading"
             hover-class="filter--pressed"
-            @tap="setFilter('all')"
+            @tap="setFilter(option.key)"
           >
-            全部
-          </button>
-          <button
-            :class="['filter', { active: filter === 'unread' }]"
-            role="tab"
-            :aria-selected="filter === 'unread'"
-            :disabled="loading"
-            hover-class="filter--pressed"
-            @tap="setFilter('unread')"
-          >
-            未读
+            {{ option.label }}
             <text
-              v-if="unreadCount"
+              v-if="option.key === 'unread' && unreadCount"
               class="filter-count"
             >
               {{ unreadCount }}
@@ -73,10 +65,10 @@
         />
         <EmptyState
           v-else-if="!notifications.length"
-          :title="filter === 'unread' ? '未读消息已经清空' : '还没有消息'"
-          :description="filter === 'unread'
-            ? '新的提醒会继续出现在这里。'
-            : '词条补证、地区确认和审核结果会出现在这里。'"
+          :title="filter === 'all' ? '还没有消息' : `没有${activeFilterLabel}消息`"
+          :description="filter === 'all'
+            ? '词条补证、地区确认和审核结果会出现在这里。'
+            : '新的提醒会继续出现在这里。'"
         />
         <view
           v-else
@@ -179,6 +171,20 @@ import { openPage } from '@/services/navigation';
 import { toMailDetailsPage } from '@/routers/mail';
 import { listNotifications, markNotificationsRead } from '@/services/mail';
 
+const FILTER_OPTIONS = Object.freeze([
+  { key: 'all', label: '全部' },
+  { key: 'unread', label: '未读' },
+  { key: 'reply', label: '回复' },
+  { key: 'like', label: '点赞' },
+  { key: 'bookmark', label: '收藏' },
+]);
+
+const VERB_FILTERS = Object.freeze({
+  reply: ['entry.comment', 'entry.reply', 'recording.comment', 'recording.reply'],
+  like: ['recording.like', 'entry.comment_like', 'recording.comment_like'],
+  bookmark: ['entry.bookmark'],
+});
+
 export default {
   components: {
     BaseButton, BaseLoading, EmptyState, PageShell,
@@ -193,9 +199,13 @@ export default {
       notifications: [],
       page: 1,
       refreshing: false,
+      filterOptions: FILTER_OPTIONS,
     };
   },
   computed: {
+    activeFilterLabel() {
+      return (this.filterOptions.find((option) => option.key === this.filter) || {}).label || '全部';
+    },
     unreadCount() {
       return this.notifications.filter((item) => item.unread).length;
     },
@@ -205,10 +215,10 @@ export default {
     },
     introTitle() {
       if (this.loading && !this.notifications.length) return '正在整理你的消息';
-      if (this.filter === 'unread') {
+      if (this.filter !== 'all') {
         return this.notifications.length
-          ? `${this.notifications.length} 条未读消息`
-          : '未读消息已清空';
+          ? `${this.notifications.length} 条${this.activeFilterLabel}消息`
+          : `没有${this.activeFilterLabel}消息`;
       }
       if (this.unreadCount) return `${this.unreadCount} 条消息待查看`;
       if (this.notifications.length) return '消息都看过了';
@@ -242,10 +252,12 @@ export default {
       this.loading = true;
       this.loadStatus = 'loading';
       try {
+        const verbs = VERB_FILTERS[this.filter];
         const response = await listNotifications({
           page,
           pageSize: 20,
           ...(this.filter === 'unread' ? { unread: true } : {}),
+          ...(verbs ? { verb: verbs.join(',') } : {}),
         });
         this.notifications = this.notifications.concat(response.notifications || []);
         this.page = page;
@@ -344,9 +356,11 @@ export default {
   display: flex;
   gap: var(--space-2);
   margin: var(--space-3) 0;
+  overflow-x: auto;
 }
 
 .filter {
+  flex: 0 0 auto;
   width: auto;
   min-width: 112rpx;
   margin: 0;
@@ -357,6 +371,7 @@ export default {
   color: var(--text-secondary-color);
   font-size: var(--font-size-sm);
   line-height: 60rpx;
+  white-space: nowrap;
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 

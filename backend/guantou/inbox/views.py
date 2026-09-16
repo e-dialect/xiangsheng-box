@@ -79,6 +79,11 @@ class Notifications(View):
                 notifications = notifications.filter(unread=False)
             else:
                 raise BadRequestException("unread should be True or False")
+        if "verb" in request.GET:
+            verbs = [item for item in request.GET["verb"].split(",") if item]
+            if not verbs:
+                raise BadRequestException("verb 不能为空")
+            notifications = notifications.filter(verb__in=verbs)
 
         page_size = int(request.GET.get("pageSize", 10))
         page = int(request.GET.get("page", 1))

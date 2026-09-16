@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
+from django.db import OperationalError
 from django.test import Client, TestCase, override_settings
 from django.core.cache import cache
 from django.utils import timezone
@@ -178,4 +179,19 @@ class ProductEventRetentionTests(TestCase):
         self.assertIsNone(maybe_maintain_product_events())
         self.assertIsNone(maybe_maintain_product_events())
 
+        self.assertEqual(mocked.call_count, 2)
+
+    @patch(
+        "productanalytics.services.aggregate_and_prune_product_events",
+        side_effect=[
+            OperationalError("database is locked"),
+            {"summaries": 0, "deleted_raw_events": 0},
+        ],
+    )
+    def test_opportunistic_maintenance_retries_transient_sqlite_lock(self, mocked):
+        cache.clear()
+
+        result = maybe_maintain_product_events()
+
+        self.assertEqual(result, {"summaries": 0, "deleted_raw_events": 0})
         self.assertEqual(mocked.call_count, 2)

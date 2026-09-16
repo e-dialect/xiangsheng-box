@@ -2368,6 +2368,13 @@ class RecordingComment(models.Model):
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies"
     )
+    reply_to = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="reply_targets",
+    )
     body = models.TextField(max_length=2000)
     hidden = models.BooleanField(default=False)
     client_id = models.UUIDField()

@@ -63,8 +63,8 @@ describe('restored journeys', () => {
     const detail = context(Detail, { targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } } });
     createComment.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
-    await detail.send(); expect(detail.form.body).toBe('乡音');
-    await detail.send();
+    await detail.sendTopLevel(); expect(detail.form.body).toBe('乡音');
+    await detail.sendTopLevel();
     expect(createComment.mock.calls[0][0].client_id).toBe(createComment.mock.calls[1][0].client_id);
     expect(detail.form.body).toBe('');
   });
@@ -117,10 +117,67 @@ describe('entry discussion payload', () => {
     const detail = context(Detail, { targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } } });
     createComment.mockResolvedValue({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
-    await detail.send();
+    await detail.sendTopLevel();
     expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ entry_id: 9 }), 'entry');
     expect(createComment.mock.calls[0][0]).not.toHaveProperty('recording_id');
     expect(listComments).toHaveBeenCalledWith(9, 1, 'entry');
+  });
+});
+
+describe('discussion replies sheet', () => {
+  const makeReply = (n, parentId) => ({
+    id: n,
+    parent_id: parentId,
+    body: `回复${n}`,
+    author_name: 'A',
+    like_count: 0,
+    liked: false,
+    editable: false,
+    reply_to_id: null,
+    reply_to_author_name: '',
+  });
+
+  it('loads additional reply pages from the full replies sheet', async () => {
+    listComments.mockImplementation(async (id, page, type, parentId) => (
+      page === 1
+        ? { results: Array.from({ length: 15 }, (_, i) => makeReply(i + 1, parentId)), next: 'next-page' }
+        : { results: [makeReply(16, parentId)], next: null }
+    ));
+
+    const detail = context(Detail, { targetId: 5, targetType: 'recording' });
+    await detail.openReplies({ id: 1, author_name: '楼主', body: '顶层留言' });
+
+    expect(detail.sheetReplies).toHaveLength(15);
+    expect(detail.sheetNext).toBe('next-page');
+
+    await detail.loadSheetReplies(true);
+
+    expect(detail.sheetReplies).toHaveLength(16);
+    expect(detail.sheetNext).toBeNull();
+  });
+
+  it('ignores a stale replies response when switching discussion threads', async () => {
+    let resolveSlow;
+    listComments
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSlow = resolve; }))
+      .mockImplementationOnce(async (id, page, type, parentId) => ({
+        results: [makeReply(200, parentId)],
+        next: null,
+      }));
+
+    const detail = context(Detail, { targetId: 5, targetType: 'recording' });
+    const slow = detail.openReplies({ id: 1, author_name: 'A', body: 'A顶层' });
+    await Promise.resolve();
+    const fast = detail.openReplies({ id: 2, author_name: 'B', body: 'B顶层' });
+    await fast;
+
+    expect(detail.sheet.parent.id).toBe(2);
+
+    resolveSlow({ results: [makeReply(100, 1)], next: null });
+    await slow;
+
+    expect(detail.sheet.parent.id).toBe(2);
+    expect(detail.sheetReplies[0].parent_id).toBe(2);
   });
 });
 

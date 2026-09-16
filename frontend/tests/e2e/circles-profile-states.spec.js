@@ -81,7 +81,7 @@ test('circle directory exposes loading, failure, and empty next steps', async ({
   await page.route(/\/circles\/(?:\?.*)?$/, async (route) => {
     requests += 1;
     if (requests === 1) {
-      await new Promise((resolve) => { setTimeout(resolve, 350); });
+      await new Promise((resolve) => { setTimeout(resolve, 1000); });
       await route.fulfill({ status: 503, json: { detail: 'unavailable' } });
       return;
     }
@@ -101,7 +101,7 @@ test('circle detail keeps its context when recordings alone fail', async ({ page
   await routeBackgroundRequests(page);
   let recordingRequests = 0;
   await page.route('**/circles/4/', async (route) => {
-    await new Promise((resolve) => { setTimeout(resolve, 350); });
+    await new Promise((resolve) => { setTimeout(resolve, 1000); });
     await route.fulfill({ json: circle });
   });
   await page.route(/\/circles\/4\/recordings\/(?:\?.*)?$/, async (route) => {
@@ -129,7 +129,7 @@ test('public profile moves from recoverable error to an accessible contribution 
   await page.route(/\/users\/9\/?(?:\?.*)?$/, async (route) => {
     requests += 1;
     if (requests === 1) {
-      await new Promise((resolve) => { setTimeout(resolve, 350); });
+      await new Promise((resolve) => { setTimeout(resolve, 1000); });
       await route.fulfill({ status: 503, json: { detail: 'unavailable' } });
       return;
     }
