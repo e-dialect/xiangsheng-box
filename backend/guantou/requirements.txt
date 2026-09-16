@@ -2,7 +2,7 @@
 django==6.1.1
 django-cors-headers~=4.9.0
 django-simpleui==2026.1.13
-djangorestframework~=3.18.0
+djangorestframework~=3.18.1
 
 # Utilities
 demjson3~=3.0.6
