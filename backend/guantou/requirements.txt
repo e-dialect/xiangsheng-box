@@ -6,7 +6,7 @@ djangorestframework~=3.18.1
 
 # Utilities
 demjson3~=3.0.6
-pyjwt~=2.4.0
+pyjwt~=2.14.0
 django-environ==0.14.0
 
 # Data Processing
