@@ -2,11 +2,11 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Automatically rebase every open Dependabot PR after `main` changes while preserving all branch-protection checks.
+**Goal:** Keep open Dependabot PRs automatically rebased without bypassing branch-protection checks or storing a maintainer credential.
 
-**Architecture:** Keep Dependabot's native rebase strategy explicit and run it daily. Add a narrowly-permissioned GitHub Actions workflow that reacts to pushes on `main` by posting Dependabot's supported rebase command only to open Dependabot-authored PRs.
+**Architecture:** Keep Dependabot's native rebase strategy explicit and run it daily. Do not post Dependabot commands from GitHub Actions because Dependabot does not authorize GitHub App identities for comment commands. Use a maintainer command only for one-time urgent refreshes.
 
-**Tech Stack:** Dependabot v2 configuration, GitHub Actions YAML, GitHub CLI.
+**Tech Stack:** Dependabot v2 configuration, GitHub CLI.
 
 ---
 
@@ -21,29 +21,27 @@
 
 **Step 3:** Parse the YAML and assert all entries have the expected values.
 
-### Task 2: Rebase after main changes
+### Task 2: Avoid unsupported bot commands
 
 **Files:**
-- Create: `.github/workflows/dependabot-rebase.yml`
+- Do not include: `.github/workflows/dependabot-rebase.yml`
 
-**Step 1:** Add `push` on `main` and `workflow_dispatch` triggers.
+**Step 1:** Remove the workflow that posts `@dependabot rebase` as `github-actions[bot]`.
 
-**Step 2:** Grant `issues: write` and `pull-requests: write` for GitHub GraphQL `addComment`, plus `contents: write` so the workflow actor has the push access required for Dependabot comment commands.
+**Step 2:** Document that GitHub App identities are rejected by Dependabot comment-command authorization even when they have write permissions.
 
-**Step 3:** Query open PRs authored by `app/dependabot` and post `@dependabot rebase` to each one.
-
-**Step 4:** Add concurrency protection and verify the workflow YAML and shell syntax.
+**Step 3:** Keep urgent, one-time rebases as an explicit maintainer action instead of storing a long-lived PAT in Actions secrets.
 
 ### Task 3: Deliver through repository protections
 
 **Files:**
 - Include: `.github/dependabot.yml`
-- Include: `.github/workflows/dependabot-rebase.yml`
+- Remove: `.github/workflows/dependabot-rebase.yml`
 - Include: `docs/plans/2026-09-17-dependabot-auto-rebase-design.md`
 - Include: `docs/plans/2026-09-17-dependabot-auto-rebase-plan.md`
 
-**Step 1:** Run whitespace, YAML, workflow, and exact-permission validation.
+**Step 1:** Run whitespace and YAML validation, and assert the unsupported workflow is absent.
 
-**Step 2:** Commit on `codex/dependabot-auto-rebase`.
+**Step 2:** Commit on `codex/remove-unsupported-dependabot-workflow`.
 
 **Step 3:** Push the branch and open a PR against `main`; do not bypass branch protection.
