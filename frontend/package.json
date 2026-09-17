@@ -94,7 +94,7 @@
     "eslint-plugin-import": "^2.27.4",
     "eslint-plugin-vue": "^9.9.0",
     "jsdom": "^30.0.1",
-    "less": "^4.8.1",
+    "less": "^4.9.1",
     "mini-types": "*",
     "miniprogram-api-typings": "*",
     "playwright": "^1.63.0",

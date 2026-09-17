@@ -4898,10 +4898,10 @@ lcid@^3.0.0:
   dependencies:
     invert-kv "^3.0.0"
 
-less@^4.8.1:
-  version "4.8.1"
-  resolved "https://registry.yarnpkg.com/less/-/less-4.8.1.tgz#eda5a5c92f21507da6e0f88346a76c37e3403f7b"
-  integrity sha512-jQ3lRIo1aUtiWVYXZ7mk4+V4BjCGswF3IxTLJ+4RUta8ZiHh8lhkig2G8dya2eCcyR1dYUvzuV46EkJN8PSwww==
+less@^4.9.1:
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/less/-/less-4.9.1.tgz#5a873974b8e66dec7d4f04243bf1c8a5beef9de7"
+  integrity sha512-orp15PfJvvNDIqJdVWzMI9Sjpjp3VTiw3sfvbB+67LlISTEn8uVT2EdYSuyl02BLvaftv6sdk9Umnxmm5rckmg==
   dependencies:
     copy-anything "^3.0.5"
     parse-node-version "^1.0.1"
