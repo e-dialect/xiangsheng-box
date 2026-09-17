@@ -28,7 +28,7 @@
 
 **Step 1:** Add `push` on `main` and `workflow_dispatch` triggers.
 
-**Step 2:** Grant only `contents: read`, `pull-requests: read`, and the `issues: write` permission required to post PR conversation comments.
+**Step 2:** Grant only `contents: read` plus the `issues: write` and `pull-requests: write` permissions required by GitHub GraphQL `addComment` for PR conversation comments.
 
 **Step 3:** Query open PRs authored by `app/dependabot` and post `@dependabot rebase` to each one.
 
