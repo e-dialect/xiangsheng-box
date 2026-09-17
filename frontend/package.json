@@ -98,7 +98,7 @@
     "mini-types": "*",
     "miniprogram-api-typings": "*",
     "playwright": "^1.63.0",
-    "rollup": "4.63.1",
+    "rollup": "4.63.3",
     "sass": "^1.103.1",
     "start-server-and-test": "^3.0.12",
     "unplugin-auto-import": "^21.1.0",
@@ -108,7 +108,7 @@
     "wait-on": "^9.1.0"
   },
   "resolutions": {
-    "rollup": "4.63.1",
+    "rollup": "4.63.3",
     "vite": "5.2.8"
   }
 }
