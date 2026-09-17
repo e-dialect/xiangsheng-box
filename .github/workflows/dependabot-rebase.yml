@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # Dependabot only accepts comment commands from actors with push access.
+  contents: write
   issues: write
   pull-requests: write
 

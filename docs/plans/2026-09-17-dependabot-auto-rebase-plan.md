@@ -28,7 +28,7 @@
 
 **Step 1:** Add `push` on `main` and `workflow_dispatch` triggers.
 
-**Step 2:** Grant only `contents: read` plus the `issues: write` and `pull-requests: write` permissions required by GitHub GraphQL `addComment` for PR conversation comments.
+**Step 2:** Grant `issues: write` and `pull-requests: write` for GitHub GraphQL `addComment`, plus `contents: write` so the workflow actor has the push access required for Dependabot comment commands.
 
 **Step 3:** Query open PRs authored by `app/dependabot` and post `@dependabot rebase` to each one.
 
@@ -42,7 +42,7 @@
 - Include: `docs/plans/2026-09-17-dependabot-auto-rebase-design.md`
 - Include: `docs/plans/2026-09-17-dependabot-auto-rebase-plan.md`
 
-**Step 1:** Run whitespace, YAML, and workflow validation.
+**Step 1:** Run whitespace, YAML, workflow, and exact-permission validation.
 
 **Step 2:** Commit on `codex/dependabot-auto-rebase`.
 
