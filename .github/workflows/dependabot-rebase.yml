@@ -1,0 +1,41 @@
+name: Rebase Dependabot pull requests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: dependabot-rebase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebase:
+    name: Rebase open Dependabot pull requests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request rebases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          pull_requests="$(gh pr list \
+            --state open \
+            --json author,number \
+            --jq '.[] | select(.author.login == "app/dependabot") | .number')"
+
+          if [[ -z "${pull_requests}" ]]; then
+            echo "No open Dependabot pull requests."
+            exit 0
+          fi
+
+          while IFS= read -r pull_request; do
+            echo "Requesting rebase for pull request #${pull_request}."
+            gh pr comment "${pull_request}" --body '@dependabot rebase'
+          done <<< "${pull_requests}"
