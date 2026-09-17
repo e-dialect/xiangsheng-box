@@ -84,7 +84,7 @@
     "@dcloudio/vite-plugin-uni": "3.0.0-5020420260813003",
     "@playwright/test": "^1.63.0",
     "@vitejs/plugin-vue": "5.2.4",
-    "@vue/compiler-dom": "3.4.21",
+    "@vue/compiler-dom": "3.5.42",
     "@vue/runtime-core": "3.4.21",
     "@vue/test-utils": "^2.5.0",
     "eslint": "^8.31.0",
