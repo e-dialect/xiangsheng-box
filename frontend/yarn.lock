@@ -2656,6 +2656,13 @@
   dependencies:
     "@vue/shared" "3.4.21"
 
+"@vue/reactivity@3.5.42":
+  version "3.5.42"
+  resolved "https://registry.yarnpkg.com/@vue/reactivity/-/reactivity-3.5.42.tgz#800220f023d36fd04d94460c7c7ab5808f8ae75f"
+  integrity sha512-TzNNfKpb7hDxbQltwAut8VDQA5YP+BuRlxntHUuRjyKwlMvmAPbs3unhCvieijifY6vFfVBwsS7wG/C7uq+bEQ==
+  dependencies:
+    "@vue/shared" "3.5.42"
+
 "@vue/runtime-core@3.4.21":
   version "3.4.21"
   resolved "https://registry.npmmirror.com/@vue/runtime-core/-/runtime-core-3.4.21.tgz#3749c3f024a64c4c27ecd75aea4ca35634db0062"
@@ -2663,6 +2670,14 @@
   dependencies:
     "@vue/reactivity" "3.4.21"
     "@vue/shared" "3.4.21"
+
+"@vue/runtime-core@3.5.42":
+  version "3.5.42"
+  resolved "https://registry.yarnpkg.com/@vue/runtime-core/-/runtime-core-3.5.42.tgz#a8af85746d6f9a9f1f8e4626be24eb0b8c9a1e72"
+  integrity sha512-9uACtuHs7vJGkm5Bp3xu4xRDLFTIYy5DgxpToVjqGIAhAEKwQfsaLvKINhM6nFVp6bZPRFGdDqd1g52MqKsotA==
+  dependencies:
+    "@vue/reactivity" "3.5.42"
+    "@vue/shared" "3.5.42"
 
 "@vue/runtime-dom@3.4.21":
   version "3.4.21"
