@@ -12,6 +12,7 @@ describe('user logout storage policy', () => {
       id: '7',
       auth_intercept_intent: 'intent',
       'can_drafts:user:7': '[{"id":"draft-1"}]',
+      'recording_drafts:v2:user:7': '[{"id":"recording-draft-1"}]',
       search_history: '["moon"]',
       ui_theme_pack: 'member-pine',
       ui_theme_outfits: '[{"id":"mix-a"}]',
@@ -39,6 +40,7 @@ describe('user logout storage policy', () => {
     expect(storage.id).toBeUndefined();
     expect(storage.auth_intercept_intent).toBeUndefined();
     expect(storage['can_drafts:user:7']).toBe('[{"id":"draft-1"}]');
+    expect(storage['recording_drafts:v2:user:7']).toBe('[{"id":"recording-draft-1"}]');
     expect(storage.search_history).toBe('["moon"]');
     expect(storage.ui_theme_pack).toBeUndefined();
     expect(storage.ui_theme_outfits).toBeUndefined();
