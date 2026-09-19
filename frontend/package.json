@@ -99,7 +99,7 @@
     "miniprogram-api-typings": "*",
     "playwright": "^1.63.0",
     "rollup": "4.63.3",
-    "sass": "^1.103.1",
+    "sass": "^1.104.1",
     "start-server-and-test": "^3.0.12",
     "unplugin-auto-import": "^21.1.0",
     "unplugin-vue-components": "^32.1.0",
