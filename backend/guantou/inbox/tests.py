@@ -182,6 +182,33 @@ class InboxApiTests(TestCase):
             {"type": "entry", "id": 42, "url": "/pages/entries/details?id=42"},
         )
 
+    def test_list_filters_by_verb(self):
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.RECORDING_LIKE,
+            description="赞了你的录音",
+        )
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.ENTRY_BOOKMARK,
+            description="收藏了你的词条",
+        )
+
+        response = self.client.get(
+            "/notifications",
+            {"verb": "recording.like"},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total"], 1)
+        self.assertEqual(
+            response.json()["notifications"][0]["verb"],
+            Notification.Verb.RECORDING_LIKE,
+        )
+
     def test_event_notification_suppresses_self_notifications(self):
         result = send_event_notification(
             actor=self.sender,

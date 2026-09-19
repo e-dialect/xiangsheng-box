@@ -1,5 +1,8 @@
 import uuid
+import warnings
+
 from django.contrib.auth.models import User
+from django.core.paginator import UnorderedObjectListWarning
 from django.test import TestCase
 from rest_framework.test import APIClient
 from inbox.models import Notification
@@ -174,6 +177,144 @@ class RestorationTests(TestCase):
             ).data["count"],
             0,
         )
+
+    def test_comment_reply_count_and_parent_filter(self):
+        data = {
+            "recording_id": self.recording.id,
+            "body": "顶层留言",
+            "client_id": str(uuid.uuid4()),
+        }
+        top = self.client.post("/recording-comments/", data, format="json")
+        self.assertEqual(top.status_code, 201, top.data)
+        top_id = top.data["id"]
+        for _ in range(4):
+            reply = self.client.post(
+                "/recording-comments/",
+                {
+                    **data,
+                    "client_id": str(uuid.uuid4()),
+                    "parent_id": top_id,
+                    "body": "回复留言",
+                },
+                format="json",
+            )
+            self.assertEqual(reply.status_code, 201, reply.data)
+
+        listing = self.client.get(
+            "/recording-comments/", {"recording_id": self.recording.id}
+        ).data["results"]
+        self.assertEqual(len(listing), 1)
+        self.assertEqual(listing[0]["id"], top_id)
+        self.assertEqual(listing[0]["reply_count"], 4)
+
+        replies = self.client.get(
+            "/recording-comments/",
+            {"recording_id": self.recording.id, "parent_id": top_id},
+        ).data["results"]
+        self.assertEqual(len(replies), 4)
+        self.assertEqual([item["parent_id"] for item in replies], [top_id] * 4)
+
+    def test_reply_to_reply_targets_the_specific_comment(self):
+        data = {
+            "recording_id": self.recording.id,
+            "body": "顶层留言",
+            "client_id": str(uuid.uuid4()),
+        }
+        top = self.client.post("/recording-comments/", data, format="json")
+        first = self.client.post(
+            "/recording-comments/",
+            {
+                **data,
+                "client_id": str(uuid.uuid4()),
+                "parent_id": top.data["id"],
+                "body": "第一条回复",
+            },
+            format="json",
+        )
+        self.client.post(
+            "/recording-comments/",
+            {
+                **data,
+                "client_id": str(uuid.uuid4()),
+                "parent_id": top.data["id"],
+                "body": "第二条回复",
+            },
+            format="json",
+        )
+        reply = self.client.post(
+            "/recording-comments/",
+            {
+                **data,
+                "client_id": str(uuid.uuid4()),
+                "parent_id": top.data["id"],
+                "reply_to_id": first.data["id"],
+                "body": "回复第一条",
+            },
+            format="json",
+        )
+        self.assertEqual(reply.status_code, 201, reply.data)
+        self.assertEqual(reply.data["reply_to_id"], first.data["id"])
+        self.assertEqual(reply.data["reply_to_author_name"], self.user.username)
+
+        bad = self.client.post(
+            "/recording-comments/",
+            {
+                **data,
+                "client_id": str(uuid.uuid4()),
+                "reply_to_id": first.data["id"],
+                "body": "缺少一级评论",
+            },
+            format="json",
+        )
+        self.assertEqual(bad.status_code, 400)
+
+    def test_reply_pagination_is_stable_across_pages(self):
+        data = {
+            "recording_id": self.recording.id,
+            "body": "顶层留言",
+            "client_id": str(uuid.uuid4()),
+        }
+        top = self.client.post("/recording-comments/", data, format="json")
+        self.assertEqual(top.status_code, 201, top.data)
+        top_id = top.data["id"]
+        created_ids = []
+        for index in range(18):
+            response = self.client.post(
+                "/recording-comments/",
+                {
+                    **data,
+                    "client_id": str(uuid.uuid4()),
+                    "parent_id": top_id,
+                    "body": f"回复{index}",
+                },
+                format="json",
+            )
+            self.assertEqual(response.status_code, 201, response.data)
+            created_ids.append(response.data["id"])
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            page1 = self.client.get(
+                "/recording-comments/",
+                {"recording_id": self.recording.id, "parent_id": top_id, "page": 1},
+            )
+            page2 = self.client.get(
+                "/recording-comments/",
+                {"recording_id": self.recording.id, "parent_id": top_id, "page": 2},
+            )
+
+        unordered = [
+            item
+            for item in caught
+            if issubclass(item.category, UnorderedObjectListWarning)
+        ]
+        self.assertEqual(unordered, [])
+
+        page1_ids = [item["id"] for item in page1.data["results"]]
+        page2_ids = [item["id"] for item in page2.data["results"]]
+        self.assertEqual(len(page1_ids), 15)
+        self.assertEqual(len(page2_ids), 3)
+        self.assertEqual(page1_ids + page2_ids, created_ids)
 
     def test_search_daily_following_and_hidden_entry_link(self):
         self.assertEqual(
@@ -368,7 +509,9 @@ class RestorationTests(TestCase):
             entry=self.entry, author=self.other, body="词条留言", client_id=uuid.uuid4()
         )
         endpoint = f"/entry-comments/{comment.id}/like/"
-        self.assertEqual(self.client.put(endpoint).status_code, 200)
+        response = self.client.put(endpoint)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["like_count"], 1)
         self.client.delete(endpoint)
         self.client.put(endpoint)
         self.assertEqual(

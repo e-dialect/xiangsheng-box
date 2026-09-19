@@ -404,6 +404,7 @@ class CommentInput(serializers.Serializer):
     recording_id = serializers.IntegerField(min_value=1, required=False)
     entry_id = serializers.IntegerField(min_value=1, required=False)
     parent_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    reply_to_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     body = serializers.CharField(max_length=2000)
     client_id = serializers.UUIDField()
 
@@ -411,9 +412,24 @@ class CommentInput(serializers.Serializer):
 class CommentSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source="author.username", read_only=True)
     author_id = serializers.IntegerField(read_only=True)
+    reply_to_id = serializers.IntegerField(read_only=True)
+    reply_to_author_name = serializers.SerializerMethodField()
+    reply_count = serializers.IntegerField(read_only=True)
+    recent_replies = serializers.SerializerMethodField()
     like_count = serializers.SerializerMethodField()
     liked = serializers.SerializerMethodField()
     editable = serializers.SerializerMethodField()
+
+    def get_recent_replies(self, obj):
+        if obj.parent_id:
+            return []
+        replies = obj.replies.filter(hidden=False).order_by("created_at", "id")[:3]
+        return CommentSerializer(replies, many=True, context=self.context).data
+
+    def get_reply_to_author_name(self, obj):
+        if not obj.reply_to_id:
+            return ""
+        return obj.reply_to.author.username
 
     def get_like_count(self, obj):
         return obj.likes.count()
@@ -438,6 +454,10 @@ class CommentSerializer(serializers.ModelSerializer):
             "body",
             "author_name",
             "author_id",
+            "reply_to_id",
+            "reply_to_author_name",
+            "reply_count",
+            "recent_replies",
             "created_at",
             "like_count",
             "liked",
@@ -471,7 +491,23 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
                 hidden=False,
             )
             .filter(Q(parent=None) | Q(parent__hidden=False))
-            .select_related("author", "recording", "entry", "parent__author")
+            .annotate(
+                reply_count=Count(
+                    "replies",
+                    filter=Q(replies__hidden=False),
+                    distinct=True,
+                )
+            )
+            # annotate 引入 GROUP BY 后 Meta.ordering 不再生效，分页前必须显式排序，
+            # 否则 Paginator 会抛 UnorderedObjectListWarning，且并发新增回复时跨页重复/漏项。
+            .order_by("created_at", "id")
+            .select_related(
+                "author",
+                "recording",
+                "entry",
+                "parent__author",
+                "reply_to__author",
+            )
             .prefetch_related("likes")
         )
 
@@ -481,6 +517,19 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
         )
         get_object_or_404(self.visible_targets(), pk=values)
         rows = self.get_queryset().filter(**{f"{self.target_type}_id": values})
+        parent_id = request.query_params.get("parent_id")
+        if parent_id:
+            parent_id = serializers.IntegerField(min_value=1).run_validation(parent_id)
+            get_object_or_404(
+                self.get_queryset().filter(
+                    parent=None,
+                    **{f"{self.target_type}_id": values},
+                ),
+                pk=parent_id,
+            )
+            rows = rows.filter(parent_id=parent_id)
+        else:
+            rows = rows.filter(parent=None)
         page = self.paginate_queryset(rows)
         return self.get_paginated_response(self.get_serializer(page, many=True).data)
 
@@ -497,6 +546,7 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
         if not recording.visibility:
             raise PermissionDenied("内容未公开，不能新增评论")
         parent = None
+        reply_to = None
         if data.get("parent_id"):
             parent = get_object_or_404(
                 self.get_queryset(),
@@ -504,34 +554,48 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
                 **self.target_filter(recording),
                 parent=None,
             )
+        if data.get("reply_to_id"):
+            if parent is None:
+                raise ValidationError("回复具体评论时必须同时提供一级评论")
+            reply_to = get_object_or_404(
+                self.get_queryset(),
+                pk=data["reply_to_id"],
+                **self.target_filter(recording),
+            )
+            if reply_to.parent_id != parent.id:
+                raise ValidationError("回复目标不在同一讨论串")
         comment, created = RecordingComment.objects.get_or_create(
             author=request.user,
             client_id=data["client_id"],
             defaults={
                 **self.target_filter(recording),
                 "parent": parent,
+                "reply_to": reply_to,
                 "body": data["body"],
             },
         )
         if (
             getattr(comment, target_key) != recording.id
             or comment.parent_id != data.get("parent_id")
+            or comment.reply_to_id != data.get("reply_to_id")
             or comment.body != data["body"]
             or comment.hidden
         ):
             raise ValidationError("重复请求标识对应的评论不一致")
         if created:
+            owner = self.recipient(recording)
             event_once(
                 request.user,
-                self.recipient(recording),
+                owner,
                 f"{self.target_type}.comment",
                 recording,
                 comment,
             )
-            if parent and parent.author != self.recipient(recording):
+            reply_recipient = reply_to or parent
+            if reply_recipient and reply_recipient.author != owner:
                 event_once(
                     request.user,
-                    parent.author,
+                    reply_recipient.author,
                     f"{self.target_type}.reply",
                     recording,
                     comment,
@@ -570,9 +634,8 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
                 )
         else:
             comment.likes.filter(user=request.user).delete()
-        return Response(
-            {"liked": request.method == "PUT", "like_count": comment.likes.count()}
-        )
+        like_count = RecordingCommentLike.objects.filter(comment_id=comment.id).count()
+        return Response({"liked": request.method == "PUT", "like_count": like_count})
 
 
 class EntryCommentViewSet(RecordingCommentViewSet):
