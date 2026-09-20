@@ -170,6 +170,55 @@ RESOURCE_CONTRACTS = (
     },
 )
 
+COMMENT_FIELDS = {
+    "id",
+    "recording_id",
+    "entry_id",
+    "parent_id",
+    "body",
+    "author_name",
+    "author_id",
+    "created_at",
+    "reply_to_id",
+    "reply_to_author_name",
+    "reply_count",
+    "recent_replies",
+    "deleted",
+    "like_count",
+    "liked",
+    "editable",
+}
+
+COMMENT_CONTRACTS = (
+    {
+        "serializer": "CommentSerializer",
+        "schema": "RecordingComment",
+        "fields": COMMENT_FIELDS,
+    },
+    {
+        "serializer": "CommentSerializer",
+        "schema": "EntryComment",
+        "fields": COMMENT_FIELDS,
+    },
+    {
+        "serializer": "CommentReplySerializer",
+        "schema": "CommentReply",
+        "fields": {
+            "id",
+            "parent_id",
+            "body",
+            "author_name",
+            "author_id",
+            "created_at",
+            "reply_to_id",
+            "reply_to_author_name",
+            "like_count",
+            "liked",
+            "editable",
+        },
+    },
+)
+
 RETIRED_CORE_PREFIXES = {
     "packages",
     "flavors",
@@ -321,6 +370,7 @@ def contract_errors():
     django.setup()
     from guantou.urls import router
     from guantou import v2_serializers
+    from guantou import restoration
 
     paths, schemas, schema_parents = parse_openapi()
     registered = {prefix: viewset for prefix, viewset, _ in router.registry}
@@ -351,6 +401,24 @@ def contract_errors():
                 errors.append(f"OpenAPI 路径 {path} 缺少方法: {sorted(missing)}")
 
         serializer_class = getattr(v2_serializers, spec["serializer"])
+        implementation_fields = set(serializer_class().fields)
+        missing_serializer_fields = spec["fields"] - implementation_fields
+        if missing_serializer_fields:
+            errors.append(
+                f"序列化器 {spec['serializer']} 缺少核心字段: "
+                f"{sorted(missing_serializer_fields)}"
+            )
+        contract_fields = expanded_schema_fields(
+            spec["schema"], schemas, schema_parents
+        )
+        missing_contract_fields = spec["fields"] - contract_fields
+        if missing_contract_fields:
+            errors.append(
+                f"OpenAPI schema {spec['schema']} 缺少核心字段: "
+                f"{sorted(missing_contract_fields)}"
+            )
+    for spec in COMMENT_CONTRACTS:
+        serializer_class = getattr(restoration, spec["serializer"])
         implementation_fields = set(serializer_class().fields)
         missing_serializer_fields = spec["fields"] - implementation_fields
         if missing_serializer_fields:
