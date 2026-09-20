@@ -62,8 +62,16 @@ def recording_data(recording, request):
 class CollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collection
-        fields = ["id", "title", "description", "is_public", "owner_id", "created_at"]
-        read_only_fields = ["owner_id", "created_at"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "is_public",
+            "owner_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["owner_id", "created_at", "updated_at"]
 
 
 class SectionInput(serializers.Serializer):
@@ -117,6 +125,10 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if box.owner_id != self.request.user.id:
             raise PermissionDenied("只有集盒所有者可以修改")
         return box
+
+    def touch(self, box):
+        """Bump the box's updated_at after member mutations without a full save."""
+        Collection.objects.filter(pk=box.pk).update(updated_at=timezone.now())
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -188,6 +200,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                         "id": item.id,
                         "needs_review": not valid,
                         "recording": recording_map[item.recording_id],
+                        "created_at": item.created_at,
                     }
                 )
                 seen.add(item.recording_id)
@@ -197,6 +210,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                     "entry": entry_map[section.entry_id],
                     "recordings": items,
                     "recording_count": len(items),
+                    "created_at": section.created_at,
                 }
             )
         pending = []
@@ -204,7 +218,11 @@ class CollectionViewSet(viewsets.ModelViewSet):
             if item.recording_id not in recording_map:
                 continue
             pending.append(
-                {"id": item.id, "recording": recording_map[item.recording_id]}
+                {
+                    "id": item.id,
+                    "recording": recording_map[item.recording_id],
+                    "created_at": item.created_at,
+                }
             )
             seen.add(item.recording_id)
         if data["editable"]:
@@ -235,11 +253,14 @@ class CollectionViewSet(viewsets.ModelViewSet):
             entry=entry,
             defaults={"sort_order": append_order(box.sections)},
         )
+        self.touch(box)
         return Response({"id": section.id})
 
     @action(detail=True, methods=["delete"], url_path=r"entries/(?P<item_id>[0-9]+)")
     def remove_entry(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().sections, pk=item_id).delete()
+        box = self.owned()
+        get_object_or_404(box.sections, pk=item_id).delete()
+        self.touch(box)
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -276,11 +297,14 @@ class CollectionViewSet(viewsets.ModelViewSet):
         # Explicitly assigning a linked entry confirms organization of a pending item.
         if section:
             box.recording_items.filter(section=None, recording=recording).delete()
+        self.touch(box)
         return Response({"id": item.id})
 
     @action(detail=True, methods=["delete"], url_path=r"recordings/(?P<item_id>[0-9]+)")
     def remove_recording(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().recording_items, pk=item_id).delete()
+        box = self.owned()
+        get_object_or_404(box.recording_items, pk=item_id).delete()
+        self.touch(box)
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -315,6 +339,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         for index, row in enumerate(ordered):
             row.sort_order = index
         rows.model.objects.bulk_update(ordered, ["sort_order"])
+        self.touch(box)
         return Response({"ordered": True})
 
 

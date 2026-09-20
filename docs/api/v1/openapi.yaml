@@ -1182,6 +1182,9 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
     CollectionCreate:
       allOf:
         - $ref: "#/components/schemas/CollectionWrite"
@@ -1209,6 +1212,9 @@ components:
           $ref: "#/components/schemas/RecordingV2"
         needs_review:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
     CollectionSection:
       type: object
       properties:
@@ -1224,6 +1230,9 @@ components:
         recording_count:
           type: integer
           minimum: 0
+        created_at:
+          type: string
+          format: date-time
     CollectionDetail:
       allOf:
         - $ref: "#/components/schemas/Collection"

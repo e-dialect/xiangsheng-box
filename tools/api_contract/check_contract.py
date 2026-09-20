@@ -219,6 +219,31 @@ COMMENT_CONTRACTS = (
     },
 )
 
+COLLECTION_FIELDS = {
+    "id",
+    "title",
+    "description",
+    "is_public",
+    "owner_id",
+    "created_at",
+    "updated_at",
+}
+
+COLLECTION_SECTION_FIELDS = {
+    "id",
+    "entry",
+    "recordings",
+    "recording_count",
+    "created_at",
+}
+
+COLLECTED_RECORDING_FIELDS = {
+    "id",
+    "recording",
+    "needs_review",
+    "created_at",
+}
+
 RETIRED_CORE_PREFIXES = {
     "packages",
     "flavors",
@@ -434,6 +459,33 @@ def contract_errors():
             errors.append(
                 f"OpenAPI schema {spec['schema']} 缺少核心字段: "
                 f"{sorted(missing_contract_fields)}"
+            )
+    collection_serializer_fields = set(restoration.CollectionSerializer().fields)
+    missing_collection_serializer = COLLECTION_FIELDS - collection_serializer_fields
+    if missing_collection_serializer:
+        errors.append(
+            "序列化器 CollectionSerializer 缺少核心字段: "
+            f"{sorted(missing_collection_serializer)}"
+        )
+    missing_collection_schema = COLLECTION_FIELDS - expanded_schema_fields(
+        "Collection", schemas, schema_parents
+    )
+    if missing_collection_schema:
+        errors.append(
+            "OpenAPI schema Collection 缺少核心字段: "
+            f"{sorted(missing_collection_schema)}"
+        )
+    for schema, required in (
+        ("CollectionSection", COLLECTION_SECTION_FIELDS),
+        ("CollectedRecording", COLLECTED_RECORDING_FIELDS),
+    ):
+        missing_schema_fields = required - expanded_schema_fields(
+            schema, schemas, schema_parents
+        )
+        if missing_schema_fields:
+            errors.append(
+                f"OpenAPI schema {schema} 缺少核心字段: "
+                f"{sorted(missing_schema_fields)}"
             )
     for path, methods in AUXILIARY_V2_PATHS.items():
         missing = methods - paths.get(path, set())

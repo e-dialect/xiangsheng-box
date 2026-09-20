@@ -77,6 +77,23 @@ class RestorationTests(TestCase):
         )
         self.assertEqual(RecordingEntryLink.objects.count(), 2)
 
+    def test_timestamps_are_returned_for_boxes_and_members(self):
+        response = self.client.post(
+            self.url + "recordings/",
+            {"recording_id": self.recording.id, "entry_id": self.entry.id},
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        detail = self.client.get(self.url).data
+        self.assertIn("updated_at", detail)
+        self.assertTrue(detail["updated_at"])
+        section = detail["sections"][0]
+        self.assertIn("created_at", section)
+        self.assertTrue(section["created_at"])
+        self.assertIn("created_at", section["recordings"][0])
+        self.assertTrue(section["recordings"][0]["created_at"])
+        listed = self.client.get("/collections/", {"mine": "true"}).data
+        self.assertIn("updated_at", listed["results"][0])
+
     def test_private_and_hidden_resources_are_not_leaked(self):
         self.client.post(
             self.url + "recordings/",
