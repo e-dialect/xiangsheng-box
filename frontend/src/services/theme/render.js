@@ -4,7 +4,9 @@ import {
   trackThemePerfError,
   trackThemePerfStyle,
 } from '@/services/themeAnalytics';
+import { getAccentChrome } from '@/services/theme';
 import {
+  DEFAULT_FAMILY_STYLE,
   LOCAL_DRESS_GROUPS,
   P1_DRESS_GROUP_IDS,
   THEME_PREVIEW_SAMPLE,
@@ -25,9 +27,12 @@ import {
 import { bindThemeRenderPort } from '@/services/theme/renderPort';
 import {
   applyOutfitStyle,
+  cloneCatalogItem,
   flattenStyleJson,
   resolveOutfitStyle,
 } from '@/services/themeSchema';
+
+export { cloneCatalogItem, cloneSkinStyle } from '@/services/themeSchema';
 
 export function listAppliedDress({ isMiniProgram = false } = {}) {
   const selected = getLocalDressMap();
@@ -77,6 +82,47 @@ export function listOutfitHubDress({ isMiniProgram = false } = {}) {
 
 export function listSelectedLocalDress() {
   return listAppliedDress().map((entry) => entry.item.name);
+}
+
+function isCssVarMap(source) {
+  if (!source || typeof source !== 'object' || Array.isArray(source)) return false;
+  return Object.keys(source).some((key) => key.startsWith('--'));
+}
+
+export function isolateThemePreviewVars(source) {
+  const base = flattenStyleJson(DEFAULT_FAMILY_STYLE).vars;
+  if (!source) return { ...base };
+  if (isCssVarMap(source)) return { ...base, ...source };
+  return { ...base, ...flattenStyleJson(source.style_json).vars };
+}
+
+export function describeSkinTokens(item) {
+  const style = item?.style_json && typeof item.style_json === 'object' ? item.style_json : {};
+  const chrome = getAccentChrome(style.accent);
+  return {
+    id: item?.id || '',
+    name: item?.name || '',
+    primary: chrome.nav,
+    secondary: chrome.page,
+    textColor: style.navColor || style.color || style.profileColor || 'var(--text-color)',
+    background: style.pageColor || style.background || style.cardBackground || chrome.page,
+    previewImage: item?.cover_img || item?.poster_img || item?.detail_img || '',
+  };
+}
+
+export function themePreviewAccentClass(item) {
+  const accent = String(item?.style_json?.accent || 'pine').toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(accent)) return 'accent-pine';
+  return `accent-${accent}`;
+}
+
+export function themePreviewShotClass(item, extra = []) {
+  return [`shot-${item?.preview || 'default'}`, themePreviewAccentClass(item), ...extra]
+    .filter(Boolean);
+}
+
+export function themePreviewVars(item) {
+  return isolateThemePreviewVars(item);
 }
 
 export function buildLivePreview({
@@ -131,12 +177,10 @@ export function buildLivePreview({
     skipped,
     nativeLocked: Boolean(isMiniProgram),
     sample: THEME_PREVIEW_SAMPLE,
-    vars: resolved.vars,
+    vars: isolateThemePreviewVars(resolved.vars),
+    skin: describeSkinTokens(theme),
+    accentClass: themePreviewAccentClass(theme),
   };
-}
-
-export function themePreviewVars(item) {
-  return flattenStyleJson(item?.style_json).vars;
 }
 
 export function composePreviewOutfit({
@@ -146,14 +190,14 @@ export function composePreviewOutfit({
   extraDress = null,
   isMiniProgram = false,
 } = {}) {
-  const theme = getThemeById(themeId) || getActiveTheme();
+  const theme = cloneCatalogItem(getThemeById(themeId) || getActiveTheme());
   const overlayFlag = overlay === undefined ? getOverlayLocalDress() : Boolean(overlay);
   const selected = { ...(localDress || getLocalDressMap()) };
   if (extraDress?.group) {
     selected[extraDress.group] = extraDress.id;
   }
   const dressItems = Object.entries(selected).flatMap(([groupId, itemId]) => {
-    const item = getDressItem(itemId);
+    const item = cloneCatalogItem(getDressItem(itemId));
     const group = getDressGroup(groupId);
     if (!item || !group) return [];
     return [{ item, group }];

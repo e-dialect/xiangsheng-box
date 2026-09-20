@@ -1,16 +1,16 @@
 # Core Django
-django==6.1
+django==6.1.1
 django-cors-headers~=4.9.0
 django-simpleui==2026.1.13
-djangorestframework~=3.18.0
+djangorestframework~=3.18.1
 
 # Utilities
 demjson3~=3.0.6
-pyjwt~=2.4.0
+pyjwt~=2.14.0
 django-environ==0.14.0
 
 # Data Processing
-numpy>=2.5.2,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
+numpy>=2.5.3,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
 requests
 requests_toolbelt==1.0.0
 

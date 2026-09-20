@@ -1,0 +1,20 @@
+# Legal and licensing boundaries are R2 and require the organization owner.
+/LICENSE                                  @lin594
+/LICENSING.md                             @lin594
+/DATA_LICENSE.md                          @lin594
+/ASSET_BOUNDARIES.md                      @lin594
+/THIRD_PARTY_NOTICES.md                   @lin594
+/.github/CODEOWNERS                       @lin594
+
+# Migrations, identity, permissions, consent/evidence governance and audit are R2.
+/backend/guantou/*/migrations/**           @aB0T-bupt @lin594
+/backend/guantou/guantou/authentication.py @aB0T-bupt @lin594
+/backend/guantou/guantou/v2_permissions.py @aB0T-bupt @lin594
+/backend/guantou/guantou/v2_governance.py  @aB0T-bupt @lin594
+/backend/guantou/guantou/legacy_import.py  @aB0T-bupt @lin594
+/backend/guantou/user/**                   @aB0T-bupt @lin594
+/backend/guantou/audit/**                  @aB0T-bupt @lin594
+
+# Production security and deployment boundaries are R2.
+/backend/guantou/config/settings.py        @aB0T-bupt @lin594
+/docker-compose*.yml                       @aB0T-bupt @lin594

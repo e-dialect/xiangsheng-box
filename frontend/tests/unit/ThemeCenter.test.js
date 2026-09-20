@@ -25,6 +25,7 @@ import {
   clearLocalDress,
   composePreviewOutfit,
   describeAccess,
+  describeSkinTokens,
   dressDisplayTags,
   getActiveTheme,
   getDressGroup,
@@ -70,6 +71,7 @@ import {
   setOverlayLocalDress,
   socialStats,
   themeDisplayTags,
+  themePreviewVars,
   THEME_CATEGORIES,
   THEME_CLOUD_QUEUE_KEY,
   THEME_FAVORITE_STORAGE_KEY,
@@ -1090,6 +1092,37 @@ describe('Theme center page', () => {
     expect(wrapper.vm.previewOpen).toBe(false);
     expect(getActiveTheme().id).toBe('default');
     expect(getLocalDressMap()).toEqual({ cards: 'cards-plain' });
+  });
+
+  it('previews a skin card without writing the global outfit', async () => {
+    const wrapper = mountPage();
+    const paper = GLOBAL_THEMES.find((item) => item.id === 'paper');
+    const radius = paper.style_json.cardBorderRadius;
+    const applied = getAppliedOutfitVars();
+
+    wrapper.vm.onSkinCardPreview(paper);
+    await wrapper.vm.$nextTick();
+    expect(wrapper.vm.previewOpen).toBe(true);
+    expect(wrapper.vm.previewItem.style_json).not.toBe(paper.style_json);
+    wrapper.vm.previewItem.style_json.cardBorderRadius = '99px';
+    expect(paper.style_json.cardBorderRadius).toBe(radius);
+    expect(getActiveTheme().id).toBe('default');
+    expect(getAppliedOutfitVars()).toEqual(applied);
+    expect(wrapper.vm.livePreviewModel.skin).toMatchObject({
+      name: paper.name,
+      primary: expect.any(String),
+      secondary: expect.any(String),
+    });
+    expect(describeSkinTokens(paper).previewImage != null).toBe(true);
+
+    const previewVars = themePreviewVars(paper);
+    previewVars['--dress-card-border-radius'] = '1px';
+    expect(themePreviewVars(paper)['--dress-card-border-radius']).not.toBe('1px');
+
+    wrapper.vm.closePreview();
+    expect(wrapper.vm.previewOpen).toBe(false);
+    expect(getActiveTheme().id).toBe('default');
+    expect(getAppliedOutfitVars()).toEqual(applied);
   });
 
   it('opens detail from a recent theme card and routes dress recents to the list page', async () => {

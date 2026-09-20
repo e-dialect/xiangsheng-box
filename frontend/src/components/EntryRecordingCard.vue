@@ -5,6 +5,29 @@
   >
     <view
       v-if="!compact"
+      class="recording-card__texture"
+      aria-hidden="true"
+    />
+    <view
+      class="recording-card__author"
+    >
+      <AvatarFrame
+        :src="recording.recorder?.avatar || ''"
+        :name="recorderName"
+        :size="compact ? 36 : 48"
+      />
+      <text class="recording-card__author-name">
+        {{ recorderName }}
+      </text>
+      <text
+        v-if="compact"
+        class="recording-card__duration"
+      >
+        · {{ Math.round((recording.duration_ms || 0) / 1000) }} 秒
+      </text>
+    </view>
+    <view
+      v-if="!compact"
       class="recording-card__meta"
     >
       <text class="recording-card__dialect">
@@ -32,13 +55,6 @@
       {{ pronunciationText }}
     </view>
 
-    <view
-      v-if="compact"
-      class="recording-card__meta"
-    >
-      {{ recording.recorder?.nickname || recording.recorder?.username || '乡音贡献者' }}
-      · {{ Math.round((recording.duration_ms || 0) / 1000) }} 秒
-    </view>
     <view class="recording-card__actions">
       <BaseButton
         v-if="detailLink"
@@ -85,6 +101,7 @@
 <script>
 import { goRecordingDetail } from '@/services/navigation';
 import BaseButton from '@/components/BaseButton.vue';
+import AvatarFrame from '@/components/AvatarFrame.vue';
 import {
   dialectLabel,
   entryTitle,
@@ -101,7 +118,7 @@ const TYPE_LABELS = {
 
 export default {
   name: 'EntryRecordingCard',
-  components: { BaseButton },
+  components: { AvatarFrame, BaseButton },
   props: {
     recording: { type: Object, required: true },
     community: { type: Boolean, default: true },
@@ -122,6 +139,11 @@ export default {
     },
     entry() {
       return this.primaryLink?.entry || null;
+    },
+    recorderName() {
+      return this.recording.recorder?.nickname
+        || this.recording.recorder?.username
+        || '乡音贡献者';
     },
     title() {
       return this.entry ? entryTitle(this.entry) : '待整理乡音';
@@ -179,13 +201,52 @@ export default {
 .recording-card.recording-card--compact {
   padding: 0;
   border: 0;
+  box-shadow: none;
   background: transparent;
 }
 .recording-card {
-  padding: 30rpx;
-  border-radius: var(--radius-lg);
-  background: var(--surface-color);
-  border: 1rpx solid var(--border-color);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: var(--dress-card-padding, 30rpx);
+  border-radius: var(--dress-card-border-radius, var(--radius-lg));
+  background: var(--dress-card-background, var(--surface-color));
+  border:
+    var(--dress-card-border-width, 1rpx)
+    solid var(--dress-card-border-color, var(--border-color));
+  box-shadow: var(--dress-card-shadow, none);
+}
+
+.recording-card__texture {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: var(--dress-card-texture-opacity, var(--dress-grain-opacity, 0));
+  background-image: var(--dress-card-texture-image, var(--dress-grain-image, none));
+  background-size: var(--dress-card-texture-size, var(--dress-grain-size, 46rpx 46rpx));
+}
+
+.recording-card__author {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: var(--muted-color);
+  font-size: 22rpx;
+}
+
+.recording-card__author-name {
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recording-card__duration {
+  flex: 0 0 auto;
 }
 
 .recording-card__meta,
@@ -197,9 +258,20 @@ export default {
 }
 
 .recording-card__meta {
+  margin-top: 16rpx;
   justify-content: space-between;
   color: var(--muted-color);
   font-size: 22rpx;
+}
+
+.recording-card__dialect {
+  padding: var(--dress-card-tag-padding, 6rpx 14rpx);
+  border:
+    var(--dress-card-tag-border-width, 0px)
+    solid var(--dress-card-tag-border-color, transparent);
+  border-radius: var(--dress-card-tag-border-radius, var(--radius-pill));
+  background: var(--dress-card-tag-background, var(--accent-subtle-color));
+  color: var(--dress-card-tag-color, var(--accent-color));
 }
 
 .recording-card__title {

@@ -186,11 +186,11 @@ test('theme center keeps one live pack and placeholders', async ({ page }) => {
   await expect(page.getByText('录音数从贡献履历自动核验；徽章与挑战资格由活动审核发放，不能在本页自行增加。')).toBeVisible();
   await page.goBack();
 
-  await page.locator('.theme-card', { hasText: '松风会员' }).click();
+  await page.locator('.theme-card', { hasText: '松风会员' }).locator('.theme-name').click();
   await expect(page.getByText('该装扮为会员专属，开通会员即可解锁全部会员主题与装扮').first()).toBeVisible();
   await page.locator('.sheet-actions .base-button').first().click({ force: true });
 
-  await page.locator('.theme-card', { hasText: '开春乡音' }).click();
+  await page.locator('.theme-card', { hasText: '开春乡音' }).locator('.theme-name').click();
   await expect(page.getByText('已绝版').first()).toBeVisible();
   await page.locator('.sheet-actions .base-button').first().click({ force: true });
 
@@ -206,7 +206,7 @@ test('theme center keeps one live pack and placeholders', async ({ page }) => {
   await expect(page.getByText('立即应用')).toHaveCount(0);
   await page.locator('.sheet-actions .base-button').first().click({ force: true });
 
-  await page.locator('.theme-card', { hasText: '默认方言主题' }).click();
+  await page.locator('.theme-card', { hasText: '默认方言主题' }).locator('.theme-name').click();
   await page.locator('.sheet').getByText('实时预览').click({ force: true });
   await expect(page.locator('.preview-sheet').getByText('实时预览').first()).toBeVisible();
   await expect(page.getByText('立即应用').first()).toBeVisible();
@@ -300,7 +300,21 @@ async function mockSignedInCollector(page) {
   });
   await page.route('**/users/7/password', async (route) => {
     if (route.request().method() === 'PUT') {
-      await route.fulfill({ json: { user: { id: 7 }, token: 'fresh-token' } });
+      await route.fulfill({
+        json: {
+          user: {
+            id: 7,
+            username: 'collector',
+            nickname: '采集者',
+            email: 'c@example.com',
+            telephone: '13900000001',
+            birthday: '1991-02-03',
+            wechat: false,
+            primary_dialect: { id: 3, name: '四川话', qualified_code: '西南官话.四川' },
+          },
+          token: 'fresh-token',
+        },
+      });
       return;
     }
     await route.continue();
