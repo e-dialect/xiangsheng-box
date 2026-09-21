@@ -4,7 +4,7 @@
 
 ## Related Issue
 
-<!-- Fixes #... / Relates to #...；没有 Leaf Issue 不视为正式实现任务。 -->
+<!-- Fixes #... / Relates to #...；没有 Leaf Issue 不视为正式实现任务。Issue 编号只写在这里，不要放进 PR 标题。 -->
 
 ## Risk
 
@@ -25,6 +25,7 @@
 
 - [ ] PR title and commit messages use `type: summary` or `type(scope): summary`, e.g. `ci: cache dependencies`
 - [ ] `scope` names an owned domain from `CONTRIBUTING.md` — no phase/version codenames (`v2`, `phase1`) and no whole-layer names (`frontend`, `backend`); a PR spanning two domains uses the primary scope and explains the rest below
+- [ ] PR title and commit subject lines carry no issue numbers — issues are linked only in **Related Issue** above (`Closes #123`, or `Relates to #123` for partial work)
 - [ ] PR branch commits are clean: no `WIP`, `fixup!`, unrelated merge commits, or unrelated history; a merge used only to sync the current default branch is allowed
 - [ ] `make backend-check`
 - [ ] `make frontend-check`
