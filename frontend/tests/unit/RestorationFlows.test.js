@@ -60,7 +60,7 @@ describe('restored journeys', () => {
     vi.useRealTimers();
   });
   it('retains a comment request id after a failed send to prevent duplicate comments', async () => {
-    const detail = context(Detail, { targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } } });
+    const detail = context(Detail, { targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } }, $emit: vi.fn() });
     createComment.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
     await detail.send(); expect(detail.form.body).toBe('乡音');
@@ -114,13 +114,14 @@ describe('draft interruption recovery', () => {
 
 describe('entry discussion payload', () => {
   it('posts to Entry discussion without accidentally attaching a Recording', async () => {
-    const detail = context(Detail, { targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } } });
+    const detail = context(Detail, { targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } }, $emit: vi.fn() });
     createComment.mockResolvedValue({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
     await detail.send();
     expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ entry_id: 9 }), 'entry');
     expect(createComment.mock.calls[0][0]).not.toHaveProperty('recording_id');
-    expect(listComments).toHaveBeenCalledWith(9, 1, 'entry');
+    /* 顶层评论：不带 parent_id，用服务端默认页大小 */
+    expect(listComments).toHaveBeenCalledWith(9, 1, 'entry', undefined, undefined);
   });
 });
 

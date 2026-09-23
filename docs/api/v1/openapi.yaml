@@ -494,11 +494,23 @@ paths:
             type: integer
             minimum: 1
           required: true
+        - name: parent_id
+          in: query
+          description: 提供时返回该一级评论下的一层回复
+          schema:
+            type: integer
+            nullable: true
         - name: page
           in: query
           schema:
             type: integer
             minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
     post:
       tags:
         - Recordings
@@ -622,11 +634,23 @@ paths:
             type: integer
             minimum: 1
           required: true
+        - name: parent_id
+          in: query
+          description: 提供时返回该一级评论下的一层回复
+          schema:
+            type: integer
+            nullable: true
         - name: page
           in: query
           schema:
             type: integer
             minimum: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
     post:
       tags:
         - Entries
@@ -1158,6 +1182,9 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
     CollectionCreate:
       allOf:
         - $ref: "#/components/schemas/CollectionWrite"
@@ -1185,6 +1212,9 @@ components:
           $ref: "#/components/schemas/RecordingV2"
         needs_review:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
     CollectionSection:
       type: object
       properties:
@@ -1200,6 +1230,9 @@ components:
         recording_count:
           type: integer
           minimum: 0
+        created_at:
+          type: string
+          format: date-time
     CollectionDetail:
       allOf:
         - $ref: "#/components/schemas/Collection"
@@ -1223,6 +1256,35 @@ components:
             recording_count:
               type: integer
               description: 去重后的可见录音数
+    CommentReply:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        parent_id:
+          type: integer
+        body:
+          type: string
+        author_id:
+          type: integer
+          nullable: true
+        author_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        like_count:
+          type: integer
+        liked:
+          type: boolean
+        editable:
+          type: boolean
     RecordingComment:
       type: object
       properties:
@@ -1232,6 +1294,9 @@ components:
         recording_id:
           type: integer
           minimum: 1
+        entry_id:
+          type: integer
+          nullable: true
         parent_id:
           type: integer
           nullable: true
@@ -1239,12 +1304,26 @@ components:
           type: string
         author_id:
           type: integer
-          minimum: 1
+          nullable: true
         author_name:
           type: string
         created_at:
           type: string
           format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        reply_count:
+          type: integer
+          minimum: 0
+        recent_replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentReply"
+        deleted:
+          type: boolean
         like_count:
           type: integer
         liked:
@@ -1258,6 +1337,9 @@ components:
           type: integer
           minimum: 1
         parent_id:
+          type: integer
+          nullable: true
+        reply_to_id:
           type: integer
           nullable: true
         body:
@@ -1280,6 +1362,9 @@ components:
         entry_id:
           type: integer
           minimum: 1
+        recording_id:
+          type: integer
+          nullable: true
         parent_id:
           type: integer
           nullable: true
@@ -1287,12 +1372,26 @@ components:
           type: string
         author_id:
           type: integer
-          minimum: 1
+          nullable: true
         author_name:
           type: string
         created_at:
           type: string
           format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        reply_count:
+          type: integer
+          minimum: 0
+        recent_replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentReply"
+        deleted:
+          type: boolean
         like_count:
           type: integer
         liked:
@@ -1306,6 +1405,9 @@ components:
           type: integer
           minimum: 1
         parent_id:
+          type: integer
+          nullable: true
+        reply_to_id:
           type: integer
           nullable: true
         body:

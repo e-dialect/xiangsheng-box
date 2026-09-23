@@ -22,6 +22,7 @@
             :confirm-type="confirmType"
             :autosize="resolvedAutosize"
             :indicator="indicator"
+            :adjust-position="adjustPosition"
             bordered
             @change="handleChange"
             @blur="$emit('blur', $event)"
@@ -43,6 +44,7 @@
             :clearable="clearable"
             :status="error ? 'error' : status"
             :suffix-icon="suffixIcon"
+            :adjust-position="adjustPosition"
             borderless
             @change="handleChange"
             @confirm="handleConfirm"
@@ -135,6 +137,8 @@ export default {
     focus: { type: Boolean, default: false },
     ariaLabel: { type: String, default: '' },
     ariaRole: { type: String, default: '' },
+    /* 面板内由容器自行抬升输入区时置 false，避免原生层二次顶起页面。 */
+    adjustPosition: { type: Boolean, default: true },
     confirmType: {
       type: String,
       default: 'done',

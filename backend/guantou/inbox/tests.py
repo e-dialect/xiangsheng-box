@@ -179,7 +179,75 @@ class InboxApiTests(TestCase):
         self.assertEqual(item["verb"], Notification.Verb.USAGE_ATTESTATION)
         self.assertEqual(
             item["target"],
-            {"type": "entry", "id": 42, "url": "/pages/entries/details?id=42"},
+            {
+                "type": "entry",
+                "id": 42,
+                "url": "/pages/entries/details?id=42",
+                # Older rows carry no discussion anchor.
+                "comment_id": None,
+                "root_id": None,
+                "anchor": "",
+            },
+        )
+
+    def test_notification_target_exposes_comment_anchor(self):
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.REPLY,
+            description="你的乡音有了新的回应",
+            metadata={
+                "target_type": "recording",
+                "target_id": 7,
+                "target_url": "/pages/recordings/details?id=7",
+                "comment_id": 9,
+                "root_id": 8,
+                "anchor": "comment-9",
+            },
+        )
+
+        response = self.client.get(
+            "/notifications",
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        target = response.json()["notifications"][0]["target"]
+        self.assertEqual(target["comment_id"], 9)
+        self.assertEqual(target["root_id"], 8)
+        self.assertEqual(target["anchor"], "comment-9")
+
+    def test_list_filters_by_verb(self):
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.RECORDING_LIKE,
+        )
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.REPLY,
+        )
+
+        response = self.client.get(
+            "/notifications",
+            {"verb": Notification.Verb.RECORDING_LIKE},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["total"], 1)
+        self.assertEqual(
+            body["notifications"][0]["verb"], Notification.Verb.RECORDING_LIKE
+        )
+        self.assertEqual(
+            self.client.get(
+                "/notifications",
+                {"verb": ""},
+                HTTP_AUTHORIZATION=bearer(self.recipient),
+            ).status_code,
+            400,
         )
 
     def test_event_notification_suppresses_self_notifications(self):

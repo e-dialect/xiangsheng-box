@@ -69,15 +69,25 @@
           @click="goEntryDetail(link.entry.id)"
         />
       </view>
-      <DiscussionThread
-        :key="id"
+      <DiscussionSummary
+        ref="summary"
         :target-id="id"
+        @open="openPanel"
       />
     </view>
+    <DiscussionPanel
+      v-if="panelOpen"
+      :scopes="discussionScopes"
+      :initial-root="panelRoot"
+      :initial-comment="panelComment"
+      @close="panelOpen = false"
+      @sent="refreshSummary"
+    />
   </PageShell>
 </template>
 <script>
-import DiscussionThread from '@/components/DiscussionThread.vue';
+import DiscussionSummary from '@/components/DiscussionSummary.vue';
+import DiscussionPanel from '@/components/DiscussionPanel.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
@@ -98,7 +108,8 @@ import { notify } from '@/services/feedback';
 
 export default {
   components: {
-    DiscussionThread,
+    DiscussionSummary,
+    DiscussionPanel,
     PageShell,
     BaseButton,
     BaseLoading,
@@ -112,7 +123,9 @@ export default {
     loading: true,
     error: '',
     busy: false,
-
+    panelOpen: false,
+    panelRoot: null,
+    panelComment: null,
   }),
   computed: {
     recorderName() {
@@ -121,12 +134,30 @@ export default {
     shareType() {
       return typeof window === 'undefined' ? 'share' : '';
     },
+    /* 录音详情默认只讨论这段录音 */
+    discussionScopes() {
+      return [{
+        type: 'recording',
+        id: this.id,
+        label: this.recording?.original_gloss || '乡音留言',
+      }];
+    },
   },
   onLoad(options) {
     this.id = options.id;
+    this.panelComment = Number(options.comment) || null;
+    this.panelRoot = Number(options.root) || null;
   },
   onShow() {
     this.load();
+  },
+  onBackPress() {
+    if (!this.panelOpen) return false;
+    this.panelOpen = false;
+    return true;
+  },
+  onHide() {
+    this.panelOpen = false;
   },
   onShareAppMessage() {
     return this.shareMessage();
@@ -155,11 +186,19 @@ export default {
         recordingId: this.id,
       });
     },
+    openPanel() {
+      this.panelOpen = true;
+    },
+    refreshSummary() {
+      if (this.$refs.summary) this.$refs.summary.reload();
+    },
     async load() {
       this.loading = true;
       this.error = '';
       try {
         this.recording = await getRecording(this.id);
+        /* 通知深链：直接打开这条讨论并高亮被回复的留言 */
+        if (this.panelComment || this.panelRoot) this.openPanel();
       } catch (error) {
         this.recording = null;
         this.error = '录音不存在、未公开或暂时无法读取';

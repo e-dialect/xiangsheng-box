@@ -85,6 +85,44 @@ describe('notification center', () => {
     });
   });
 
+  it('opens the anchored discussion for a reply notification', async () => {
+    const wrapper = mountCenter();
+    const reply = {
+      ...notification,
+      id: 13,
+      verb: 'comment.reply',
+      target: {
+        type: 'recording',
+        id: 7,
+        url: '/pages/recordings/details?id=7',
+        comment_id: 31,
+        root_id: 30,
+        anchor: 'comment-31',
+      },
+    };
+    wrapper.vm.notifications = [reply];
+
+    await wrapper.vm.openNotification(reply);
+
+    expect(uni.navigateTo).toHaveBeenCalledWith({
+      url: '/pages/recordings/details?id=7&comment=31&root=30',
+    });
+  });
+
+  it('falls back to the target url for older notifications without an anchor', async () => {
+    const wrapper = mountCenter();
+    wrapper.vm.notifications = [notification];
+
+    await wrapper.vm.openNotification({
+      ...notification,
+      target: { ...notification.target, comment_id: null, root_id: null },
+    });
+
+    expect(uni.navigateTo).toHaveBeenCalledWith({
+      url: '/pages/entries/details?id=9',
+    });
+  });
+
   it('marks the loaded collection read in one request', async () => {
     const wrapper = mountCenter();
     wrapper.vm.notifications = [notification];

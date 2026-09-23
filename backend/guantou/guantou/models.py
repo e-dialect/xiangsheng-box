@@ -2287,6 +2287,7 @@ class Collection(models.Model):
     description = models.TextField(blank=True, max_length=2000)
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at", "-id"]
@@ -2298,6 +2299,7 @@ class CollectionEntry(models.Model):
     )
     entry = models.ForeignKey(Entry, on_delete=models.PROTECT)
     sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["sort_order", "id"]
@@ -2321,6 +2323,7 @@ class CollectionRecording(models.Model):
     )
     recording = models.ForeignKey(Recording, on_delete=models.PROTECT)
     sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["sort_order", "id"]
@@ -2368,6 +2371,14 @@ class RecordingComment(models.Model):
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies"
     )
+    # Second-level reply target; always a sibling under the same root comment.
+    reply_to = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="reply_targets",
+    )
     body = models.TextField(max_length=2000)
     hidden = models.BooleanField(default=False)
     client_id = models.UUIDField()
@@ -2375,6 +2386,16 @@ class RecordingComment(models.Model):
 
     class Meta:
         ordering = ["created_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["entry", "parent", "hidden", "created_at"],
+                name="entry_comment_thread_idx",
+            ),
+            models.Index(
+                fields=["recording", "parent", "hidden", "created_at"],
+                name="rec_comment_thread_idx",
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["author", "client_id"], name="recording_comment_request_unique"

@@ -1,6 +1,6 @@
 """Entry-first collections and lightweight Recording interactions (no legacy writes)."""
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -62,8 +62,16 @@ def recording_data(recording, request):
 class CollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collection
-        fields = ["id", "title", "description", "is_public", "owner_id", "created_at"]
-        read_only_fields = ["owner_id", "created_at"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "is_public",
+            "owner_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["owner_id", "created_at", "updated_at"]
 
 
 class SectionInput(serializers.Serializer):
@@ -117,6 +125,10 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if box.owner_id != self.request.user.id:
             raise PermissionDenied("只有集盒所有者可以修改")
         return box
+
+    def touch(self, box):
+        """Bump the box's updated_at after member mutations without a full save."""
+        Collection.objects.filter(pk=box.pk).update(updated_at=timezone.now())
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
@@ -188,6 +200,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                         "id": item.id,
                         "needs_review": not valid,
                         "recording": recording_map[item.recording_id],
+                        "created_at": item.created_at,
                     }
                 )
                 seen.add(item.recording_id)
@@ -197,6 +210,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
                     "entry": entry_map[section.entry_id],
                     "recordings": items,
                     "recording_count": len(items),
+                    "created_at": section.created_at,
                 }
             )
         pending = []
@@ -204,7 +218,11 @@ class CollectionViewSet(viewsets.ModelViewSet):
             if item.recording_id not in recording_map:
                 continue
             pending.append(
-                {"id": item.id, "recording": recording_map[item.recording_id]}
+                {
+                    "id": item.id,
+                    "recording": recording_map[item.recording_id],
+                    "created_at": item.created_at,
+                }
             )
             seen.add(item.recording_id)
         if data["editable"]:
@@ -235,11 +253,14 @@ class CollectionViewSet(viewsets.ModelViewSet):
             entry=entry,
             defaults={"sort_order": append_order(box.sections)},
         )
+        self.touch(box)
         return Response({"id": section.id})
 
     @action(detail=True, methods=["delete"], url_path=r"entries/(?P<item_id>[0-9]+)")
     def remove_entry(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().sections, pk=item_id).delete()
+        box = self.owned()
+        get_object_or_404(box.sections, pk=item_id).delete()
+        self.touch(box)
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -276,11 +297,14 @@ class CollectionViewSet(viewsets.ModelViewSet):
         # Explicitly assigning a linked entry confirms organization of a pending item.
         if section:
             box.recording_items.filter(section=None, recording=recording).delete()
+        self.touch(box)
         return Response({"id": item.id})
 
     @action(detail=True, methods=["delete"], url_path=r"recordings/(?P<item_id>[0-9]+)")
     def remove_recording(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().recording_items, pk=item_id).delete()
+        box = self.owned()
+        get_object_or_404(box.recording_items, pk=item_id).delete()
+        self.touch(box)
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -315,6 +339,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         for index, row in enumerate(ordered):
             row.sort_order = index
         rows.model.objects.bulk_update(ordered, ["sort_order"])
+        self.touch(box)
         return Response({"ordered": True})
 
 
@@ -327,6 +352,15 @@ def event_once(actor, recipient, verb, recording, comment=None):
         "target_id": recording.id,
         "target_url": f"/pages/{'entries' if target_type == 'entry' else 'recordings'}/details?id={recording.id}",
     }
+    if comment is not None:
+        # Enough routing to reopen the discussion and highlight the comment.
+        metadata.update(
+            {
+                "comment_id": comment.id,
+                "root_id": comment.parent_id or comment.id,
+                "anchor": f"comment-{comment.id}",
+            }
+        )
     obj = comment or recording
     # One notification per actor/object/verb, including unlike/re-like.
     from django.contrib.contenttypes.models import ContentType
@@ -404,16 +438,13 @@ class CommentInput(serializers.Serializer):
     recording_id = serializers.IntegerField(min_value=1, required=False)
     entry_id = serializers.IntegerField(min_value=1, required=False)
     parent_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    reply_to_id = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     body = serializers.CharField(max_length=2000)
     client_id = serializers.UUIDField()
 
 
-class CommentSerializer(serializers.ModelSerializer):
-    author_name = serializers.CharField(source="author.username", read_only=True)
-    author_id = serializers.IntegerField(read_only=True)
-    like_count = serializers.SerializerMethodField()
-    liked = serializers.SerializerMethodField()
-    editable = serializers.SerializerMethodField()
+class CommentFieldsMixin:
+    """Viewer-relative fields shared by top-level comments and their replies."""
 
     def get_like_count(self, obj):
         return obj.likes.count()
@@ -428,6 +459,82 @@ class CommentSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         return user.is_authenticated and (user.id == obj.author_id or user.is_staff)
 
+    def get_reply_to_author_name(self, obj):
+        if not obj.reply_to_id:
+            return ""
+        return obj.reply_to.author.username
+
+
+class CommentReplySerializer(CommentFieldsMixin, serializers.ModelSerializer):
+    author_name = serializers.CharField(source="author.username", read_only=True)
+    author_id = serializers.IntegerField(read_only=True)
+    reply_to_author_name = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    liked = serializers.SerializerMethodField()
+    editable = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecordingComment
+        fields = [
+            "id",
+            "parent_id",
+            "body",
+            "author_name",
+            "author_id",
+            "created_at",
+            "reply_to_id",
+            "reply_to_author_name",
+            "like_count",
+            "liked",
+            "editable",
+        ]
+
+
+class CommentSerializer(CommentFieldsMixin, serializers.ModelSerializer):
+    """Top-level comment list. Hidden roots survive as tombstones when replies remain."""
+
+    author_name = serializers.CharField(source="author.username", read_only=True)
+    author_id = serializers.IntegerField(read_only=True)
+    reply_to_id = serializers.IntegerField(read_only=True)
+    reply_to_author_name = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
+    recent_replies = serializers.SerializerMethodField()
+    deleted = serializers.SerializerMethodField()
+    like_count = serializers.SerializerMethodField()
+    liked = serializers.SerializerMethodField()
+    editable = serializers.SerializerMethodField()
+
+    def get_reply_count(self, obj):
+        annotated = getattr(obj, "reply_count", None)
+        if annotated is not None:
+            return annotated
+        return obj.replies.filter(hidden=False).count()
+
+    def get_recent_replies(self, obj):
+        if obj.parent_id:
+            return []
+        replies = obj.replies.filter(hidden=False).order_by("created_at", "id")[:3]
+        return CommentReplySerializer(replies, many=True, context=self.context).data
+
+    def get_deleted(self, obj):
+        return obj.hidden
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.hidden:
+            # Keep the thread readable without disclosing the removed content.
+            data.update(
+                {
+                    "body": "",
+                    "author_name": "",
+                    "author_id": None,
+                    "like_count": 0,
+                    "liked": False,
+                    "editable": False,
+                }
+            )
+        return data
+
     class Meta:
         model = RecordingComment
         fields = [
@@ -439,6 +546,11 @@ class CommentSerializer(serializers.ModelSerializer):
             "author_name",
             "author_id",
             "created_at",
+            "reply_to_id",
+            "reply_to_author_name",
+            "reply_count",
+            "recent_replies",
+            "deleted",
             "like_count",
             "liked",
             "editable",
@@ -465,14 +577,60 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
+        """Writable rows only: hidden comments accept no reply, like or delete."""
         return (
             RecordingComment.objects.filter(
                 **{f"{self.target_type}__in": self.visible_targets()},
                 hidden=False,
             )
             .filter(Q(parent=None) | Q(parent__hidden=False))
-            .select_related("author", "recording", "entry", "parent__author")
+            .select_related(
+                "author", "recording", "entry", "parent__author", "reply_to__author"
+            )
             .prefetch_related("likes")
+        )
+
+    def thread_queryset(self, target_id):
+        """Top-level page of one discussion; hidden roots stay when replies remain."""
+        return (
+            RecordingComment.objects.filter(
+                **{f"{self.target_type}__in": self.visible_targets()},
+                **{f"{self.target_type}_id": target_id},
+                parent=None,
+            )
+            .filter(Q(hidden=False) | Q(replies__hidden=False))
+            .annotate(
+                reply_count=Count(
+                    "replies", filter=Q(replies__hidden=False), distinct=True
+                )
+            )
+            .select_related(
+                "author", "recording", "entry", "parent__author", "reply_to__author"
+            )
+            .prefetch_related("likes")
+            .order_by("created_at", "id")
+            .distinct()
+        )
+
+    def replies_queryset(self, target_id, root_id):
+        """Replies of one root; the root itself may already be hidden."""
+        return (
+            RecordingComment.objects.filter(
+                **{f"{self.target_type}__in": self.visible_targets()},
+                **{f"{self.target_type}_id": target_id},
+                parent_id=root_id,
+                hidden=False,
+            )
+            .annotate(
+                reply_count=Count(
+                    "replies", filter=Q(replies__hidden=False), distinct=True
+                )
+            )
+            .select_related(
+                "author", "recording", "entry", "parent__author", "reply_to__author"
+            )
+            .prefetch_related("likes")
+            .order_by("created_at", "id")
         )
 
     def list(self, request):
@@ -480,7 +638,22 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
             request.query_params.get(f"{self.target_type}_id")
         )
         get_object_or_404(self.visible_targets(), pk=values)
-        rows = self.get_queryset().filter(**{f"{self.target_type}_id": values})
+        root_id = request.query_params.get("parent_id")
+        if root_id:
+            root_id = serializers.IntegerField(min_value=1).run_validation(root_id)
+            roots = (
+                RecordingComment.objects.filter(
+                    **{f"{self.target_type}__in": self.visible_targets()},
+                    **{f"{self.target_type}_id": values},
+                    parent=None,
+                ).filter(Q(hidden=False) | Q(replies__hidden=False))
+                # Joining replies multiplies rows; get_object_or_404 needs distinct.
+                .distinct()
+            )
+            get_object_or_404(roots, pk=root_id)
+            rows = self.replies_queryset(values, root_id)
+        else:
+            rows = self.thread_queryset(values)
         page = self.paginate_queryset(rows)
         return self.get_paginated_response(self.get_serializer(page, many=True).data)
 
@@ -504,35 +677,55 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
                 **self.target_filter(recording),
                 parent=None,
             )
-        comment, created = RecordingComment.objects.get_or_create(
-            author=request.user,
-            client_id=data["client_id"],
-            defaults={
+        reply_to = None
+        if data.get("reply_to_id"):
+            if parent is None:
+                raise ValidationError("回复具体评论时必须同时提供一级评论")
+            reply_to = get_object_or_404(
+                self.get_queryset(),
+                pk=data["reply_to_id"],
                 **self.target_filter(recording),
-                "parent": parent,
-                "body": data["body"],
-            },
-        )
+            )
+            if reply_to.parent_id != parent.id:
+                raise ValidationError("回复目标不在同一讨论串")
+        defaults = {
+            **self.target_filter(recording),
+            "parent": parent,
+            "reply_to": reply_to,
+            "body": data["body"],
+        }
+        try:
+            # Nested savepoint so a losing race can still recover the winning row.
+            with transaction.atomic():
+                comment, created = RecordingComment.objects.get_or_create(
+                    author=request.user,
+                    client_id=data["client_id"],
+                    defaults=defaults,
+                )
+        except IntegrityError:
+            comment = RecordingComment.objects.get(
+                author=request.user, client_id=data["client_id"]
+            )
+            created = False
         if (
             getattr(comment, target_key) != recording.id
             or comment.parent_id != data.get("parent_id")
+            or comment.reply_to_id != data.get("reply_to_id")
             or comment.body != data["body"]
             or comment.hidden
         ):
             raise ValidationError("重复请求标识对应的评论不一致")
         if created:
+            owner = self.recipient(recording)
             event_once(
-                request.user,
-                self.recipient(recording),
-                f"{self.target_type}.comment",
-                recording,
-                comment,
+                request.user, owner, f"{self.target_type}.comment", recording, comment
             )
-            if parent and parent.author != self.recipient(recording):
+            reply_recipient = reply_to or parent
+            if reply_recipient and reply_recipient.author != owner:
                 event_once(
                     request.user,
-                    parent.author,
-                    f"{self.target_type}.reply",
+                    reply_recipient.author,
+                    Notification.Verb.REPLY,
                     recording,
                     comment,
                 )
@@ -557,9 +750,13 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
     def like(self, request, pk=None):
         comment = self.get_object()
         if request.method == "PUT":
-            _, created = RecordingCommentLike.objects.get_or_create(
-                comment=comment, user=request.user
-            )
+            try:
+                with transaction.atomic():
+                    _, created = RecordingCommentLike.objects.get_or_create(
+                        comment=comment, user=request.user
+                    )
+            except IntegrityError:
+                created = False
             if created:
                 event_once(
                     request.user,
@@ -571,7 +768,13 @@ class RecordingCommentViewSet(viewsets.GenericViewSet):
         else:
             comment.likes.filter(user=request.user).delete()
         return Response(
-            {"liked": request.method == "PUT", "like_count": comment.likes.count()}
+            {
+                "liked": request.method == "PUT",
+                # Re-count from the table: prefetched likes can be stale after a write.
+                "like_count": RecordingCommentLike.objects.filter(
+                    comment_id=comment.id
+                ).count(),
+            }
         )
 
 
