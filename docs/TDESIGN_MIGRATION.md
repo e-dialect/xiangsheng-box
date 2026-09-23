@@ -12,6 +12,8 @@ V2 全站聚合验收由 [#346](https://github.com/e-dialect/xiangsheng-box/issu
 
 共享 `BaseButton` 的 ghost / outline 按压态由 [#381](https://github.com/e-dialect/xiangsheng-box/issues/381) 固定为当前强调色边界与文字、强调浅色背景；避免 TDesign 固定深色 active token 在暗色主题中形成伪禁用，同时不改变 primary、danger、disabled 或 loading 状态。
 
+[#410](https://github.com/e-dialect/xiangsheng-box/issues/410) 将 `soft` / `fog` 的文字、背景和描边重新绑定到项目语义 Token：浅底按钮使用语义正文色，雾面按钮使用次级正文色，避免支持主题下前景与背景同色或对比度不足；页面不再为主题按钮单独补色。
+
 | 页面/共享区域 | 状态 | 后续工作或 Issue |
 | --- | --- | --- |
 | `components/BaseButton/BaseForm/BaseField/BaseLoading` | done | 项目级原语；BaseField 在 BaseForm 内转发真实表单关系，独立使用时提供无 DOM 的安全关系，页面切换不触发 FormItem 卸载错误 |

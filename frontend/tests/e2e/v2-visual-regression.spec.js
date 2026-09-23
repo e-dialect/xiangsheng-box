@@ -32,6 +32,29 @@ function relativeScreenshot(group, filename) {
   return `${group}/${filename}.png`;
 }
 
+function contrastRatio(foreground, background) {
+  const channels = (value) => {
+    const values = (String(value).match(/[\d.]+/g) || []).map(Number);
+    if (values.length < 3) throw new Error(`Unsupported color value: ${value}`);
+    if (values.length > 3 && values[3] < 1) {
+      throw new Error(`Contrast check requires an opaque rendered color: ${value}`);
+    }
+    return values.slice(0, 3).map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+  };
+  const luminance = (value) => {
+    const [red, green, blue] = channels(value);
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+  };
+  const light = Math.max(luminance(foreground), luminance(background));
+  const dark = Math.min(luminance(foreground), luminance(background));
+  return (light + 0.05) / (dark + 0.05);
+}
+
 async function capture(page, {
   actualPathExpected = '',
   avatarState = 'image',
@@ -90,6 +113,61 @@ test.afterAll(async () => {
     stateSampleCount: STATE_VISUAL_MATRIX.length,
     themeJourneyVariantCount: THEME_JOURNEY_VISUAL_MATRIX.length,
     outputDirectory: visualReviewOutput,
+  });
+});
+
+const BUTTON_ACCENTS = ['pine', 'tea', 'ink', 'clay', 'mist', 'osmanthus'];
+const BUTTON_THEMES = ['light', 'dark'];
+const BUTTON_CONTRAST_CASES = [
+  ...BUTTON_THEMES.flatMap((theme) => BUTTON_ACCENTS.flatMap((accent) => [
+    {
+      accent, look: 'soft', route: '/pages/search', screenshot: `button-soft-search-${theme}-${accent}`, theme,
+    },
+    {
+      accent, look: 'fog', route: '/pages/search', screenshot: `button-fog-search-${theme}-${accent}`, theme,
+    },
+  ])),
+  {
+    accent: 'pine', look: 'fog', route: '/pages/circles/index', screenshot: 'button-fog-circles-light-pine', theme: 'light',
+  },
+  {
+    accent: 'pine', look: 'fog', route: '/pages/collections/index', screenshot: 'button-fog-collections-light-pine', theme: 'light',
+  },
+];
+
+BUTTON_CONTRAST_CASES.forEach(({
+  accent, look, route, screenshot, theme,
+}) => {
+  test(`button contrast ${look} ${theme}/${accent} ${route} · #410`, async ({ page }) => {
+    await installVisualFixture(page, { accent, persona: 'member', theme });
+    await page.addInitScript((selectedLook) => {
+      localStorage.setItem('ui_button_style', selectedLook);
+      localStorage.setItem('ui_button_ghost', selectedLook);
+      localStorage.setItem('ui_button_effect', 'none');
+    }, look);
+    await openVisualRoute(page, route, { persona: 'member' });
+    await page.evaluate((selectedLook) => {
+      window.uni?.setStorageSync('ui_button_style', selectedLook);
+      window.uni?.setStorageSync('ui_button_ghost', selectedLook);
+      window.uni?.$emit('theme-change', {
+        effect: 'none',
+        ghostLook: selectedLook,
+        primaryLook: selectedLook,
+      });
+    }, look);
+    const buttons = page.locator(`.base-button--look-${look}:visible`);
+    await expect(buttons.first()).toBeVisible();
+    const colors = await buttons.evaluateAll((nodes) => nodes.map((node) => {
+      const styles = getComputedStyle(node);
+      return { background: styles.backgroundColor, foreground: styles.color };
+    }));
+    colors.forEach(({ background, foreground }) => {
+      expect(foreground).not.toBe(background);
+      expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    });
+    await stableScreenshot(page, {
+      path: visualScreenshotPath('themes', screenshot),
+    });
   });
 });
 

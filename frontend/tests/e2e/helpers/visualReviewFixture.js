@@ -326,6 +326,7 @@ export function observeRuntime(page) {
 }
 
 export async function installVisualFixture(page, {
+  accent = 'pine',
   avatarState = 'image',
   persona = 'guest',
   theme = 'light',
@@ -333,17 +334,24 @@ export async function installVisualFixture(page, {
   focus = '',
   preserveStorage = false,
 } = {}) {
-  await page.addInitScript(({ member, selectedTheme, preserve }) => {
+  await page.addInitScript(({
+    member, selectedAccent, selectedTheme, preserve,
+  }) => {
     if (!preserve || !sessionStorage.getItem('fixture-seeded')) localStorage.clear();
     sessionStorage.setItem('fixture-seeded', 'true');
     localStorage.setItem('ui_theme', selectedTheme);
-    localStorage.setItem('ui_accent', 'pine');
+    localStorage.setItem('ui_accent', selectedAccent);
     localStorage.setItem('visitor_id', 'visual-review-visitor');
     if (member) {
       localStorage.setItem('token', 'visual-review-token');
       localStorage.setItem('id', '7');
     }
-  }, { member: persona === 'member', selectedTheme: theme, preserve: preserveStorage });
+  }, {
+    member: persona === 'member',
+    selectedAccent: accent,
+    selectedTheme: theme,
+    preserve: preserveStorage,
+  });
 
   await page.route(`${process.env.VISUAL_REVIEW_API_ORIGIN || 'http://localhost:8000'}/**`, async (route) => {
     const request = route.request();

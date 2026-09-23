@@ -97,6 +97,23 @@ describe('BaseButton', () => {
     expect(source).toContain('color: var(--text-color);');
   });
 
+  it('keeps soft and fog button foregrounds distinct from their light backgrounds', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/BaseButton.vue'),
+      'utf8',
+    );
+    expect(source).toContain('--td-button-primary-color: var(--text-color);');
+    expect(source).toContain('--td-button-primary-bg-color: var(--accent-subtle-color);');
+    expect(source).toContain('--td-brand-color: var(--text-secondary-color);');
+    expect(source).toContain(
+      '--td-button-primary-outline-color: var(--text-secondary-color);',
+    );
+    expect(source).toContain(
+      '.base-button--ghost.base-button--look-fog {\n  background: var(--surface-subtle-color);',
+    );
+    expect(source).not.toContain('--td-button-primary-outline-active-color:');
+  });
+
   it('emits click on tap but not when disabled or loading', async () => {
     const wrapper = mount(BaseButton);
     wrapper.getComponent({ name: 'TDesignStub' }).vm.$emit('click', { detail: {} });
