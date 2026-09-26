@@ -97,7 +97,7 @@ describe('BaseButton', () => {
     expect(source).toContain('color: var(--text-color);');
   });
 
-  it('keeps soft and fog button foregrounds distinct from their light backgrounds', () => {
+  it('keeps subtle button looks readable in their default and active states', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/BaseButton.vue'),
       'utf8',
@@ -111,6 +111,18 @@ describe('BaseButton', () => {
     expect(source).toContain(
       '.base-button--ghost.base-button--look-fog {\n  background: var(--surface-subtle-color);',
     );
+    expect(source).toContain(
+      '.base-button--look-fresh {\n  --td-brand-color: var(--accent-subtle-color);',
+    );
+    expect(source).toContain(
+      '.base-button--look-wash {\n  --td-brand-color: var(--accent-subtle-color);',
+    );
+    expect(source).toContain(
+      '.base-button--ghost.base-button--look-filled {\n  --td-brand-color: var(--accent-subtle-color);',
+    );
+    expect(source.match(/--td-button-primary-outline-color: var\(--text-color\);/g)).toHaveLength(2);
+    expect(source.match(/--td-button-primary-active-bg-color: var\(--surface-subtle-color\);/g)).toHaveLength(2);
+    expect(source.match(/--td-button-primary-outline-active-border-color: var\(--text-color\);/g)).toHaveLength(2);
     expect(source).not.toContain('--td-button-primary-outline-active-color:');
   });
 
@@ -210,7 +222,9 @@ describe('BaseField', () => {
   it('preserves completion icons while server errors take precedence over success', async () => {
     const suffixIcon = { name: 'check-circle-filled' };
     const wrapper = mount(BaseField, {
-      props: { name: 'concept', status: 'success', suffixIcon, error: '概念有误' },
+      props: {
+        name: 'concept', status: 'success', suffixIcon, error: '概念有误',
+      },
     });
     const input = wrapper.findAllComponents({ name: 'TDesignStub' })[1];
     expect(input.attributes('status')).toBeUndefined();
@@ -241,7 +255,9 @@ describe('BaseField', () => {
 
   it('keeps field semantics with a custom picker control instead of rendering an input', () => {
     const wrapper = mount(BaseField, {
-      props: { name: 'dialect_id', label: '方言点', help: '请选择当地记录', required: true },
+      props: {
+        name: 'dialect_id', label: '方言点', help: '请选择当地记录', required: true,
+      },
       slots: { default: '<div class="custom-control">闽语 · 莆仙片</div>' },
     });
     expect(wrapper.findAllComponents({ name: 'TDesignStub' })).toHaveLength(1);
