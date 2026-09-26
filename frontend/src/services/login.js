@@ -14,6 +14,7 @@ import {
   toDialectOnboarding,
 } from '@/services/dialectOnboarding';
 import { openPage } from '@/services/navigation';
+import { endGuestDraftSession } from '@/services/recordingDrafts';
 import { afterThemeLogin, afterThemeLogout } from '@/services/themeApi';
 import rawRequest from '../utils/rawRequest';
 
@@ -65,6 +66,7 @@ export async function afterLogin(res, options = {}) {
     title: '登录成功',
     icon: 'success',
   });
+  endGuestDraftSession();
   uni.setStorageSync('token', res.token);
   uni.setStorageSync('id', res.id);
   try {

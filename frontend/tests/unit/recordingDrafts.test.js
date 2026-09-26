@@ -1,7 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/services/recordingDraftAudio', () => ({ persistDraftAudio: vi.fn(), restoreDraftAudio: vi.fn(), removeDraftAudio: vi.fn(), isDraftAudioAvailable: vi.fn() }));
 import { persistDraftAudio, restoreDraftAudio, removeDraftAudio, isDraftAudioAvailable } from '@/services/recordingDraftAudio';
-import { saveRecordingDraft, restoreRecordingDraft, listRecordingDrafts, deleteRecordingDraft, listRecordingDraftsWithAudioStatus } from '@/services/recordingDrafts';
+import {
+  clearInvalidRecordingDraftAudio,
+  discardLegacyRecordingDrafts,
+  draftOwner,
+  endGuestDraftSession,
+  listLegacyRecordingDrafts,
+  migrateLegacyRecordingDrafts,
+  saveRecordingDraft,
+  restoreRecordingDraft,
+  listRecordingDrafts,
+  deleteRecordingDraft,
+  listRecordingDraftsWithAudioStatus,
+  MAX_RECORDING_DRAFTS,
+  RECORDING_DRAFT_LIMIT_ERROR,
+} from '@/services/recordingDrafts';
 import { searchHistory, rememberSearch, clearSearchHistory } from '@/services/entrySearchAssist';
 
 let storage;
@@ -85,4 +99,61 @@ it('checks whether persisted draft audio still exists without discarding its tex
   expect(rows[0].audio.available).toBe(false);
   expect(rows[0].form.original_gloss).toBe('月娘');
   expect(listRecordingDrafts()).toHaveLength(1);
+});
+
+it('writes an explicit v2 schema and isolates guest sessions', async () => {
+  persistDraftAudio.mockResolvedValue(null);
+  user = '';
+  const firstOwner = draftOwner();
+  await saveRecordingDraft({ form: { original_gloss: 'guest text' } }, firstOwner);
+  expect(listRecordingDrafts(firstOwner)[0]).toMatchObject({
+    schemaVersion: 2,
+    formatVersion: 2,
+    owner: firstOwner,
+  });
+  endGuestDraftSession();
+  const secondOwner = draftOwner();
+  expect(secondOwner).not.toBe(firstOwner);
+  expect(listRecordingDrafts(secondOwner)).toEqual([]);
+});
+
+it('rejects a new draft at the limit before persisting audio or deleting an older draft', async () => {
+  const owner = 'user:1';
+  const existing = Array.from({ length: MAX_RECORDING_DRAFTS }, (_, index) => ({
+    id: `draft-${index}`,
+    owner,
+    schemaVersion: 2,
+    formatVersion: 2,
+    form: { original_gloss: `草稿${index}` },
+  }));
+  storage.set(`recording_drafts:v2:${owner}`, JSON.stringify(existing));
+
+  await expect(saveRecordingDraft(input(), owner)).rejects.toMatchObject({
+    code: RECORDING_DRAFT_LIMIT_ERROR,
+    limit: MAX_RECORDING_DRAFTS,
+  });
+
+  expect(persistDraftAudio).not.toHaveBeenCalled();
+  expect(removeDraftAudio).not.toHaveBeenCalled();
+  expect(listRecordingDrafts(owner).map((draft) => draft.id))
+    .toEqual(existing.map((draft) => draft.id));
+});
+
+it('clears only unavailable audio and keeps the draft fields', async () => {
+  persistDraftAudio.mockResolvedValue({ persisted: true, mediaId: 'missing', storage: 'indexeddb' });
+  await saveRecordingDraft(input());
+  isDraftAudioAvailable.mockResolvedValue(false);
+  expect(await clearInvalidRecordingDraftAudio()).toBe(1);
+  expect(listRecordingDrafts()[0]).toMatchObject({ audio: null, audioInvalid: true });
+  expect(listRecordingDrafts()[0].form.original_gloss).toBe(input().form.original_gloss);
+});
+
+it('does not import unmappable legacy can drafts and exposes an explicit cleanup path', async () => {
+  storage.set('can_drafts:user:1', JSON.stringify([{ id: 'legacy', form: { concept_text: 'old' } }]));
+  uni.getStorageInfoSync = vi.fn(() => ({ keys: ['can_drafts:user:1'] }));
+  expect(listLegacyRecordingDrafts()).toHaveLength(1);
+  expect(await migrateLegacyRecordingDrafts('user:1')).toBe(0);
+  expect(listRecordingDrafts('user:1')).toEqual([]);
+  expect(discardLegacyRecordingDrafts({ owner: 'user:1' })).toBe(1);
+  expect(listLegacyRecordingDrafts()).toEqual([]);
 });

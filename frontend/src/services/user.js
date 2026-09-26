@@ -1,6 +1,7 @@
 import request from '@/utils/request';
 import rawRequest from '@/utils/rawRequest';
 import { afterLogin } from '@/services/login';
+import { endGuestDraftSession } from '@/services/recordingDrafts';
 import { afterThemeLogout } from '@/services/themeApi';
 
 const PAGE_LOAD_OPTIONS = Object.freeze({ loading: false });
@@ -196,6 +197,7 @@ export function clearUserInfo() {
   delete app.globalData.userInfo;
   delete app.globalData.contribution;
   delete app.globalData.id;
+  endGuestDraftSession();
   afterThemeLogout();
 }
 
