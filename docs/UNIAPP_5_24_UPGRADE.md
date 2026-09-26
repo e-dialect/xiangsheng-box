@@ -18,9 +18,9 @@
 | --- | --- |
 | `@dcloudio/uni-*` 编译器与平台包 | `3.0.0-5020620260917001`（5.26 批次，见下文） |
 | `@dcloudio/types` | `3.4.31` |
-| Vue / runtime-core / compiler-dom | `3.4.21` |
-| Vite / `@vitejs/plugin-vue` | `5.2.8` / `5.2.4` |
-| Rollup | `4.14.3` |
+| Vue / runtime-core / compiler-dom | `3.4.21` / `3.5.42` / `3.5.42` |
+| Vite / `@vitejs/plugin-vue` | `5.2.8` / `6.0.9` |
+| Rollup | `4.63.3` |
 
 Vitest 2.1.9 与 vite-node 接受 Vite `^5.0.0`，Vite 5.2.8 接受 Rollup `^4.13.0`。`package.json` 的 `resolutions` 将这些传递依赖也固定到上表版本，避免开发构建和单测各自加载不同的 Vite/Rollup。
 
