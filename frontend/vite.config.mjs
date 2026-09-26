@@ -37,9 +37,10 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         api: 'modern-compiler',
-        // UniApp 5.24 still enters Sass through legacy Vue SFC adapters on H5
-        // and mp-weixin. Keep this upstream-only deprecation scoped until a
-        // stable compiler release removes those calls.
+        // UniApp 5.24 and the aligned 5.26 batch still enter Sass through
+        // legacy Vue SFC adapters on H5 and mp-weixin. Keep this upstream-only
+        // deprecation scoped until a stable compiler release removes those
+        // calls; dropping it makes both checked builds fail again.
         silenceDeprecations: ['legacy-js-api'],
       },
     },

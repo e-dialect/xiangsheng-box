@@ -22,7 +22,7 @@
 - 分支命名建议使用 `feat/...`、`fix/...`、`docs/...`、`refactor/...`。
 - PR 中的提交信息必须使用 Conventional Commits 风格：`type: summary` 或 `type(scope): summary`，例如 `feat(entries): improve pronunciation evidence` 或 `fix(recordings): preserve draft metadata`。
 - 常用类型：`feat`、`fix`、`docs`、`test`、`refactor`、`build`、`ci`、`chore`、`revert`。
-- `scope` 使用小写英文、数字或短横线，并且必须是有归属的领域或模块，从现有词表里选：`entries`、`recordings`、`collections`、`circles`、`discussion`、`inbox`、`articles`、`curation`、`audit`、`announcements`、`siteconfig`、`themes`、`user`、`search`、`analytics`、`api-contract`、`materials`、`ci`。词表里没有合适的项时，在 PR 描述中说明新 scope 对应哪个目录或领域，再补进本表。
+- `scope` 使用小写英文、数字或短横线，并且必须是有归属的领域或模块，从现有词表里选：`entries`、`recordings`、`collections`、`circles`、`discussion`、`inbox`、`articles`、`curation`、`audit`、`announcements`、`siteconfig`、`themes`、`user`、`search`、`analytics`、`api-contract`、`materials`、`deps`、`ci`。其中 `deps` 只用于依赖清单、锁文件和依赖机器人配置。词表里没有合适的项时，在 PR 描述中说明新 scope 对应哪个目录或领域，再补进本表。
 - 不要用阶段、版本或计划代号作 scope（`v2`、`v3`、`phase1`、`M1` 等），也不要用整层名字（`frontend`、`backend`、`core`）：它们不携带责任域信息，changelog 无法据此归类。`feat(v2): …` 是重构期间的历史写法，属于错误示范，不要沿用——`v2_views.py` 之类的旧文件名同理，不构成 scope 依据。「Entry / Recording V2」只在指称领域模型本身时才出现在标题正文里。
 - 一支 PR 确实跨两个领域时，scope 写主要的那个，另一个写在 PR 描述里；不要用「A 与 B」把两件东西拼进标题来回避 scope 选择。
 - PR 标题与提交信息的首行都不带 issue 编号（`(#405)`、`(#405) (#406)`、`fix #406` 等）。issue 关联只写在 PR 描述的「Related Issue」里：完成用 `Closes #123` / `Fixes #123`，只覆盖一部分用 `Relates to #123` 并在正文逐条说明遗留范围。Squash and merge 会把 PR 描述带进提交说明，所以关联不会因为标题里没有编号而丢失。标题里出现编号几乎总是一个来源错误：把合并后自动生成的提交信息回填成了 PR 标题。
