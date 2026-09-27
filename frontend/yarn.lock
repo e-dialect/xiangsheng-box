@@ -3823,10 +3823,10 @@ eslint-module-utils@^2.12.1:
   dependencies:
     debug "^3.2.7"
 
-eslint-plugin-html@^8.2.0:
-  version "8.2.0"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-html/-/eslint-plugin-html-8.2.0.tgz#cee7cf203c532df77c562712d7646af0b6b6d624"
-  integrity sha512-L6F37uij4uq3cZah46BawXeZlZYW9IfFeep7BwkuxBZA++BbihvEpoJPhq0NpCruPRzVkG/tpgvQYM53Re4pVA==
+eslint-plugin-html@^8.2.1:
+  version "8.2.1"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-html/-/eslint-plugin-html-8.2.1.tgz#ea690d62af027fb84ed53d432cb961cf5a07d639"
+  integrity sha512-Xn6QOifC3niiqDojZ/hgGRCj+YOefDHtT6ShwM65/+goFCNFcTTXUoXcjht+gvuds2I6r3tmM5XWQuTOOF5lhw==
   dependencies:
     htmlparser2 "^10.0.0"
 
