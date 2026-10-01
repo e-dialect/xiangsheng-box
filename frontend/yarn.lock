@@ -2923,10 +2923,10 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.18.1:
-  version "1.19.0"
-  resolved "https://registry.yarnpkg.com/axios/-/axios-1.19.0.tgz#ddf864d4c8233c0e6873746ab59361537d05ad39"
-  integrity sha512-ht/iuYZXEjFxLH/Hkezgd7m6JKlHHXEUSneaDz8uZe1Gj5QZtCnpyDsckvAiEnT89OEbCLmnte4R4sn7P0EKFw==
+axios@^1.18.1, axios@^1.20.0:
+  version "1.20.0"
+  resolved "https://registry.yarnpkg.com/axios/-/axios-1.20.0.tgz#515513445aa60e71d04b6521ca6210829ccb4786"
+  integrity sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==
   dependencies:
     follow-redirects "^1.16.0"
     form-data "^4.0.6"
@@ -4784,10 +4784,10 @@ jimp@0.10.3:
     core-js "^3.4.1"
     regenerator-runtime "^0.13.3"
 
-joi@^18.2.3:
-  version "18.2.3"
-  resolved "https://registry.npmmirror.com/joi/-/joi-18.2.3.tgz#efdd1311496cd585730633fc57253a45641a3e85"
-  integrity sha512-N5A3KTWQpPWT4ExxxPlUx7WmykGXRzhNidWhV41d6Abu9YfI2NyWCJuxdPnslJCPWtbRpSVOWSnSS6GakLM/Rg==
+joi@^18.2.3, joi@^18.2.9:
+  version "18.2.9"
+  resolved "https://registry.yarnpkg.com/joi/-/joi-18.2.9.tgz#8f489aebefab85cfa9979ea4471e3eea022787b1"
+  integrity sha512-2mD929bUVKUhOLQQEVhlf6EZ0Mlo0DeRb5MO7cViR9AXLtBauuccEtB1py9Ocxpo/P7ucnh442iY/iOwrh3IQw==
   dependencies:
     "@hapi/address" "^5.1.1"
     "@hapi/formula" "^3.0.2"
@@ -6909,7 +6909,7 @@ w3c-xmlserializer@^6.0.0:
   dependencies:
     xml-name-validator "^5.0.0"
 
-wait-on@9.1.0, wait-on@^9.1.0:
+wait-on@9.1.0:
   version "9.1.0"
   resolved "https://registry.yarnpkg.com/wait-on/-/wait-on-9.1.0.tgz#3872a460589e33f2c7a1c53cbbb83c437477073e"
   integrity sha512-PymrLXHLBM1Ju/Xspb2ADUhbPSMvbnuNvy/mN2hWtpbJ3da0h3Ky1LqwKPG5QSVR57liyO0iUpfipYl/s5qNvA==
@@ -6918,6 +6918,16 @@ wait-on@9.1.0, wait-on@^9.1.0:
     joi "^18.2.3"
     lodash "^4.18.1"
     minimist "^1.2.8"
+    rxjs "^7.8.2"
+
+wait-on@^9.2.0:
+  version "9.2.0"
+  resolved "https://registry.yarnpkg.com/wait-on/-/wait-on-9.2.0.tgz#ed8589e65dc19d246b0ee0e2e274bba8873a90c3"
+  integrity sha512-8feGEWK7OEg9n/DII8SVIvDus52AmjoyecoKBgrtHNKZN7PeVgLYrogOOHKbb8Z5LcXEOnj9hwP5m0epO0bPwA==
+  dependencies:
+    axios "^1.20.0"
+    joi "^18.2.9"
+    lodash "^4.18.1"
     rxjs "^7.8.2"
 
 webidl-conversions@^8.0.1:
