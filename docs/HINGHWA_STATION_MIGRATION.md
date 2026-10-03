@@ -54,6 +54,13 @@ Experience Track 负责：
 
 ## 6. 旧能力盘点
 
+### 地方站与旧入口设计交付
+
+- [莆仙站首页 IA 与内容边界（#428）](X4_STATION_HOME_IA.md)：品牌、通用能力边界、ProductProfile 信息需求、导航与明暗主题视觉原型。
+- [旧 URL / 小程序入口映射（#429）](X4_LEGACY_URL_MAPPING.md)：固定源码版本、逐项路由清单、真实入口抽样、CM-03 映射需求和 fallback。
+
+这两份交付是设计与审计依据；建议 Station 路由尚未合入主分支，不构成 redirect 上线或生产 cutover 验收。
+
 `semantic search / quiz / AudioCompare / article / music / rewards` 不直接照搬。逐项给出：
 
 - move to core
