@@ -44,6 +44,12 @@ test('text draft survives refresh and resumes into recording form', async ({ pag
   await page.getByText('保存草稿', { exact: true }).click();
   await expect(page.getByText('草稿已保存，可稍后继续', { exact: true }).first()).toBeVisible();
   await page.reload();
+  await expect(page.getByText('发现未完成草稿', { exact: true })).toBeVisible();
+  const restoreButton = page.locator('uni-button[data-type="confirm"]', {
+    hasText: '恢复草稿',
+  });
+  await expect(restoreButton).toBeVisible();
+  await restoreButton.click();
   await page.getByText('草稿箱', { exact: true }).click();
   await expect(page.getByText('窗外开始落大雨', { exact: true })).toBeVisible();
   await page.getByText('继续录制', { exact: true }).click();

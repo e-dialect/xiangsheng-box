@@ -361,11 +361,11 @@ import {
   pageResults,
 } from '@/services/entryRecording';
 import { uploadFile } from '@/services/file';
-import { notify, notifySuccess } from '@/services/feedback';
+import { confirm, notify, notifySuccess } from '@/services/feedback';
 import { listAllDialects } from '@/services/guantou';
 import { goRecordingDetail, goRecordingDrafts } from '@/services/navigation';
 import {
-  draftOwner, saveRecordingDraft, restoreRecordingDraft, deleteRecordingDraft,
+  draftOwner, listRecordingDrafts, saveRecordingDraft, restoreRecordingDraft, deleteRecordingDraft,
 } from '@/services/recordingDrafts';
 import { releaseDraftAudioUrl } from '@/services/recordingDraftAudio';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
@@ -399,6 +399,7 @@ export default {
         original_pronunciation: '',
         citation: '',
         rights_statement: '',
+        recording_type: 'word',
       },
       rules: {
         original_gloss: [{ required: true, message: '请简单说明录音的大意' }],
@@ -491,6 +492,28 @@ export default {
         if (draft.entryId) await this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
     } else if (options.entry_id) await this.loadEntry(options.entry_id);
+    else {
+      const [latestDraft] = listRecordingDrafts(this.ownerScope)
+        .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
+      if (latestDraft) {
+        const restore = await confirm({
+          title: '发现未完成草稿',
+          content: '是否恢复最近一次未完成的录音？选择取消后可选择放弃或稍后处理。',
+          confirmText: '恢复草稿',
+          cancelText: '稍后处理',
+        });
+        if (restore) await this.restoreDraft(latestDraft.id);
+        else if (await confirm({
+          title: '放弃这份草稿？',
+          content: '放弃后将删除这份草稿及其临时音频，文字也无法恢复。',
+          confirmText: '放弃草稿',
+          cancelText: '保留草稿',
+          danger: true,
+        })) {
+          await deleteRecordingDraft(latestDraft.id, this.ownerScope);
+        }
+      }
+    }
     this.savedDraftSignature = this.draftSignature();
     this.draftReady = true;
   },
@@ -512,6 +535,18 @@ export default {
     this.persistDirtyDraft().finally(() => { releaseDraftAudioUrl(this.audio); });
   },
   methods: {
+    async restoreDraft(id) {
+      try {
+        const draft = await restoreRecordingDraft(id, this.ownerScope);
+        this.draftId = draft.id;
+        this.form = { ...this.form, ...draft.form };
+        this.audio = draft.audio || emptyAudio();
+        if (!this.audio.path || draft.audioInvalid) {
+          this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
+        }
+        if (draft.entryId) await this.loadEntry(draft.entryId);
+      } catch (error) { notify({ title: error.message }); }
+    },
     async goRecordingDrafts() {
       await this.persistDirtyDraft();
       goRecordingDrafts();
@@ -529,7 +564,7 @@ export default {
       if (!this.draftReady || this.submitted || this.submitting
         || this.savedDraftSignature === this.draftSignature()) return;
       const hasText = Object.entries(this.form).some(([key, value]) => (
-        key !== 'usage_dialect_id' && String(value || '').trim()
+        !['usage_dialect_id', 'recording_type'].includes(key) && String(value || '').trim()
       ));
       if (!this.draftId && !this.audio.path && !hasText) return;
       await this.saveDraft({ silent: true });
@@ -659,7 +694,7 @@ export default {
         const payload = {
           audio_url: uploaded.url,
           usage_dialect_id: Number(this.form.usage_dialect_id),
-          recording_type: 'word',
+          recording_type: this.form.recording_type || 'word',
           original_gloss: String(this.form.original_gloss).trim(),
           duration_ms: Number(uploaded.duration_ms ?? this.audio.durationMs ?? 0),
           rights_statement: String(this.form.rights_statement || '').trim(),
