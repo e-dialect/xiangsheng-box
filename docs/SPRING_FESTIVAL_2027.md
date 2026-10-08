@@ -15,6 +15,21 @@
 
 春节阶段的 [Project #7 · 乡声万语 · 2027 春节冲刺](https://github.com/orgs/e-dialect/projects/7) 是 Sprint execution cockpit，只收录直接服务本轮 Gate、Demo 或 Journey 的执行项。乡声集盒长期 Roadmap 与技术债继续保留在仓库及 #423，不需要进入 Project #7；春节 X/W 分别使用独立 Sprint Tracking。
 
+### 阶段交付定义（2026-10-08 Steering Directive）
+
+**2027 年 1 月：真实用户可用并有限放量；2027 年春节：正式公开推广。** 这是两个不同的验收节点，不允许用开发演示或代码完成度代替真实使用，也不因目标日期而降低现有 Release Gate。
+
+| 阶段 | 乡声集盒 X | 万语校坊 W |
+| --- | --- | --- |
+| 10–12 月 | 收敛微信真机核心旅程、真实内容、权限/同意、稳定录音上传及试点质量证据 | 坚持 Data First + Product Polish：获准莆仙资料、蒙古语 20k+ 规模验证、非开发校对者和可审计结果 |
+| 2027 年 1 月 | 完成约 30 人真实受控测试与 Parent Test；通过前级 Gate 后约 200 人有限放量，1 月内提交真实体验及数据证据 | 真实校对者能在独立工作台完成真实莆仙资料的校对—仲裁—导出；蒙古语真实规模导入与抽检、X/W 人工可控小批次 Bundle 往返可复现 |
+| 2027-01-30–02-05 | 通过前级 Gate 后，约 1000 人**受控预热**，不等于全面公开 | 在受控范围稳定处理资料、校勘和结果交接 |
+| 2027-02-06 起 | 通过正式 Release Gate 后开展春节公开 Campaign，2/20 元宵第二波 | 持续支撑可信语料与专业校勘服务；不要求同步公众开放注册 |
+
+既定 1/15 资源准备、1/16–1/23 测试、1/24 Feature Freeze、1/25–1/29 种子测试与停止/回滚条件仍以本文第 10 节为准。W 的 20k+ 试点是**真实规模导入加样本校对**，不是要求 20k+ 条全部人工校完；兴化语记生产 cutover 仍是附带 R2 Gate 的条件动作，并非 1 月上线硬性前置。X/W 仍通过人工可控数据包交接，不共享数据库或实时同步。
+
+实际分项验收与滚动排期以 [Steering #2](https://github.com/e-dialect/.github/issues/2)、[X #439](https://github.com/e-dialect/xiangsheng-box/issues/439) 和 [W #91](https://github.com/e-dialect/wanyu-proofreader/issues/91) 为准；Team/Project 不再维护第三份独立的验收清单。
+
 ## 2. 产品与实体边界
 
 - E-Dialect 是开放 GitHub 工程社区；乡声万语是社区内的长期计划，不等同于整个社区。
