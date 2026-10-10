@@ -74,9 +74,39 @@ class FileApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_reject_non_whitelist_extension(self):
-        file = SimpleUploadedFile("song.ogg", b"fake-audio", content_type="audio/ogg")
+        file = SimpleUploadedFile("song.exe", b"fake-audio", content_type="audio/mpeg")
         response = self.client.post("/files", {"file": file}, **self._auth_headers())
         self.assertEqual(response.status_code, 400)
+
+    @patch("files.views.upload_file")
+    @patch("files.views.normalize_audio_to_mp3", return_value=5000)
+    def test_browser_recording_formats_are_normalized(
+        self, normalize_audio, upload_file
+    ):
+        upload_file.return_value = "https://example.test/voice.mp3"
+        for name, mime in (
+            ("voice.webm", "audio/webm;codecs=opus"),
+            ("blob", "audio/webm"),
+            ("voice.ogg", "audio/ogg;codecs=opus"),
+        ):
+            with self.subTest(name=name, mime=mime):
+                file = SimpleUploadedFile(name, b"browser-audio", content_type=mime)
+                response = self.client.post(
+                    "/files", {"file": file}, **self._auth_headers()
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["duration_ms"], 5000)
+        self.assertEqual(normalize_audio.call_count, 3)
+
+    @patch(
+        "files.views.normalize_audio_to_mp3", side_effect=AudioDecodeError("invalid")
+    )
+    def test_browser_recording_still_requires_decodable_audio(self, normalize_audio):
+        file = SimpleUploadedFile("voice.webm", b"not-audio", content_type="audio/webm")
+        response = self.client.post("/files", {"file": file}, **self._auth_headers())
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "无法解析音频文件")
+        normalize_audio.assert_called_once()
 
     def test_reject_oversized_audio(self):
         big_data = b"x" * (5 * 1024 * 1024 + 1)  # just over 5 MB
