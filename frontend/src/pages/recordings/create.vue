@@ -576,8 +576,12 @@ export default {
       return pending;
     },
     async performSaveDraft({ silent = false } = {}) {
-      if (this.submitted) return;
-      if (draftOwner() !== this.ownerScope) { notify({ title: '账号已切换，请重新打开录音页' }); return; }
+      if (this.submitted) return { restorable: false, message: '录音已提交' };
+      if (draftOwner() !== this.ownerScope) {
+        const message = '账号已切换，请重新打开录音页';
+        notify({ title: message });
+        return { restorable: false, message };
+      }
       this.savingDraft = true;
       const signature = this.draftSignature();
       const audioPath = this.audio.path;
@@ -588,7 +592,9 @@ export default {
           audio: { ...this.audio },
           entryId: this.selectedEntry?.id,
         }, this.ownerScope);
-        if (draftOwner() !== this.ownerScope) return;
+        if (draftOwner() !== this.ownerScope) {
+          return { restorable: false, message: '账号已切换，请重新打开录音页' };
+        }
         const unchanged = signature === this.draftSignature();
         this.draftId = draft.id;
         if (draft.audio && this.audio.path === audioPath) {
@@ -600,12 +606,14 @@ export default {
         if (draft.audioError) this.draftMessage = '仅文字已保存，音频保存失败，请保留本页重试';
         else this.draftMessage = unchanged ? '草稿已保存，可稍后继续' : '上一版已保存，新修改仍待保存';
         if (!silent || draft.audioError) notify({ title: this.draftMessage });
+        return { restorable: unchanged && !draft.audioError, message: this.draftMessage };
       } catch (error) {
         if (error.persistedAudio && this.audio.path === audioPath) {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
         this.draftMessage = error.message;
         notify({ title: error.message });
+        return { restorable: false, message: this.draftMessage };
       } finally { this.savingDraft = false; }
     },
     dialectLabel,
@@ -726,8 +734,13 @@ export default {
           ...this.fieldErrors,
           ...(error?.data || {}),
         };
-        await this.saveDraft();
-        notify({ title: this.draftMessage || '保存失败，录音仍保留在本页', icon: 'none' });
+        const failureMessage = error?.message || error?.errMsg || '请检查网络后重试';
+        const draftResult = await this.saveDraft({ silent: true });
+        const recoveryMessage = draftResult?.restorable
+          ? '草稿已保存，可从草稿箱重试。'
+          : `${draftResult?.message || '草稿未完整保存'}，请保留本页重试。`;
+        this.draftMessage = `提交失败：${failureMessage}。尚未加入个人贡献。${recoveryMessage}`;
+        notify({ title: this.draftMessage, icon: 'none' });
       } finally {
         this.submitting = false;
       }
