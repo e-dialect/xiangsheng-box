@@ -14,7 +14,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY scripts/replace_backend_url.sh /
 RUN chmod +x /replace_backend_url.sh
 RUN addgroup -g 10001 app && adduser -D -u 10001 -G app app && \
-    sed -i -e '/^user /d' -e 's@pid[[:space:]]*/var/run/nginx.pid;@pid /tmp/nginx.pid;@' /etc/nginx/nginx.conf && \
+    sed -i -e '/^user /d' -e 's@pid[[:space:]][^;]*;@pid /tmp/nginx.pid;@' /etc/nginx/nginx.conf && \
     chown -R 10001:10001 /usr/share/nginx/html
 COPY --chown=10001:10001 --from=build /usr/src/app/dist/build/h5 /usr/share/nginx/html
 
