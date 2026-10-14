@@ -218,6 +218,26 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
+      - name: Build production frontend image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          tags: guantou-frontend-production:latest
+          build-args: |
+            VITE_BACKEND_URL=
+          outputs: type=docker,dest=${{ runner.temp }}/guantou-frontend-production.tar
+          cache-from: type=gha,scope=frontend-production
+          cache-to: type=gha,mode=max,scope=frontend-production
+
+      - name: Load isolated production runtime images
+        run: |
+          docker load --input "${RUNNER_TEMP}/guantou-backend.tar"
+          docker load --input "${RUNNER_TEMP}/guantou-frontend-production.tar"
+
+      - name: Check real production runtime without external services
+        run: python3 scripts/check-production-runtime.py
+
       - name: Upload Docker images
         uses: actions/upload-artifact@v7
         with:

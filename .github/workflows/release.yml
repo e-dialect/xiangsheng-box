@@ -152,8 +152,8 @@ jobs:
           # avoids rewriting immutable assets on its read-only root filesystem.
           build-args: |
             VITE_BACKEND_URL=
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          cache-from: type=gha,scope=frontend-production
+          cache-to: type=gha,mode=max,scope=frontend-production
       - name: Inspect immutable registry objects and create manifest
         env:
           BACKEND_DIGEST: ${{ steps.backend.outputs.digest || steps.existing.outputs.backend_digest }}

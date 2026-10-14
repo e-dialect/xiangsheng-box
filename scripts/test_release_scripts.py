@@ -57,12 +57,22 @@ class AuthorizationTests(unittest.TestCase):
             self.assertNotIn('secrets', build['with'])
             self.assertNotIn('env', build)
             ignored = (ROOT / context / '.dockerignore').read_text().splitlines()
-            self.assertIn('.env', ignored)
-            self.assertIn('.env.local', ignored)
+            self.assertIn('.env*', ignored)
         self.assertIn('VITE_BACKEND_URL_RUNTIME_REPLACEMENT', (ROOT / 'frontend/Dockerfile').read_text())
         cos_original = subprocess.check_output(['git', 'show', SHA + ':.github/workflows/deploy-cos.yml'], cwd=ROOT)
         self.assertEqual((ROOT / '.github/workflows/deploy-cos.yml').read_bytes(), cos_original)
         self.assertNotIn('TENCENT_CLOUD', (ROOT / '.github/workflows/release.yml').read_text())
+
+    def test_ci_production_runtime_uses_the_same_compiled_frontend_contract(self):
+        steps = CI['jobs']['docker']['steps']
+        production = next(step for step in steps if step.get('name') == 'Build production frontend image')
+        self.assertEqual(production['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+        self.assertEqual(production['with']['platforms'], 'linux/amd64')
+        self.assertNotIn('push', production['with'])
+        smoke = next(step for step in steps if step.get('name') == 'Check real production runtime without external services')
+        self.assertEqual(smoke['run'], 'python3 scripts/check-production-runtime.py')
+        self.assertLess(steps.index(production), steps.index(smoke))
+        self.assertLess(steps.index(smoke), next(i for i, step in enumerate(steps) if step.get('name') == 'Upload Docker images'))
 
     def authorize(self, mutation=None):
         script = RELEASE['jobs']['authorize']['steps'][0]['with']['script']
