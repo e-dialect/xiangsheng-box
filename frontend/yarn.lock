@@ -2923,7 +2923,7 @@ available-typed-arrays@^1.0.7:
   dependencies:
     possible-typed-array-names "^1.0.0"
 
-axios@^1.18.1, axios@^1.20.0:
+axios@^1.20.0:
   version "1.20.0"
   resolved "https://registry.yarnpkg.com/axios/-/axios-1.20.0.tgz#515513445aa60e71d04b6521ca6210829ccb4786"
   integrity sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==
@@ -4784,7 +4784,7 @@ jimp@0.10.3:
     core-js "^3.4.1"
     regenerator-runtime "^0.13.3"
 
-joi@^18.2.3, joi@^18.2.9:
+joi@^18.2.9:
   version "18.2.9"
   resolved "https://registry.yarnpkg.com/joi/-/joi-18.2.9.tgz#8f489aebefab85cfa9979ea4471e3eea022787b1"
   integrity sha512-2mD929bUVKUhOLQQEVhlf6EZ0Mlo0DeRb5MO7cViR9AXLtBauuccEtB1py9Ocxpo/P7ucnh442iY/iOwrh3IQw==
@@ -5189,7 +5189,7 @@ minimatch@^3.0.5, minimatch@^3.1.1, minimatch@^3.1.2:
   dependencies:
     brace-expansion "^1.1.7"
 
-minimist@^1.2.0, minimist@^1.2.6, minimist@^1.2.8:
+minimist@^1.2.0, minimist@^1.2.6:
   version "1.2.8"
   resolved "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
@@ -6288,10 +6288,10 @@ stackback@0.0.2:
   resolved "https://registry.npmmirror.com/stackback/-/stackback-0.0.2.tgz#1ac8a0d9483848d1695e418b6d031a3c3ce68e3b"
   integrity sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==
 
-start-server-and-test@^3.0.12:
-  version "3.0.12"
-  resolved "https://registry.yarnpkg.com/start-server-and-test/-/start-server-and-test-3.0.12.tgz#0573aeb5fe7282b3980362951cc96110606528d2"
-  integrity sha512-JhW9LiYXqJxyzmgMvBQ6JxVcz16wV+c5IE6rTHofqLBKjSE075Yr9e6sTr8QgrkHMHlHqkDegzKpQfVKxwauJw==
+start-server-and-test@^3.0.13:
+  version "3.0.13"
+  resolved "https://registry.yarnpkg.com/start-server-and-test/-/start-server-and-test-3.0.13.tgz#bc52cd5ab613cd4567e739d35f380d9f645cce52"
+  integrity sha512-Zlgm0u/S+J9XOPljvr2M/cOWCG4BasrNLnBBr/rCK/EWmmTF2c5+P4CCALQNwwmJHovvgsS8aGlmze2ybYUn3g==
   dependencies:
     arg "5.0.2"
     check-more-types "2.24.0"
@@ -6299,7 +6299,7 @@ start-server-and-test@^3.0.12:
     execa "5.1.1"
     lazy-ass "2.0.3"
     tree-kill "1.2.2"
-    wait-on "9.1.0"
+    wait-on "9.5.1"
 
 statuses@2.0.1:
   version "2.0.1"
@@ -6914,18 +6914,7 @@ w3c-xmlserializer@^6.0.0:
   dependencies:
     xml-name-validator "^5.0.0"
 
-wait-on@9.1.0:
-  version "9.1.0"
-  resolved "https://registry.yarnpkg.com/wait-on/-/wait-on-9.1.0.tgz#3872a460589e33f2c7a1c53cbbb83c437477073e"
-  integrity sha512-PymrLXHLBM1Ju/Xspb2ADUhbPSMvbnuNvy/mN2hWtpbJ3da0h3Ky1LqwKPG5QSVR57liyO0iUpfipYl/s5qNvA==
-  dependencies:
-    axios "^1.18.1"
-    joi "^18.2.3"
-    lodash "^4.18.1"
-    minimist "^1.2.8"
-    rxjs "^7.8.2"
-
-wait-on@^9.5.1:
+wait-on@9.5.1, wait-on@^9.5.1:
   version "9.5.1"
   resolved "https://registry.yarnpkg.com/wait-on/-/wait-on-9.5.1.tgz#6867956a9dbb39e28d35e5db6a779bdbf0f013b8"
   integrity sha512-bOtj1wRY6u+GPnNskZLcgZNHOaL5NC4+5hRCbEpVoVX6MbMrCLCqIBM2bjsAfrgst3ZC0siIo7vLb4LuYFfIow==
