@@ -1,0 +1,170 @@
+name: Publish production images
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full current main SHA with successful CI
+        required: true
+      ci_run_id:
+        description: Successful latest CI run for that exact main SHA
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-image-publication
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Verify trusted main and CI gate
+    if: github.repository == 'e-dialect/xiangsheng-box' && github.repository_id == '1286043779' && (github.event_name == 'workflow_run' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source_sha: ${{ steps.verify.outputs.source_sha }}
+      ci_run_id: ${{ steps.verify.outputs.ci_run_id }}
+    steps:
+      # No checkout or registry credentials before GitHub records authorize main.
+      - uses: actions/github-script@v8
+        id: verify
+        env:
+          REQUESTED_SHA: ${{ inputs.source_sha }}
+          REQUESTED_CI_RUN_ID: ${{ inputs.ci_run_id }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const triggered = context.payload.workflow_run;
+            const runId = triggered?.id ?? Number(process.env.REQUESTED_CI_RUN_ID);
+            const sha = triggered?.head_sha ?? process.env.REQUESTED_SHA;
+            if (!/^[0-9a-f]{40}$/.test(sha ?? '') || !Number.isSafeInteger(runId) || runId < 1) {
+              throw new Error('A full source SHA and valid CI run ID are required');
+            }
+            const [{ data: main }, { data: workflow }, { data: run }, { data: candidates }] = await Promise.all([
+              github.rest.repos.getBranch({ owner, repo, branch: 'main' }),
+              github.rest.actions.getWorkflow({ owner, repo, workflow_id: 'ci.yml' }),
+              github.rest.actions.getWorkflowRun({ owner, repo, run_id: runId }),
+              github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: 'ci.yml', branch: 'main', head_sha: sha, per_page: 100 }),
+            ]);
+            const trusted = item => item.head_sha === sha && item.head_branch === 'main'
+              && item.head_repository?.full_name === 'e-dialect/xiangsheng-box' && item.head_repository?.id === 1286043779
+              && item.repository?.full_name === 'e-dialect/xiangsheng-box' && item.repository?.id === 1286043779
+              && item.workflow_id === workflow.id && ['push', 'workflow_dispatch'].includes(item.event);
+            const latest = candidates.workflow_runs.filter(trusted).sort((a, b) => b.run_number - a.run_number)[0];
+            if (main.commit.sha !== sha || !trusted(run) || latest?.id !== runId
+              || run.status !== 'completed' || run.conclusion !== 'success') {
+              throw new Error('Publication requires the latest successful CI for current trusted main');
+            }
+            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              owner, repo, run_id: runId, filter: 'latest', per_page: 100,
+            });
+            const gate = jobs.find(job => job.name === 'CI gate');
+            if (!gate || gate.status !== 'completed' || gate.conclusion !== 'success') {
+              throw new Error('The aggregate CI gate did not pass');
+            }
+            core.setOutput('source_sha', sha);
+            core.setOutput('ci_run_id', String(runId));
+
+  publish:
+    name: Publish immutable production images
+    needs: authorize
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SOURCE_SHA: ${{ needs.authorize.outputs.source_sha }}
+      CI_RUN_ID: ${{ needs.authorize.outputs.ci_run_id }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v4
+      - name: Confirm current main before registry login
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { data } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (data.commit.sha !== process.env.SOURCE_SHA) throw new Error('main advanced; publish its CI run instead');
+      - name: Set deterministic OCI version stamps
+        run: |
+          python3 - >> "$GITHUB_ENV" <<'PY'
+          import datetime, os, subprocess
+          sha = os.environ['SOURCE_SHA']
+          stamp = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', sha]))
+          print('VERSION=sha-' + sha)
+          print('BUILD_DATE=' + datetime.datetime.fromtimestamp(stamp, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))
+          PY
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve existing immutable images for safe retry
+        id: existing
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/resolve-release-images.mjs
+      - name: Build and publish backend
+        id: backend
+        if: steps.existing.outputs.backend_digest == ''
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend/guantou
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ghcr.io/e-dialect/xiangsheng-box-backend:sha-${{ env.SOURCE_SHA }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            org.opencontainers.image.source=https://github.com/e-dialect/xiangsheng-box
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build and publish frontend
+        id: frontend
+        if: steps.existing.outputs.frontend_digest == ''
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ghcr.io/e-dialect/xiangsheng-box-frontend:sha-${{ env.SOURCE_SHA }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
+            org.opencontainers.image.source=https://github.com/e-dialect/xiangsheng-box
+          # VITE_BACKEND_URL is runtime configuration. Empty uses the public
+          # HTTPS origin. Same-origin API routing is a deployment contract;
+          # no production secrets or fixed API origin enter the build.
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+      - name: Inspect immutable registry objects and create manifest
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest || steps.existing.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest || steps.existing.outputs.frontend_digest }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir release
+          node scripts/inspect-release-images.mjs release
+          node scripts/create-release-manifest.mjs release
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-manifest
+          path: release/release-manifest.json
+          if-no-files-found: error
+          retention-days: 90
