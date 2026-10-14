@@ -146,6 +146,40 @@ def safe_state(docker, names):
     return result
 
 
+def nginx_startup_diagnostics(docker, name, nonce):
+    """Classify only this synthetic fixture's startup errors; never emit logs."""
+    try:
+        container = docker.inspect(name)
+        if container is None or container['Config'].get('Labels', {}).get('edialect.production-runtime-smoke') != nonce:
+            return {'available': False}
+        result = docker.call(['logs', '--tail', '25', name], check=False, timeout=10)
+        if result.returncode:
+            return {'available': False}
+        lines = (result.stdout + result.stderr)[:16384].decode('utf-8', errors='replace').splitlines()
+        errors = '\n'.join(line for line in lines if 'nginx:' in line and any(
+            level in line for level in ('[emerg]', '[alert]', '[crit]')
+        ))
+        categories = {
+            'readOnlyFilesystem': 'read-only file system', 'permissionDenied': 'permission denied',
+            'missingPath': 'no such file or directory', 'directoryCreation': 'mkdir()',
+            'fileOpen': 'open()', 'invalidDirective': 'unknown directive',
+            'bindingFailure': 'bind()', 'groupChange': 'setgid(', 'userChange': 'setuid(',
+        }
+        paths = {
+            '/tmp/nginx.pid', '/tmp/client_body', '/tmp/proxy', '/tmp/fastcgi', '/tmp/uwsgi', '/tmp/scgi',
+            '/var/run/nginx.pid', '/run/nginx.pid', '/var/log/nginx/error.log', '/var/log/nginx/access.log',
+            '/var/cache/nginx/client_temp', '/var/cache/nginx/proxy_temp',
+            '/var/cache/nginx/fastcgi_temp', '/var/cache/nginx/uwsgi_temp', '/var/cache/nginx/scgi_temp',
+        }
+        return {
+            'available': True,
+            'errorCategories': sorted(key for key, value in categories.items() if value in errors.lower()),
+            'systemPaths': sorted(path for path in paths if '"' + path + '"' in errors or "'" + path + "'" in errors),
+        }
+    except Exception:
+        return {'available': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend-image', default='guantou-backend:latest')
@@ -156,13 +190,15 @@ def main():
     nonce = uuid.uuid4().hex
     label = 'edialect.production-runtime-smoke'
     names = {service: 'ci-production-' + service + '-' + nonce for service in ('backend', 'frontend')}
-    receipt = {'fixture': nonce, 'checks': {}, 'network': 'none', 'data': 'synthetic tmpfs only'}
+    receipt = {'fixture': nonce, 'checks': {}, 'network': 'none', 'data': 'synthetic tmpfs only',
+               'phase': 'validate-local-context'}
     created = {}
     success = False
     try:
         contexts = json.loads(docker.call(['context', 'inspect', args.docker_context]).stdout)
         if not contexts[0]['Endpoints']['docker']['Host'].startswith('unix://'):
             raise SmokeFailure('Only a local Unix Docker socket is permitted')
+        receipt['phase'] = 'resolve-image-identities'
         images = {}
         for service in names:
             reference = getattr(args, service + '_image')
@@ -173,6 +209,7 @@ def main():
                 raise SmokeFailure('Production fixture requires linux/amd64 images')
             images[service] = image['Id']
         for service, name in names.items():
+            receipt['phase'] = 'start-' + service
             uid = '1000:1000' if service == 'backend' else '10001:10001'
             command = ['run', '-d', '--pull=never', '--name', name, '--label', label + '=' + nonce,
                        '--network=none', '--user', uid, '--read-only', '--cap-drop=ALL',
@@ -186,12 +223,16 @@ def main():
             else:
                 command += ['--env', 'VITE_BACKEND_URL=']
             created[service] = docker.call(command + [images[service]]).stdout.decode().strip()
+        receipt['phase'] = 'wait-backend'
         wait_for(docker, ['exec', names['backend'], 'python', '-c', BACKEND_READY])
+        receipt['phase'] = 'check-backend-contract'
         receipt['checks'].update(json.loads(docker.call(['exec', names['backend'], 'python', '-c', BACKEND_CHECKS]).stdout))
         if docker.call(['exec', names['backend'], 'id', '-u']).stdout.strip() != b'1000':
             raise SmokeFailure('Backend must use UID 1000')
         receipt['checks']['backendUnprivilegedUID'] = True
+        receipt['phase'] = 'wait-frontend'
         html = wait_for(docker, ['exec', names['frontend'], 'wget', '-qO-', 'http://127.0.0.1:8080/'])
+        receipt['phase'] = 'check-frontend-contract'
         if b'<html' not in html.lower() or b'VITE_BACKEND_URL_RUNTIME_REPLACEMENT' in html:
             raise SmokeFailure('Production HTML contract failed')
         path = asset_path(html)
@@ -205,12 +246,15 @@ def main():
         receipt['checks'].update(frontendHTMLAndJavaScript=True, frontendWithoutRuntimePlaceholder=True,
                                  nginxNonrootPort8080AndTmpPID=True)
         receipt['containers'] = safe_state(docker, names)
+        receipt['phase'] = 'complete'
         success = True
     except BaseException as error:
         receipt['errorType'] = type(error).__name__
         if isinstance(error, SmokeFailure):
             receipt['error'] = str(error)
         receipt['containers'] = safe_state(docker, names)
+        if 'frontend' in receipt['phase']:
+            receipt['frontendStartupDiagnostics'] = nginx_startup_diagnostics(docker, names['frontend'], nonce)
     finally:
         cleaned = True
         for service, name in reversed(list(names.items())):
