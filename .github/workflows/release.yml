@@ -116,14 +116,20 @@ jobs:
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/resolve-release-images.mjs
-      - name: Build and publish backend
+      - name: Load verified existing images for exact pair acceptance
+        env:
+          BACKEND_DIGEST: ${{ steps.existing.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.existing.outputs.frontend_digest }}
+        run: node scripts/load-existing-release-images.mjs
+      - name: Build and load backend
         id: backend
         if: steps.existing.outputs.backend_digest == ''
         uses: docker/build-push-action@v7
         with:
           context: ./backend/guantou
           platforms: linux/amd64
-          push: true
+          push: false
+          load: true
           provenance: false
           tags: ghcr.io/e-dialect/xiangsheng-box-backend:sha-${{ env.SOURCE_SHA }}
           labels: |
@@ -133,14 +139,15 @@ jobs:
             org.opencontainers.image.source=https://github.com/e-dialect/xiangsheng-box
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
-      - name: Build and publish frontend
+      - name: Build and load frontend
         id: frontend
         if: steps.existing.outputs.frontend_digest == ''
         uses: docker/build-push-action@v7
         with:
           context: ./frontend
           platforms: linux/amd64
-          push: true
+          push: false
+          load: true
           provenance: false
           tags: ghcr.io/e-dialect/xiangsheng-box-frontend:sha-${{ env.SOURCE_SHA }}
           labels: |
@@ -154,18 +161,43 @@ jobs:
             VITE_BACKEND_URL=
           cache-from: type=gha,scope=frontend-production
           cache-to: type=gha,mode=max,scope=frontend-production
+      - name: Accept the exact production image pair before publication
+        run: |
+          mkdir -p release
+          if ! python3 scripts/check-production-runtime.py \
+            --backend-image "ghcr.io/e-dialect/xiangsheng-box-backend:sha-${SOURCE_SHA}" \
+            --frontend-image "ghcr.io/e-dialect/xiangsheng-box-frontend:sha-${SOURCE_SHA}" \
+            > release/production-runtime.json; then
+            cat release/production-runtime.json
+            exit 1
+          fi
+          cat release/production-runtime.json
+      - name: Publish only tested missing images and verify registry config IDs
+        id: promote
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/publish-tested-images.mjs release/production-runtime.json
       - name: Inspect immutable registry objects and create manifest
         env:
-          BACKEND_DIGEST: ${{ steps.backend.outputs.digest || steps.existing.outputs.backend_digest }}
-          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest || steps.existing.outputs.frontend_digest }}
+          BACKEND_DIGEST: ${{ steps.promote.outputs.backend_digest }}
+          FRONTEND_DIGEST: ${{ steps.promote.outputs.frontend_digest }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir release
           node scripts/inspect-release-images.mjs release
           node scripts/create-release-manifest.mjs release
+      - name: Preserve bounded runtime acceptance receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-runtime
+          path: release/production-runtime.json
+          if-no-files-found: ignore
+          retention-days: 30
       - uses: actions/upload-artifact@v7
         with:
           name: release-manifest
-          path: release/release-manifest.json
+          path: |
+            release/release-manifest.json
+            release/production-runtime.json
           if-no-files-found: error
           retention-days: 90

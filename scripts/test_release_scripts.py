@@ -21,6 +21,16 @@ def labels():
     return {'org.opencontainers.image.revision': SHA, 'org.opencontainers.image.source': 'https://github.com/e-dialect/xiangsheng-box', 'org.opencontainers.image.version': 'sha-' + SHA, 'org.opencontainers.image.created': COMMIT_DATE}
 
 
+RUNTIME_CHECKS = ['capabilitiesWithoutTLSRedirect', 'productionAdminStaticCSS', 'untrustedHostRejected', 'corsExactOrigin', 'phoneDemoDisabled', 'httpsRedirect', 'gunicornIsPID1', 'backendUnprivilegedUID', 'productionStateDefaults', 'frontendHTMLAndJavaScript', 'frontendWithoutRuntimePlaceholder', 'nginxNonrootPort8080AndTmpPID']
+
+
+def runtime_receipt(images):
+    return {'result': 'PASS', 'cleanup': 'PASS', 'phase': 'complete',
+            'checks': dict.fromkeys(RUNTIME_CHECKS, True),
+            'containers': {service: {'present': True, 'status': 'running', 'imageId': image}
+                           for service, image in images.items()}}
+
+
 def node(source, env=None):
     return subprocess.run(['node', '--input-type=module', '-e', source], cwd=ROOT,
                           env={**os.environ, **(env or {})}, capture_output=True, text=True, timeout=20)
@@ -50,6 +60,8 @@ class AuthorizationTests(unittest.TestCase):
             build = steps[service]
             self.assertEqual(build['with']['context'], context)
             self.assertEqual(build['with']['platforms'], 'linux/amd64')
+            self.assertIs(build['with']['push'], False)
+            self.assertIs(build['with']['load'], True)
             if service == 'frontend':
                 self.assertEqual(build['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
             else:
@@ -73,6 +85,18 @@ class AuthorizationTests(unittest.TestCase):
         self.assertEqual(smoke['run'], 'python3 scripts/check-production-runtime.py')
         self.assertLess(steps.index(production), steps.index(smoke))
         self.assertLess(steps.index(smoke), next(i for i, step in enumerate(steps) if step.get('name') == 'Upload Docker images'))
+
+    def test_release_smokes_before_any_publication_and_preserves_failure_receipt(self):
+        steps = RELEASE['jobs']['publish']['steps']
+        names = [step.get('name') for step in steps]
+        smoke = names.index('Accept the exact production image pair before publication')
+        promote = next(i for i, step in enumerate(steps) if step.get('id') == 'promote')
+        self.assertLess(smoke, promote)
+        self.assertIn('check-production-runtime.py', steps[smoke]['run'])
+        self.assertIn('steps.promote.outputs.backend_digest', str(steps[promote + 1]))
+        diagnostic = next(step for step in steps if step.get('name') == 'Preserve bounded runtime acceptance receipt')
+        self.assertEqual(diagnostic['if'], 'always()')
+        self.assertEqual(diagnostic['with']['path'], 'release/production-runtime.json')
 
     def authorize(self, mutation=None):
         script = RELEASE['jobs']['authorize']['steps'][0]['with']['script']
@@ -126,6 +150,7 @@ class ManifestTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = pathlib.Path(self.temp.name)
+        self.tested = {}
         self.env = {'SOURCE_SHA': SHA, 'VERSION': 'sha-' + SHA, 'BUILD_DATE': COMMIT_DATE}
         for service in ['backend', 'frontend']:
             self.write_config(service, {'os': 'linux', 'architecture': 'amd64',
@@ -145,6 +170,8 @@ class ManifestTests(unittest.TestCase):
 
     def bind_config(self, service):
         raw = (self.directory / (service + '-config.json')).read_bytes()
+        self.tested[service] = 'sha256:' + hashlib.sha256(raw).hexdigest()
+        (self.directory / 'production-runtime.json').write_text(json.dumps(runtime_receipt(self.tested)))
         self.write_manifest(service, {'schemaVersion': 2,
             'mediaType': 'application/vnd.oci.image.manifest.v1+json',
             'config': {'digest': 'sha256:' + hashlib.sha256(raw).hexdigest(), 'size': len(raw)}})
@@ -179,6 +206,20 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(release['recovery']['dataFormat'], 'django-sqlite-media')
         self.assertEqual(release['build']['backend'], {})
         self.assertEqual(set(release['images']), {'backend', 'frontend'})
+
+    def test_smoke_identity_and_complete_acceptance_are_required_for_manifest(self):
+        for mutation in ['image', 'check', 'cleanup']:
+            with self.subTest(mutation=mutation):
+                receipt = runtime_receipt(self.tested)
+                if mutation == 'image':
+                    receipt['containers']['backend']['imageId'] = 'sha256:' + 'f' * 64
+                elif mutation == 'check':
+                    receipt['checks']['productionStateDefaults'] = False
+                else:
+                    receipt['cleanup'] = 'FAIL'
+                (self.directory / 'production-runtime.json').write_text(json.dumps(receipt))
+                self.assertNotEqual(self.create().returncode, 0)
+                self.assertFalse((self.directory / 'release-manifest.json').exists())
 
     def test_tampered_registry_bytes_do_not_produce_manifest(self):
         with (self.directory / 'backend-manifest.json').open('ab') as stream:

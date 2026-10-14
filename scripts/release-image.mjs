@@ -92,3 +92,49 @@ export async function inspectImage(service, digest, sourceSHA, buildDate) {
   verifyImage(raw, configRaw, digest, sourceSHA, buildDate)
   return { raw, configRaw }
 }
+
+export async function existingImageDigest(service, sourceSHA, buildDate) {
+  assert.ok(['backend', 'frontend'].includes(service))
+  assert.match(sourceSHA ?? '', /^[0-9a-f]{40}$/)
+  assert.ok(process.env.GHCR_TOKEN, 'Registry credentials required')
+  const tag = `sha-${sourceSHA}`
+  const matches = []
+  for (let page = 1; ; page += 1) {
+    const response = await fetch(`https://api.github.com/orgs/e-dialect/packages/container/xiangsheng-box-${service}/versions?per_page=100&page=${page}`, {
+      headers: {
+        Authorization: `Bearer ${process.env.GHCR_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    })
+    // A new package returns 404. All other failures block publication.
+    if (response.status === 404 && page === 1) break
+    assert.ok(response.ok, `Cannot establish existing image identity (${response.status})`)
+    const versions = await response.json()
+    assert.ok(Array.isArray(versions), 'Invalid package-version response')
+    matches.push(...versions.filter(version => version.metadata?.container?.tags?.includes(tag)))
+    if (versions.length < 100) break
+  }
+  assert.ok(matches.length <= 1, 'Source tag must identify exactly one registry version')
+  let digest = ''
+  if (matches.length) {
+    digest = matches[0].name
+    assert.match(digest ?? '', /^sha256:[0-9a-f]{64}$/)
+    await inspectImage(service, digest, sourceSHA, buildDate)
+  }
+  return digest
+}
+
+export function verifiedRuntimeImages(receipt) {
+  assert.ok(receipt.result === 'PASS' && receipt.cleanup === 'PASS' && receipt.phase === 'complete', 'Exact production image pair did not pass smoke')
+  const required = ['capabilitiesWithoutTLSRedirect', 'productionAdminStaticCSS', 'untrustedHostRejected', 'corsExactOrigin', 'phoneDemoDisabled', 'httpsRedirect', 'gunicornIsPID1', 'backendUnprivilegedUID', 'productionStateDefaults', 'frontendHTMLAndJavaScript', 'frontendWithoutRuntimePlaceholder', 'nginxNonrootPort8080AndTmpPID']
+  assert.ok(required.every(key => receipt.checks?.[key] === true), 'Production runtime acceptance incomplete')
+  const images = {}
+  for (const service of ['backend', 'frontend']) {
+    const container = receipt.containers?.[service]
+    assert.ok(container?.present === true && container.status === 'running', 'Smoke container was not running')
+    assert.match(container.imageId ?? '', /^sha256:[0-9a-f]{64}$/)
+    images[service] = container.imageId
+  }
+  return images
+}

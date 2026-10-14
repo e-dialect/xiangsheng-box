@@ -23,7 +23,7 @@ with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request,t
 '''
 
 BACKEND_CHECKS = r'''
-import json,pathlib,urllib.request,urllib.error
+import json,pathlib,sqlite3,urllib.request,urllib.error
 class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
 opener=urllib.request.build_opener(NoRedirect,urllib.request.ProxyHandler({}))
@@ -57,6 +57,11 @@ assert status in (301,302) and headers.get('Location')=='https://box.example.inv
 checks['httpsRedirect']=True
 assert b'gunicorn' in pathlib.Path('/proc/1/cmdline').read_bytes()
 checks['gunicornIsPID1']=True
+assert pathlib.Path('/data/db.sqlite3').is_file()
+with sqlite3.connect('file:/data/db.sqlite3?mode=ro',uri=True) as connection:
+ assert connection.execute('PRAGMA integrity_check').fetchall()==[('ok',)]
+assert pathlib.Path('/data/logs').is_dir()
+checks['productionStateDefaults']=True
 print(json.dumps(checks))
 '''
 
@@ -69,7 +74,6 @@ def synthetic_environment():
         'DEBUG': 'false', 'PHONE_CODE_DEMO_MODE': 'false',
         'EMAIL_CODE_DEMO_MODE': 'false', 'WECHAT_BIND_DEMO_MODE': 'false',
         'PUBLIC_BACKEND_URL': 'https://box.example.invalid',
-        'SQLITE_PATH': '/data/db.sqlite3', 'MEDIA_ROOT': '/data/media', 'LOG_DIR': '/data/logs',
         'EMAIL_HOST': 'smtp.example.invalid', 'EMAIL_HOST_USER': 'runtime@example.invalid',
         'EMAIL_HOST_PASSWORD': 'synthetic-no-external-service',
         'DEFAULT_FROM_EMAIL': 'runtime@example.invalid', 'EMAIL_PORT': '465',

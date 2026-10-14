@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { hash, verifyImage } from './release-image.mjs'
+import { hash, verifiedRuntimeImages, verifyImage } from './release-image.mjs'
 
 const directory = process.argv[2] || 'release'
 const sourceSHA = process.env.SOURCE_SHA
@@ -14,11 +14,13 @@ assert.match(process.env.BUILD_DATE ?? '', /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}
 const commitDate = new Date(Number(git('show', '-s', '--format=%ct', sourceSHA).toString().trim()) * 1000).toISOString().replace('.000Z', 'Z')
 assert.equal(process.env.BUILD_DATE, commitDate, 'Retry must use the same commit-time build stamp')
 const images = {}
+const tested = verifiedRuntimeImages(JSON.parse(await readFile(join(directory, 'production-runtime.json'))))
 for (const service of ['backend', 'frontend']) {
   const raw = await readFile(join(directory, `${service}-manifest.json`))
   const configRaw = await readFile(join(directory, `${service}-config.json`))
   const digest = process.env[`${service.toUpperCase()}_DIGEST`]
   const configDigest = verifyImage(raw, configRaw, digest, sourceSHA, commitDate)
+  assert.equal(configDigest, tested[service], 'Manifest must bind the exact smoke-tested image')
   images[service] = {
     image: `ghcr.io/e-dialect/xiangsheng-box-${service}`,
     tag: `sha-${sourceSHA}`,
@@ -60,6 +62,7 @@ const release = {
     migrationDigest: hash(Buffer.from(JSON.stringify(migrations))),
     compatibility: 'server-local-attestation-required', rollbackSafe: false,
   },
+  validation: { productionRuntime: { passed: true, imageConfigIDs: tested } },
   images,
 }
 await writeFile(join(directory, 'release-manifest.json'), `${JSON.stringify(release, null, 2)}\n`)
