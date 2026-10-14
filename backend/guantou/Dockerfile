@@ -24,6 +24,10 @@ COPY . .
 
 RUN python manage.py collectstatic --noinput
 
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home app && \
+    mkdir -p /data/logs /data/media && chown -R 10001:10001 /data && \
+    chmod -R a+rX /usr/src/guantou-backend
+
 EXPOSE 8000
 
 CMD ["sh", "docker/entrypoint.sh"]

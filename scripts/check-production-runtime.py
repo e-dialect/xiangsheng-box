@@ -16,7 +16,7 @@ class SmokeFailure(RuntimeError):
 
 BACKEND_READY = r'''
 import json,urllib.request
-request=urllib.request.Request('http://127.0.0.1:8000/site-settings/capabilities',headers={'Host':'box.edialect.top'})
+request=urllib.request.Request('http://127.0.0.1:8000/site-settings/capabilities',headers={'Host':'box.example.invalid'})
 with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request,timeout=3) as response:
  data=json.loads(response.read(1048576))
  assert response.status==200 and data.get('version')==1 and isinstance(data.get('capabilities'),dict)
@@ -28,7 +28,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
 opener=urllib.request.build_opener(NoRedirect,urllib.request.ProxyHandler({}))
 def get(path,headers=None,body=None):
- h={'Host':'box.edialect.top',**(headers or {})}
+ h={'Host':'box.example.invalid',**(headers or {})}
  if body is not None:h['Content-Type']='application/json'
  request=urllib.request.Request('http://127.0.0.1:8000'+path,headers=h,data=body)
  try:response=opener.open(request,timeout=5)
@@ -44,8 +44,8 @@ assert status==200 and headers.get_content_type()=='text/css' and len(body)>100
 checks['productionAdminStaticCSS']=True
 assert get('/site-settings/capabilities',{'Host':'untrusted.example.invalid'})[0]==400
 checks['untrustedHostRejected']=True
-status,headers,body=get('/site-settings/capabilities',{'Origin':'https://box.edialect.top'})
-assert status==200 and headers.get('Access-Control-Allow-Origin')=='https://box.edialect.top'
+status,headers,body=get('/site-settings/capabilities',{'Origin':'https://box.example.invalid'})
+assert status==200 and headers.get('Access-Control-Allow-Origin')=='https://box.example.invalid'
 assert get('/site-settings/capabilities',{'Origin':'https://untrusted.example.invalid'})[1].get('Access-Control-Allow-Origin') is None
 checks['corsExactOrigin']=True
 status,headers,body=get('/users/phone-code',{'X-Forwarded-Proto':'https'},b'{"phone":"synthetic-never-sent"}')
@@ -53,7 +53,7 @@ data=json.loads(body)
 assert status==503 and 'demo_code' not in data and data.get('delivery')!='demo'
 checks['phoneDemoDisabled']=True
 status,headers,body=get('/site-settings/carousel')
-assert status in (301,302) and headers.get('Location')=='https://box.edialect.top/site-settings/carousel'
+assert status in (301,302) and headers.get('Location')=='https://box.example.invalid/site-settings/carousel'
 checks['httpsRedirect']=True
 assert b'gunicorn' in pathlib.Path('/proc/1/cmdline').read_bytes()
 checks['gunicornIsPID1']=True
@@ -68,7 +68,7 @@ def synthetic_environment():
         'JWT_KEY': 'synthetic-runtime-jwt-' + 'b' * 64,
         'DEBUG': 'false', 'PHONE_CODE_DEMO_MODE': 'false',
         'EMAIL_CODE_DEMO_MODE': 'false', 'WECHAT_BIND_DEMO_MODE': 'false',
-        'PUBLIC_BACKEND_URL': 'https://box.edialect.top',
+        'PUBLIC_BACKEND_URL': 'https://box.example.invalid',
         'SQLITE_PATH': '/data/db.sqlite3', 'MEDIA_ROOT': '/data/media', 'LOG_DIR': '/data/logs',
         'EMAIL_HOST': 'smtp.example.invalid', 'EMAIL_HOST_USER': 'runtime@example.invalid',
         'EMAIL_HOST_PASSWORD': 'synthetic-no-external-service',

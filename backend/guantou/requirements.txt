@@ -3,6 +3,8 @@ django==6.1.2
 django-cors-headers~=4.9.0
 django-simpleui==2026.1.13
 djangorestframework~=3.18.3
+gunicorn==26.2.0
+whitenoise==6.12.0
 
 # Utilities
 demjson3~=3.0.6

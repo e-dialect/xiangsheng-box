@@ -60,7 +60,7 @@ services:
     environment:
       VITE_BACKEND_URL: ${FRONTEND_BACKEND_URL:-http://localhost:8000}
     ports:
-      - "${FRONTEND_PORT:-8181}:80"
+      - "${FRONTEND_PORT:-8181}:8080"
     depends_on:
       backend:
         condition: service_healthy

@@ -17,4 +17,5 @@
 
 # Production security and deployment boundaries are R2.
 /backend/guantou/config/settings.py        @aB0T-bupt @lin594
+/backend/guantou/config/production.py      @aB0T-bupt @lin594
 /docker-compose*.yml                       @aB0T-bupt @lin594
