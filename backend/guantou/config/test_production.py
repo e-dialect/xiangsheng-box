@@ -9,11 +9,12 @@ from django.test import SimpleTestCase
 
 
 class ProductionBoundaryTests(SimpleTestCase):
-    def _load(self, overrides=None):
+    def _load(self, overrides=None, *, paths_only=False, file_overrides=None):
         with tempfile.TemporaryDirectory() as directory:
             envfile = os.path.join(directory, "empty.env")
-            with open(envfile, "w"):
-                pass
+            with open(envfile, "w") as stream:
+                for key, value in (file_overrides or {}).items():
+                    stream.write(f"{key}={json.dumps(value)}\n")
             environment = {
                 "PATH": os.environ.get("PATH", ""),
                 "ENV_FILE": envfile,
@@ -39,6 +40,9 @@ class ProductionBoundaryTests(SimpleTestCase):
                 "SQLITE_PATH": os.path.join(directory, "db.sqlite3"),
                 "PYTHONDONTWRITEBYTECODE": "1",
             }
+            if paths_only:
+                for key in ("SQLITE_PATH", "MEDIA_ROOT", "LOG_DIR"):
+                    environment.pop(key, None)
             environment.update(overrides or {})
             code = """
 import json
@@ -68,6 +72,22 @@ print(json.dumps({
     'prefix': s.COS_KEY_PREFIX,
 }))
 """
+            if paths_only:
+                code = """
+import importlib
+import json
+import os
+from unittest.mock import patch
+module = 'config.production' if os.environ['ENVIRONMENT'].strip().lower() == 'production' else 'config.settings'
+with patch('os.makedirs') as mkdir:
+    s = importlib.import_module(module)
+print(json.dumps({
+    'database': s.DATABASES['default']['NAME'],
+    'media': s.MEDIA_ROOT,
+    'logs': s.log_path,
+    'mkdir': [call.args[0] for call in mkdir.call_args_list],
+}))
+"""
             return subprocess.run(
                 [sys.executable, "-c", code],
                 cwd=settings.BASE_DIR,
@@ -76,6 +96,63 @@ print(json.dumps({
                 text=True,
                 timeout=20,
             )
+
+    def test_production_defaults_are_writable_before_base_settings_import(self):
+        for environment in ("production", " Production ", "PRODUCTION"):
+            with self.subTest(environment=environment):
+                result = self._load({"ENVIRONMENT": environment}, paths_only=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    json.loads(result.stdout),
+                    {
+                        "database": "/data/db.sqlite3",
+                        "media": "/data/media",
+                        "logs": "/data/logs",
+                        "mkdir": ["/data/logs"],
+                    },
+                )
+
+    def test_development_keeps_source_relative_data_defaults(self):
+        result = self._load({"ENVIRONMENT": " development "}, paths_only=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "database": os.path.join(settings.BASE_DIR, "db.sqlite3"),
+                "media": os.path.join(settings.BASE_DIR, "media"),
+                "logs": os.path.join(settings.BASE_DIR, "logs"),
+                "mkdir": [os.path.join(settings.BASE_DIR, "logs")],
+            },
+        )
+
+    def test_explicit_environment_and_env_file_paths_keep_precedence(self):
+        file_paths = {
+            "SQLITE_PATH": "/file-data/db.sqlite3",
+            "MEDIA_ROOT": "/file-data/media",
+            "LOG_DIR": "/file-data/logs",
+        }
+        for overrides in (
+            {},
+            {
+                key: value.replace("file-data", "env-data")
+                for key, value in file_paths.items()
+            },
+        ):
+            with self.subTest(environment_override=bool(overrides)):
+                result = self._load(
+                    overrides, paths_only=True, file_overrides=file_paths
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = overrides or file_paths
+                self.assertEqual(
+                    json.loads(result.stdout),
+                    {
+                        "database": expected["SQLITE_PATH"],
+                        "media": expected["MEDIA_ROOT"],
+                        "logs": expected["LOG_DIR"],
+                        "mkdir": [expected["LOG_DIR"]],
+                    },
+                )
 
     def test_production_contract_is_origin_bound_and_logs_to_console(self):
         result = self._load()
