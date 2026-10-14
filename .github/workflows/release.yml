@@ -148,9 +148,10 @@ jobs:
             org.opencontainers.image.version=${{ env.VERSION }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
             org.opencontainers.image.source=https://github.com/e-dialect/xiangsheng-box
-          # VITE_BACKEND_URL is runtime configuration. Empty uses the public
-          # HTTPS origin. Same-origin API routing is a deployment contract;
-          # no production secrets or fixed API origin enter the build.
+          # Compile the production image for the public HTTPS origin. This
+          # avoids rewriting immutable assets on its read-only root filesystem.
+          build-args: |
+            VITE_BACKEND_URL=
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
       - name: Inspect immutable registry objects and create manifest

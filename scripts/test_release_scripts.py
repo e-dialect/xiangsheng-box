@@ -50,7 +50,10 @@ class AuthorizationTests(unittest.TestCase):
             build = steps[service]
             self.assertEqual(build['with']['context'], context)
             self.assertEqual(build['with']['platforms'], 'linux/amd64')
-            self.assertNotIn('build-args', build['with'])
+            if service == 'frontend':
+                self.assertEqual(build['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+            else:
+                self.assertNotIn('build-args', build['with'])
             self.assertNotIn('secrets', build['with'])
             self.assertNotIn('env', build)
             ignored = (ROOT / context / '.dockerignore').read_text().splitlines()
