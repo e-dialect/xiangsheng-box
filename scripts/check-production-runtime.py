@@ -97,7 +97,11 @@ class Docker:
 
     def inspect(self, name):
         result = self.call(['inspect', name], check=False)
-        return json.loads(result.stdout)[0] if result.returncode == 0 else None
+        if result.returncode:
+            if b'No such object:' in result.stderr or b'No such container:' in result.stderr:
+                return None
+            raise SmokeFailure('Container inspection unavailable; absence is not proven')
+        return json.loads(result.stdout)[0]
 
 
 def wait_for(docker, command, timeout=120):
