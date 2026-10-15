@@ -3,6 +3,8 @@ django==6.1.2
 django-cors-headers~=4.9.0
 django-simpleui==2026.1.13
 djangorestframework~=3.18.3
+gunicorn==26.2.0
+whitenoise==6.12.0
 
 # Utilities
 demjson3~=3.0.6
@@ -10,7 +12,7 @@ pyjwt~=2.15.1
 django-environ==0.14.0
 
 # Data Processing
-numpy>=2.5.3,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
+numpy>=2.5.4,<3.0.0  # Python 3.12+ compatible, avoid numpy 2.x for compatibility
 requests
 requests_toolbelt==1.0.0
 
@@ -26,4 +28,4 @@ cos-python-sdk-v5
 
 # Development Tools
 setuptools>=84.0.0,<85
-black==26.10.0
+black==26.10.1
