@@ -35,7 +35,7 @@ jobs:
       ci_run_id: ${{ steps.verify.outputs.ci_run_id }}
     steps:
       # No checkout or registry credentials before GitHub records authorize main.
-      - uses: actions/github-script@v8
+      - uses: actions/github-script@v9
         id: verify
         env:
           REQUESTED_SHA: ${{ inputs.source_sha }}
@@ -92,7 +92,7 @@ jobs:
           persist-credentials: false
       - uses: docker/setup-buildx-action@v4
       - name: Confirm current main before registry login
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.getBranch({ ...context.repo, branch: 'main' });
