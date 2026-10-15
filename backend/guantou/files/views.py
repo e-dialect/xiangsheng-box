@@ -28,10 +28,12 @@ ALLOWED_AUDIO_CONTENT_TYPES = frozenset(
         "audio/mp4",
         "audio/x-m4a",
         "audio/m4a",
+        "audio/webm",
+        "audio/ogg",
     }
 )
 
-ALLOWED_AUDIO_EXTENSIONS = frozenset({"mp3", "wav", "m4a"})
+ALLOWED_AUDIO_EXTENSIONS = frozenset({"mp3", "wav", "m4a", "webm", "ogg"})
 
 GENERIC_BINARY_CONTENT_TYPES = frozenset({"", "application/octet-stream"})
 
@@ -50,7 +52,9 @@ def file_extension(uploaded_file, file_type):
 
 
 def validate_audio_format(uploaded_file):
-    content_type = str(uploaded_file.content_type or "").lower()
+    content_type = (
+        str(uploaded_file.content_type or "").split(";", 1)[0].strip().lower()
+    )
     ext = file_extension(uploaded_file, "audio").lower()
     if content_type not in ALLOWED_AUDIO_CONTENT_TYPES | GENERIC_BINARY_CONTENT_TYPES:
         raise BadRequestException("不支持的音频格式")
