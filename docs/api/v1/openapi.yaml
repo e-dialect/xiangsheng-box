@@ -1071,8 +1071,8 @@ paths:
     get:
       tags: [Curation]
       operationId: listCurationActions
-      summary: 查询公开整理履历
-      security: []
+      summary: 查询本人或授权范围内的整理履历
+      description: 需要登录；本人历史不因授权到期而消失。其他人的记录按当前角色、目标可见性和历史地区范围过滤，字段按访问者裁剪。
       responses:
         "200": { description: 整理操作列表, content: { application/json: { schema: { $ref: "#/components/schemas/CurationActionPage" } } } }
     post:
@@ -1091,7 +1091,7 @@ paths:
       tags: [Curation]
       operationId: getCurationAction
       summary: 获取整理操作
-      security: []
+      description: 需要登录；无权读取的对象返回 404。地区整理员不能因目标已缩小到其地区，就读取原上级范围的决策历史。
       responses:
         "200": { description: 整理操作, content: { application/json: { schema: { $ref: "#/components/schemas/CurationActionV2" } } } }
   /curation/:
@@ -1704,14 +1704,41 @@ components:
       type: object
       properties:
         id: { type: integer, readOnly: true }
-        actor: { $ref: "#/components/schemas/UserRef" }
+        actor:
+          readOnly: true
+          description: 本人或 staff 响应含 UserRef；授权协作者只收到稳定的 id，不包含用户名、昵称或头像。
+          anyOf:
+            - { $ref: "#/components/schemas/UserRef" }
+            - { type: object, required: [id], properties: { id: { type: integer } } }
+        grant:
+          type: object
+          nullable: true
+          readOnly: true
+          description: 本人或 staff 可读取当前 grant；协作者为 null。历史依据使用 authority_snapshot，不用此字段重建过去授权。
         action_type: { type: string }
         target_type: { type: string }
         target_id: { type: integer }
         before_snapshot: { type: object, readOnly: true }
         after_snapshot: { type: object, readOnly: true }
+        authority_snapshot: { $ref: "#/components/schemas/AuthoritySnapshotV2" }
         reason: { type: string }
         evidence_ids: { type: array, items: { type: integer } }
+    AuthoritySnapshotV2:
+      type: object
+      readOnly: true
+      description: 新语义动作的授权时点快照；旧记录返回 status=unavailable、reason=legacy_record，不按当前 grant 倒填。
+      properties:
+        status: { type: string, enum: [captured, unavailable] }
+        version: { type: integer }
+        captured_at: { type: string, format: date-time }
+        mode: { type: string, enum: [grant, staff] }
+        grant_id: { type: integer }
+        role: { type: string }
+        dialect: { type: object, nullable: true }
+        valid_from: { type: string, format: date-time }
+        valid_until: { type: string, format: date-time }
+        revoked_at: { type: string, nullable: true }
+        reason: { type: string }
     CapabilitySwitches:
       type: object
       properties:

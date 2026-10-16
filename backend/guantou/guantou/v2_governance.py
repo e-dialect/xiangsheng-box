@@ -93,7 +93,7 @@ def _recording_snapshot(recording):
 def _grant_for(user, role, dialect=None):
     if user.is_staff:
         return None
-    grants = active_curator_grants(user, role)
+    grants = active_curator_grants(user, role).select_for_update(of=("self",))
     if role == CuratorGrant.Role.LEXICAL:
         return grants.first()
     if dialect:
@@ -283,6 +283,8 @@ def _review(actor, target_type, target_id, changes, reason):
             else _require_regional(actor, obj.recording.usage_dialect)
         )
         before, after, label = _review_link(obj, status, actor, reason)
+        before["usage_dialect"] = _dialect_snapshot(obj.recording.usage_dialect)
+        after["usage_dialect"] = _dialect_snapshot(obj.recording.usage_dialect)
         return grant, before, after, label
     _fail("该对象不支持状态审核", "target_type")
 
@@ -627,6 +629,36 @@ def perform_curation_action(actor, validated_data):
     ):
         _fail("待整理对象不存在", "target_id")
 
+    captured_at = timezone.now()
+    if grant is None and not actor.is_staff:
+        _fail("授权已失效，请重新检查整理权限")
+    if grant is not None:
+        if not (
+            grant.revoked_at is None
+            and grant.valid_from <= captured_at < grant.valid_until
+        ):
+            _fail("授权已失效，请重新检查整理权限")
+        authority_snapshot = {
+            "version": 1,
+            "status": "captured",
+            "captured_at": captured_at.isoformat(),
+            "mode": "grant",
+            "grant_id": grant.id,
+            "role": grant.role,
+            "dialect": _dialect_snapshot(grant.dialect),
+            "valid_from": grant.valid_from.isoformat(),
+            "valid_until": grant.valid_until.isoformat(),
+            "revoked_at": None,
+        }
+    else:
+        authority_snapshot = {
+            "version": 1,
+            "status": "captured",
+            "captured_at": captured_at.isoformat(),
+            "mode": "staff",
+            "role": "staff",
+            "dialect": None,
+        }
     action = CurationAction.objects.create(
         actor=actor,
         grant=grant,
@@ -636,6 +668,7 @@ def perform_curation_action(actor, validated_data):
         target_label=label,
         before_snapshot=before,
         after_snapshot=after,
+        authority_snapshot=authority_snapshot,
         reason=reason,
     )
     if evidence:

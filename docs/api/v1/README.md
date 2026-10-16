@@ -27,6 +27,24 @@ Entry，再分别关联 WALK、RUN。搜索相同写法时返回多条清楚标�
 - `GET /entries/bookmarks/` 与 `PUT|DELETE /entries/{id}/bookmark/`：私有收藏。
 - `GET /curation/`、`GET /curation/tasks/`：按授权显示整理工作台。
 - `GET /contributions/me/`：个人录音、补证、修订和地区足迹。
+- `GET /curation/actions/` 与 `GET /curation/actions/{id}/`：登录后查看本人历史；有效整理员还可按角色、目标可见性和历史地区范围读取协作者记录。
+- `POST /curation/actions/`：仅 staff 或有效整理员可提交；新动作保存 `authority_snapshot`，用于解释当时的角色、范围和有效期，不依赖可变的当前 grant。
+
+## 地区修改与历史读取边界
+
+Entry、Recording、PronunciationVariant 仅在 `draft` 且该目标没有语义动作历史时允许普通接口修改地区。
+其他状态或已有整理历史的目标需通过治理操作提供依据与理由；同值保存和非地区字段维护不受此规则阻止。
+普通 API 无法把已审核对象的地区悄悄改掉并保留其审核状态；staff 也需使用治理路径。
+
+地区整理员读取另一人的范围决策时，目标当前范围及快照中的前后范围都须处于其授权子树；
+只有当前地方权限不能读取原上级范围的决策。词汇整理员按其词汇对象职责读取，录音关联还需录音可见。
+无法判断历史范围或目标已删除时，对其他人的读取采取拒绝策略；本人仍能查到自己的历史。
+协作者响应保留决策理由、前后快照与授权快照，actor 只保留 id，grant 管理备注不公开，证据 ID 按来源可见性过滤。
+已到期/撤销的 sole-grant 操作者可读取自己的旧动作，但不能借此提交新动作或查他人的记录。
+
+`authority_snapshot` 保存版本、采集时间、grant/staff 模式、角色、当时方言标识/路径、有效期及当时撤销状态。
+不保存授权人的个人资料或管理备注；已有记录未回填，读取时显式显示 `unavailable`。
+它受 CurationAction 的模型 save 和只追加 API 保护，不是对直接 ORM/数据库管理写入的防篡改保证。
 
 ## 方言范围
 

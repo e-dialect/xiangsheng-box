@@ -2248,6 +2248,9 @@ class CurationAction(models.Model):
     target_label = models.CharField(max_length=240, blank=True, verbose_name="对象摘要")
     before_snapshot = models.JSONField(default=dict, verbose_name="操作前快照")
     after_snapshot = models.JSONField(default=dict, verbose_name="操作后快照")
+    authority_snapshot = models.JSONField(
+        default=dict, db_default={}, blank=True, verbose_name="操作时授权快照"
+    )
     reason = models.TextField(verbose_name="整理理由")
     evidence = models.ManyToManyField(
         EvidenceRecord,
