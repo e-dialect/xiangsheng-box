@@ -247,10 +247,29 @@ function successPayload(pathname, method, {
   if (pathname === '/circles/') return paged(empty ? [] : [CIRCLE]);
   if (pathname === '/curation/') {
     return {
-      grants: [{ id: 71, role: 'regional_curator', dialect: DIALECTS[1] }],
+      grants: [{ id: 71, role: 'regional_curator', dialect: DIALECTS[1], is_active: true }],
       pending: { entries: 1, recordings: 1, pronunciations: 1 },
     };
   }
+  if (pathname === '/evidence-records/') return paged(empty ? [] : [{
+    id: 91, source_type: 'book', original_text: '用于说明地区适用范围的合成测试材料。',
+    citation: '合成来源卡，第 2 页', created_at: '2026-10-17T00:00:00Z',
+  }]);
+  if (/^\/evidence-records\/\d+\/$/.test(pathname)) return {
+    id: 91, source_type: 'book', original_text: '用于说明地区适用范围的合成测试材料。',
+    citation: '合成来源卡，第 2 页', created_at: '2026-10-17T00:00:00Z',
+  };
+  if (/^\/curation\/actions\/\d+\/$/.test(pathname)) return {
+    id: 91, action_type: 'narrow_scope', target_type: 'entry', target_id: 21,
+    target_label: ENTRY.display_writing, actor: { id: 7 }, grant: null,
+    reason: '依据合成材料缩小范围，仍需进一步核验。', evidence_ids: [91],
+    before_snapshot: { usage_dialect: DIALECTS[0] },
+    after_snapshot: { usage_dialect: DIALECTS[1] },
+    authority_snapshot: { status: 'captured', role: 'regional_curator', mode: 'grant',
+      dialect: DIALECTS[0], captured_at: '2026-10-17T00:00:00Z' },
+    created_at: '2026-10-17T00:00:00Z',
+  };
+  if (pathname === '/curation/actions/') return paged([]);
   if (pathname === '/curation/tasks/') {
     return paged(empty ? [] : [{
       id: 81,

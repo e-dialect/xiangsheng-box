@@ -108,6 +108,8 @@ export default {
       if (!this.dialog.visible && !this.dialogResolver) return;
       const resolve = this.dialogResolver;
       this.dialog.visible = false;
+      this.dialog.content = '';
+      this.dialog.title = '';
       this.dialogResolver = null;
       if (resolve) resolve(confirmed);
     },

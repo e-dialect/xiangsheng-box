@@ -1,5 +1,10 @@
 # TDesign UI migration tracker
 
+2026-10-17：阶段二新增词条来源/整理历史、范围缩小和动作详情，复用
+BaseForm/BaseField/BaseButton/BaseLoading/EmptyState/PageShell/DialectSelector 与
+feedback 确认层；范围和验证状态见
+[`阶段二实施记录`](plans/2026-10-17-stage-2-ui.md)。尚未创建 PR/issue；在线 A/B 与小程序真机验收待完成。
+
 > 本页保留 2026 年 V2 切换前的控件迁移证据。表中 Can/Nameplate 等页面已在
 > Entry/Recording V2 切换后退役，不再表示当前页面清单或待办；当前前端边界见
 > [`FRONTEND_GUIDE.md`](FRONTEND_GUIDE.md)。

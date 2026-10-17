@@ -17,6 +17,8 @@ export const ROUTES = Object.freeze({
   contributionHistory: '/pages/users/contributions',
   entryBookmarks: '/pages/users/bookmarks',
   curationWorkbench: '/pages/curation/index',
+  entryReview: '/pages/curation/entry-review',
+  curationActionDetail: '/pages/curation/action-detail',
   curatorApplication: '/pages/curation/apply',
   loginRegister: '/pages/login/register',
   loginWechatRegister: '/pages/login/register/wechat',

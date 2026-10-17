@@ -136,6 +136,9 @@ export async function request(method = 'GET', url = '', data = {}, options = {})
     if (resolvedOptions.visitor) persistVisitorId(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       requestError = createApiError(response);
+    } else if (resolvedOptions.expectedStatus
+      && response.statusCode !== resolvedOptions.expectedStatus) {
+      requestError = { statusCode: 0, message: '返回状态异常，结果未知，请先核查历史记录' };
     }
   } catch (rawError) {
     requestError = createApiError(rawError);
