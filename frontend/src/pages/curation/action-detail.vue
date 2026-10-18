@@ -198,7 +198,8 @@ export default {
       const route = pageUrl(ROUTES.curationActionDetail, { id: this.id });
       let link = route;
       // #ifdef H5
-      link = `${window.location.origin}${route}`;
+      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+      link = `${window.location.origin}${base}${route}`;
       // #endif
       uni.setClipboardData({ data: link });
     },

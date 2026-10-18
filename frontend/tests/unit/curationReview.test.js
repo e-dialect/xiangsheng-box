@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/utils/request', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('@/services/feedback', () => ({ confirm: vi.fn(), cancelConfirmation: vi.fn() }));
@@ -8,6 +8,7 @@ const request = (await import('@/utils/request')).default;
 const { confirm } = await import('@/services/feedback');
 const { listAllDialects } = await import('@/services/guantou');
 const service = await import('@/services/curationReview');
+const { appRoutePath } = await import('@/services/navigation');
 const EntryReview = (await import('@/pages/curation/entry-review.vue')).default;
 const ActionDetail = (await import('@/pages/curation/action-detail.vue')).default;
 const Workbench = (await import('@/pages/curation/index.vue')).default;
@@ -42,6 +43,7 @@ function readyEntry() {
 }
 
 describe('stage two curation loop', () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.resetAllMocks();
     session = { id: 1, token: 'session-a' };
@@ -74,6 +76,87 @@ describe('stage two curation loop', () => {
     await service.listEntryActions(7, 3);
     expect(request.get).toHaveBeenCalledWith('/evidence-records/', { entry_id: 7, page: 2, page_size: 20 }, true, { loading: false });
     expect(request.get).toHaveBeenCalledWith('/curation/actions/', { target_type: 'entry', target_id: 7, page: 3, page_size: 20 }, true, { loading: false });
+  });
+
+  it('uses fresh owner-only staff information to enable a staff account with no grant', async () => {
+    const ctx = readyEntry();
+    request.get.mockImplementation(async (url) => {
+      if (url === '/users/1') return { user: { id: 1, is_staff: true } };
+      if (url === '/curation/') return { grants: [] };
+      if (url === '/entries/7/') return ctx.entry;
+      return { results: [], next: null };
+    });
+    await ctx.loadContext();
+    expect(ctx.summary).toEqual({ grants: [], is_staff: true });
+    expect(ctx.disabledReason).toBe('');
+    await ctx.submit();
+    expect(request.post).toHaveBeenCalledTimes(1);
+    service.reviewSession.onHide.call(ctx);
+    expect(ctx.summary).toBeNull();
+  });
+
+  it.each([
+    ['ordinary account', { user: { id: 1, is_staff: false } }],
+    ['public profile', { user: { id: 1 } }],
+    ['different owner', { user: { id: 2, is_staff: true } }],
+    ['non-boolean flag', { user: { id: 1, is_staff: 'true' } }],
+  ])('does not treat an empty grant list as staff for %s', async (_, profile) => {
+    const ctx = readyEntry();
+    request.get.mockImplementation(async (url) => (
+      url === '/users/1' ? profile : { grants: [], is_staff: true }
+    ));
+    await ctx.loadContext();
+    expect(ctx.summary.is_staff).toBe(false);
+    expect(ctx.canSubmit).toBe(false);
+    await ctx.submit();
+    expect(request.post).not.toHaveBeenCalled();
+  });
+
+  it('keeps revoked, expired and out-of-scope ordinary accounts blocked', () => {
+    expect(service.canNarrow({ grants: [], is_staff: false }, dialects[0], dialects)).toBe(false);
+    expect(service.canNarrow({ grants: [{ ...grant, is_active: false }], is_staff: false }, dialects[0], dialects)).toBe(false);
+    expect(service.canNarrow({ grants: [{ ...grant, dialect: dialects[3] }], is_staff: false }, dialects[0], dialects)).toBe(false);
+  });
+
+  it('fails closed on staff lookup errors and discards staff results after switching accounts', async () => {
+    const ctx = readyEntry();
+    request.get.mockImplementation(async (url) => {
+      if (url === '/users/1') throw { statusCode: 0 };
+      return { grants: [] };
+    });
+    await ctx.loadContext();
+    expect(ctx.summary.is_staff).toBe(false);
+    expect(ctx.contextError).toContain('无法核对站点审核权限');
+    let resolveProfile;
+    request.get.mockImplementation(async (url) => (
+      url === '/users/1' ? new Promise((resolve) => { resolveProfile = resolve; }) : { grants: [] }
+    ));
+    const pending = ctx.loadContext();
+    session = { id: 2, token: 'session-b' };
+    service.reviewSession.onHide.call(ctx);
+    resolveProfile({ user: { id: 1, is_staff: true } });
+    await pending;
+    expect(ctx.summary).toBeNull();
+  });
+
+  it.each(['/', '/guantou-preview/'])('copies an action URL with H5 base %s and only the action ID', (base) => {
+    vi.stubEnv('BASE_URL', base);
+    const ctx = context(ActionDetail, { id: 80 });
+    ctx.copyLink();
+    expect(uni.setClipboardData).toHaveBeenCalledWith({
+      data: `${window.location.origin}${base}pages/curation/action-detail?id=80`,
+    });
+  });
+
+  it.each([
+    ['/', '/pages/curation/action-detail', '/pages/curation/action-detail'],
+    ['/guantou-preview/', '/guantou-preview/pages/curation/action-detail', '/pages/curation/action-detail'],
+    ['/guantou-preview/', '/guantou-preview/', '/'],
+    ['/guantou-preview/', '/guantou-preview', '/'],
+    ['/guantou-preview/', '/guantou-preview-other/pages/curation/action-detail', '/guantou-preview-other/pages/curation/action-detail'],
+    ['/guantou-preview/', '/guantou-preview/unknown', '/unknown'],
+  ])('checks application routes within mount %s for %s', (base, pathname, expected) => {
+    expect(appRoutePath(pathname, base)).toBe(expected);
   });
 
   it('blocks repeated clicks while confirming and posts one semantic action with a 201 requirement', async () => {

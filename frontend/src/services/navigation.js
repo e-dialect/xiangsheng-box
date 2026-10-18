@@ -51,6 +51,13 @@ export function pageUrl(path, params = {}) {
   return `${path}${queryString(params)}`;
 }
 
+// H5 history paths include the deployment mount; pages.json routes do not.
+export function appRoutePath(pathname, base = '/') {
+  const mount = base.replace(/\/$/, '');
+  if (mount && pathname === mount) return '/';
+  return mount && pathname.startsWith(`${mount}/`) ? pathname.slice(mount.length) : pathname;
+}
+
 export function routeDestination(path, params = {}) {
   // 登录恢复只消费由本白名单生成的目的地，不能执行存储中的任意路径。
   if (!Object.values(ROUTES).includes(path)) return null;

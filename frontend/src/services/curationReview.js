@@ -3,6 +3,14 @@ import { buildDialectTree, findDialectPath, dialectBreadcrumb } from '@/utils/di
 
 const OPTIONS = Object.freeze({ loading: false });
 
+// Only the authenticated owner's response exposes is_staff. Keep no profile cache.
+export async function getReviewStaff() {
+  const id = Number(uni.getStorageSync('id'));
+  if (!uni.getStorageSync('token') || !Number.isSafeInteger(id) || id <= 0) return false;
+  const response = await request.get(`/users/${id}`, {}, true, OPTIONS);
+  return Number(response?.user?.id) === id && response.user.is_staff === true;
+}
+
 export function listEntryEvidence(id, page = 1) {
   return request.get('/evidence-records/', { entry_id: id, page, page_size: 20 }, true, OPTIONS);
 }
@@ -34,6 +42,7 @@ export function strictDescendants(dialects, ancestorId) {
 
 export function canNarrow(summary, dialect, dialects) {
   if (!dialect?.id || !summary) return false;
+  if (summary.is_staff === true) return true;
   const ancestors = findDialectPath(buildDialectTree(dialects), dialect.id);
   return (summary.grants || []).some((grant) => (
     grant.is_active === true && grant.role === 'regional_curator'

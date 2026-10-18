@@ -3,7 +3,9 @@
 2026-10-17：阶段二新增词条来源/整理历史、范围缩小和动作详情，复用
 BaseForm/BaseField/BaseButton/BaseLoading/EmptyState/PageShell/DialectSelector 与
 feedback 确认层；范围和验证状态见
-[`阶段二实施记录`](plans/2026-10-17-stage-2-ui.md)。原版本已部署，普通账号 AC1–AC8（含撤权）已由负责人确认完成，附件待归档；小程序真机验收待完成。2026-10-18 已移植到 `codex/migrate-stage2-ui`，依赖 `codex/migrate-curation-backend`；尚未创建 PR/issue。
+[`阶段二实施记录`](plans/2026-10-17-stage-2-ui.md)。原版本已部署，普通账号 AC1–AC8（含撤权）已由负责人确认完成，附件待归档；小程序真机验收待完成。2026-10-18 已移植到 `codex/migrate-stage2-ui`，依赖 `codex/migrate-curation-backend`。
+
+2026-10-18 review 修复：本人 staff 能力确认、复制链接部署前缀与 H5 启动路径识别已补回归；对应 [PR #532](https://github.com/e-dialect/xiangsheng-box/pull/532)、[工作包 #530](https://github.com/e-dialect/xiangsheng-box/issues/530)，后端依赖 [PR #531](https://github.com/e-dialect/xiangsheng-box/pull/531)。
 
 > 本页保留 2026 年 V2 切换前的控件迁移证据。表中 Can/Nameplate 等页面已在
 > Entry/Recording V2 切换后退役，不再表示当前页面清单或待办；当前前端边界见

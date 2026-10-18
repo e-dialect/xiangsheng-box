@@ -233,7 +233,7 @@ import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { confirm, cancelConfirmation } from '@/services/feedback';
 import { openPage, ROUTES } from '@/services/navigation';
 import {
-  listEntryEvidence, listEntryActions, strictDescendants, canNarrow, narrowPayload,
+  listEntryEvidence, listEntryActions, strictDescendants, canNarrow, narrowPayload, getReviewStaff,
   submitNarrowScope, reviewError, actionLabel, reviewSession,
 } from '@/services/curationReview';
 
@@ -353,12 +353,21 @@ export default {
     async loadContext() {
       const valid = this.reviewGuard();
       this.contextLoading = true; this.contextError = ''; this.summary = null;
-      const results = await Promise.allSettled([listAllDialects(), getCurationSummary()]);
+      const results = await Promise.allSettled([
+        listAllDialects(), getCurationSummary(), getReviewStaff(),
+      ]);
       if (!valid()) return;
       if (results[0].status === 'fulfilled') this.dialects = results[0].value;
       else this.contextError = `地区加载失败：${reviewError(results[0].reason)}`;
-      if (results[1].status === 'fulfilled') this.summary = results[1].value;
-      else this.contextError = this.contextError || reviewError(results[1].reason);
+      if (results[1].status === 'fulfilled') {
+        this.summary = {
+          ...results[1].value,
+          is_staff: results[2].status === 'fulfilled' && results[2].value === true,
+        };
+        if (results[2].status === 'rejected' && !this.summary.grants?.length) {
+          this.contextError = this.contextError || `无法核对站点审核权限：${reviewError(results[2].reason)}`;
+        }
+      } else this.contextError = this.contextError || reviewError(results[1].reason);
       this.contextLoading = false;
     },
     async loadEvidence(page) {
