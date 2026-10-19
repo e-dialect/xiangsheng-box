@@ -33,6 +33,8 @@ Entry，再分别关联 WALK、RUN。搜索相同写法时返回多条清楚标�
 ## 地区修改与历史读取边界
 
 Entry、Recording、PronunciationVariant 仅在 `draft` 且该目标没有语义动作历史时允许普通接口修改地区。
+Entry 的义项、写法关联，以及 Recording 的录音关联已有整理状态或语义动作历史时，父对象也受保护；
+关联历史版本不因 `is_current=false` 而被排除。PronunciationVariant 使用自身独立的地区范围。
 其他状态或已有整理历史的目标需通过治理操作提供依据与理由；同值保存和非地区字段维护不受此规则阻止。
 普通 API 无法把已审核对象的地区悄悄改掉并保留其审核状态；staff 也需使用治理路径。
 

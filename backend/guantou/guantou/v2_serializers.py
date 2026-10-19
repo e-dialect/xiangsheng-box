@@ -21,6 +21,7 @@ from .models import (
     UsageAttestation,
     WritingForm,
 )
+from .v2_scope import has_scope_decisions
 from .shared_serializers import DialectRefSerializer, UserLiteSerializer
 from .v2_permissions import (
     active_curator_grants,
@@ -207,9 +208,7 @@ class ProtectedScopeUpdateMixin:
                 old_id = getattr(instance, f"{self.scope_field}_id")
                 if new_id != old_id and (
                     instance.status != "draft"
-                    or CurationAction.objects.filter(
-                        target_type=self.scope_target_type, target_id=instance.pk
-                    ).exists()
+                    or has_scope_decisions(instance, self.scope_target_type)
                 ):
                     raise serializers.ValidationError(
                         {
