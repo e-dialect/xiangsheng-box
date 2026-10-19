@@ -63,6 +63,19 @@ async function openReview(page) {
   })));
 }
 
+async function openSessionControlTab(page) {
+  const tab = await page.context().newPage();
+  // Only drive same-origin storage events. Loading the app here would send
+  // synthetic credentials to the real CI backend because page routes are local.
+  await tab.route('**/*', (route) => route.fulfill({
+    contentType: 'text/html',
+    body: '<!doctype html><title>Session control</title>',
+  }));
+  const base = process.env.E2E_H5_BASE || '/';
+  await tab.goto(new URL(`${base}__e2e-session-control__`, page.url()).href);
+  return tab;
+}
+
 for (const theme of ['light', 'dark']) {
   test(`pronunciation-only evidence and persisted history labels ${theme}`, async ({ page }, testInfo) => {
     const state = await setup(page, theme, {
@@ -102,26 +115,42 @@ for (const theme of ['light', 'dark']) {
 }
 
 test('retry after an account switch reads and writes only the new selector namespace', async ({ page }) => {
+  const unmockedApiRequests = [];
+  // Page fixtures take precedence. Any request leaking from another tab would
+  // otherwise reach the real backend and reject these synthetic credentials.
+  await page.context().route('http://localhost:8000/**', (route) => {
+    unmockedApiRequests.push(route.request().url());
+    return route.fulfill({ status: 401, json: { message: 'Unmocked synthetic session' } });
+  });
   await setup(page, 'light');
   await openReview(page);
   await page.evaluate(() => {
     uni.setStorageSync('dialect-selector:recent:7', '[4,999]');
     uni.setStorageSync('dialect-selector:recent:8', '[]');
+    uni.setStorageSync('dialect-selector:recent:guest', '[999]');
   });
-  const secondTab = await page.context().newPage();
-  await secondTab.goto(process.env.E2E_H5_BASE || '/');
+  const secondTab = await openSessionControlTab(page);
   await secondTab.evaluate(() => {
     localStorage.setItem('token', 'visual-review-b'); localStorage.setItem('id', '8');
   });
   await expect(page.getByText('账号已变更，请重新加载', { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => ({
+    id: uni.getStorageSync('id'), token: uni.getStorageSync('token'),
+  }))).toEqual({ id: '8', token: 'visual-review-b' });
   await page.getByRole('button', { name: '重试', exact: true }).click();
   await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
   await expect(page.getByRole('button', { name: /^最近 ·/ })).toHaveCount(0);
   await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
-  expect(await page.evaluate(() => ({
+  await expect.poll(() => page.evaluate(() => ({
+    id: uni.getStorageSync('id'),
+    token: uni.getStorageSync('token'),
     previous: uni.getStorageSync('dialect-selector:recent:7'),
     current: uni.getStorageSync('dialect-selector:recent:8'),
-  }))).toEqual({ previous: '[4,999]', current: '[4]' });
+    guest: uni.getStorageSync('dialect-selector:recent:guest'),
+  }))).toEqual({
+    id: '8', token: 'visual-review-b', previous: '[4,999]', current: '[4]', guest: '[999]',
+  });
+  expect(unmockedApiRequests).toEqual([]);
   await secondTab.close();
 });
 
@@ -200,8 +229,7 @@ for (const theme of ['light', 'dark']) {
       await expect(page.getByText('操作时授权', { exact: true })).toBeVisible();
       expect(runtimeErrors).toEqual([]);
       // A second tab changes the same-origin session. Rendered private data must disappear.
-      const secondTab = await page.context().newPage();
-      await secondTab.goto(process.env.E2E_H5_BASE || '/');
+      const secondTab = await openSessionControlTab(page);
       await secondTab.evaluate(() => {
         localStorage.setItem('token', 'visual-review-b'); localStorage.setItem('id', '8');
       });
@@ -221,8 +249,7 @@ test('session changes also remove evidence and draft text from the pending confi
   await page.locator('textarea').fill('需要随会话清理的私有草稿理由');
   await page.getByRole('button', { name: '核对并提交范围修正', exact: true }).click();
   await expect(page.getByText('确认缩小地区范围', { exact: true })).toBeVisible();
-  const secondTab = await page.context().newPage();
-  await secondTab.goto(process.env.E2E_H5_BASE || '/');
+  const secondTab = await openSessionControlTab(page);
   await secondTab.evaluate(() => {
     localStorage.setItem('token', 'visual-review-b'); localStorage.setItem('id', '8');
   });
