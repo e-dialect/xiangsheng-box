@@ -7,6 +7,7 @@ from django.test import TestCase, TransactionTestCase, skipUnlessDBFeature
 
 from .models import (
     CurationAction,
+    Entry,
     EntrySense,
     EntryWriting,
     Recording,
@@ -26,6 +27,99 @@ class DependentScopeTests(TestCase):
     def set_draft(self):
         self.entry.status = "draft"
         self.entry.save()
+
+    def split_draft(self):
+        self.set_draft()
+        self.issue(self.owner, role="lexical_curator")
+        EntrySense.objects.create(entry=self.entry, sense_number=1, gloss="keep")
+        moved = EntrySense.objects.create(
+            entry=self.entry, sense_number=2, gloss="move"
+        )
+        EntryWriting.objects.create(
+            entry=self.entry,
+            writing=WritingForm.objects.create(text="split draft"),
+            relation_type="primary",
+        )
+        response = self.client_for(self.owner).post(
+            "/curation/actions/",
+            {
+                "action_type": "split_entry",
+                "target_type": "entry",
+                "target_id": self.entry.id,
+                "reason": "Separate independent senses",
+                "evidence_ids": [self.evidence.id],
+                "changes": {"sense_ids": [moved.id]},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        return (
+            Entry.objects.get(pk=response.data["after_snapshot"]["created"]["id"]),
+            response.data,
+        )
+
+    def test_split_created_draft_is_protected_without_direct_or_child_history(self):
+        created, action = self.split_draft()
+        self.assertEqual(created.status, "draft")
+        self.assertFalse(created.senses.exclude(status="draft").exists())
+        self.assertTrue(created.entry_writings.exists())
+        self.assertFalse(created.entry_writings.exclude(status="draft").exists())
+        self.assertFalse(
+            CurationAction.objects.filter(
+                target_type="entry", target_id=created.id
+            ).exists()
+        )
+        # The immutable server-side decision, not mutable metadata, supplies protection.
+        created.metadata = {}
+        created.save(update_fields=["metadata"])
+        self.assert_blocked(f"/entries/{created.id}/", created)
+        row = CurationAction.objects.get(pk=action["id"])
+        self.assertEqual(row.after_snapshot, action["after_snapshot"])
+
+    def test_split_created_draft_allows_same_scope_and_audited_narrowing(self):
+        created, split = self.split_draft()
+        response = self.client_for(self.owner).patch(
+            f"/entries/{created.id}/",
+            {"usage_dialect_id": self.root.id, "summary": "Clarified split result"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        response = self.narrow(target=created)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(
+            response.data["before_snapshot"]["usage_dialect"]["id"], self.root.id
+        )
+        self.assertEqual(
+            response.data["after_snapshot"]["usage_dialect"]["id"], self.local.id
+        )
+        self.assertEqual(response.data["evidence_ids"], [self.evidence.id])
+        created.refresh_from_db()
+        self.assertEqual(created.usage_dialect_id, self.local.id)
+        self.assertEqual(
+            CurationAction.objects.get(pk=split["id"]).after_snapshot,
+            split["after_snapshot"],
+        )
+
+    def test_unrelated_split_result_and_other_action_snapshot_do_not_block(self):
+        self.set_draft()
+        for kind, result_id in (
+            ("split_entry", self.entry.id + 1000),
+            ("review", self.entry.id),
+        ):
+            CurationAction.objects.create(
+                actor=self.staff,
+                action_type=kind,
+                target_type="entry",
+                target_id=self.entry.id + 2000,
+                reason="Unrelated action",
+                after_snapshot={"created": {"id": result_id}},
+            )
+        response = self.client_for(self.owner).patch(
+            f"/entries/{self.entry.id}/",
+            {"usage_dialect_id": self.local.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
 
     def assert_blocked(self, path, target):
         count = CurationAction.objects.count()

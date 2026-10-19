@@ -25,6 +25,12 @@ def has_scope_decisions(instance, target_type):
             return True
         targets |= Q(target_type="sense", target_id__in=senses.values("pk"))
         targets |= Q(target_type="writing", target_id__in=writings.values("pk"))
+        # Split history targets the source; the created draft is also a participant.
+        targets |= Q(
+            action_type=CurationAction.ActionType.SPLIT_ENTRY,
+            target_type=CurationAction.TargetType.ENTRY,
+            after_snapshot__created__id=instance.pk,
+        )
     elif isinstance(instance, Recording):
         # Historical versions carry decisions too, even when the successor is suggested.
         links = RecordingEntryLink.objects.filter(recording=instance)

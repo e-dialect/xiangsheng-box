@@ -1,5 +1,13 @@
 # 整理溯源基础迁移
 
+## 2026-10-19 二次审查修复：拆分产物也是决策参与者
+
+- `split_entry` 的动作目标是原词条，新建词条只记录在 `after_snapshot.created`。范围保护现按 `action_type=split_entry`、`target_type=entry` 和 `after_snapshot.created.id` 精确匹配新词条；即使其全部内容仍是草稿、metadata 被清空，普通地区更新也不能绕过治理操作。
+- 新增三项回归：真实拆分出的草稿拒绝普通 PATCH/PUT，允许同值/无关字段更新及有依据的治理缩小范围，原拆分快照保持不变；不相关拆分产物或其他动作的同形快照不会误伤普通草稿。
+- 核对其他多对象动作：合并的 canonical/sources 分别为 reviewed/redirected，由状态保护；竞争解释的范围归属 Recording，直接动作及已审核关联均保护，不把仅关联的 Entry 当作继承该录音地区。
+- 实际验证：`python manage.py test guantou.tests_v2_scope guantou.tests_v2_provenance guantou.tests_v2_governance --noinput` 共 40 项，39 通过、1 项 SQLite 行锁跳过；API contract 检查通过。独立 agent 复核本轮差异未发现阻塞。
+- 本轮未新增迁移、未部署、未重复完整后端/真实并发或在线验收；上轮本机 config 失败已在修改前基线复现，不能声称本地完整测试全通过。以最新提交的远端 CI 为准。
+
 ## 2026-10-19 审查修复：子对象决定保护父范围
 
 - 普通地区更新除目标自身状态/历史外，还检查 Entry 的义项和写法关联、Recording 的录音关联的整理状态与动作历史；查询包含非当前关联版本。
