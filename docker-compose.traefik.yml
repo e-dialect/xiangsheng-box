@@ -84,7 +84,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.guantou-frontend.entrypoints=web"
       - "traefik.http.routers.guantou-frontend.rule=Host(`guantou.localhost`)"
-      - "traefik.http.services.guantou-frontend.loadbalancer.server.port=80"
+      - "traefik.http.services.guantou-frontend.loadbalancer.server.port=8080"
     networks:
       - guantou
 

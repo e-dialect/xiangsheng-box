@@ -1,13 +1,17 @@
-﻿import shutil
+﻿import json
+import os
+import shutil
 import tempfile
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, SimpleTestCase, TestCase, override_settings
+from files.storage import upload_file
 
 from files.audio_processing import (
     AudioCapabilityUnavailable,
@@ -297,6 +301,7 @@ class LocalFileStorageTests(TestCase):
         self.media_root = tempfile.mkdtemp()
         self.override = override_settings(
             MEDIA_ROOT=self.media_root,
+            COS_KEY_PREFIX="xiangsheng-box",
             COS_REGION="DEFAULT_COS_REGION",
             COS_SECRET_ID="DEFAULT_COS_SECRET_ID",
             COS_SECRET_KEY="DEFAULT_COS_SECRET_KEY",
@@ -335,3 +340,225 @@ class LocalFileStorageTests(TestCase):
         self.assertEqual(served.content, b"image-data")
         self.assertEqual(served["Content-Type"], "image/png")
         self.assertNotIn("Content-Disposition", served)
+
+
+class CosNamespaceTests(SimpleTestCase):
+    @override_settings(
+        COS_KEY_PREFIX="xiangsheng-box",
+        COS_REGION="ap-singapore",
+        COS_SECRET_ID="secret-id",
+        COS_SECRET_KEY="secret-key",
+        COS_BUCKET="shared-bucket",
+    )
+    @patch("files.storage.cos_client")
+    def test_upload_prefixes_cos_key_and_returned_url(self, cos_client):
+        client = MagicMock()
+        cos_client.return_value = client
+
+        url = upload_file("/tmp/image.png", "files/image/17/2026/10/14/photo.png")
+
+        client.upload_file.assert_called_once_with(
+            Bucket="shared-bucket",
+            LocalFilePath="/tmp/image.png",
+            Key="xiangsheng-box/files/image/17/2026/10/14/photo.png",
+        )
+        self.assertEqual(
+            url,
+            "https://cos.edialect.top/xiangsheng-box/files/image/17/2026/"
+            "10/14/photo.png",
+        )
+
+    @override_settings(
+        COS_KEY_PREFIX="xiangsheng-box",
+        COS_REGION="ap-singapore",
+        COS_SECRET_ID="secret-id",
+        COS_SECRET_KEY="secret-key",
+        COS_BUCKET="shared-bucket",
+    )
+    @patch("files.storage.cos_client")
+    def test_delete_prefixes_only_this_apps_cos_key(self, cos_client):
+        from files.storage import delete_file
+
+        client = MagicMock()
+        cos_client.return_value = client
+
+        delete_file("files/audio/17/2026/10/14/voice.mp3")
+
+        client.delete_object.assert_called_once_with(
+            Bucket="shared-bucket",
+            Key="xiangsheng-box/files/audio/17/2026/10/14/voice.mp3",
+        )
+
+    @override_settings(
+        COS_KEY_PREFIX="",
+        COS_REGION="ap-singapore",
+        COS_SECRET_ID="secret-id",
+        COS_SECRET_KEY="secret-key",
+        COS_BUCKET="shared-bucket",
+    )
+    @patch("files.storage.cos_client")
+    def test_empty_prefix_preserves_existing_cos_key_contract(self, cos_client):
+        client = MagicMock()
+        cos_client.return_value = client
+
+        url = upload_file("/tmp/image.png", "files/image/17/2026/10/14/photo.png")
+
+        client.upload_file.assert_called_once_with(
+            Bucket="shared-bucket",
+            LocalFilePath="/tmp/image.png",
+            Key="files/image/17/2026/10/14/photo.png",
+        )
+        self.assertEqual(
+            url, "https://cos.edialect.top/files/image/17/2026/10/14/photo.png"
+        )
+
+    @override_settings(
+        COS_KEY_PREFIX="xiangsheng-box",
+        COS_REGION="DEFAULT_COS_REGION",
+        COS_SECRET_ID="DEFAULT_COS_SECRET_ID",
+        COS_SECRET_KEY="DEFAULT_COS_SECRET_KEY",
+        COS_BUCKET="DEFAULT_COS_BUCKET",
+        PUBLIC_BACKEND_URL="https://files.example.test",
+    )
+    @patch("files.storage.cos_client")
+    def test_local_fallback_does_not_add_cos_namespace(self, cos_client):
+        url = upload_file("/tmp/image.png", "files/image/17/2026/10/14/photo.png")
+
+        self.assertEqual(
+            url,
+            "https://files.example.test/files/image/17/2026/10/14/photo.png",
+        )
+        cos_client.assert_not_called()
+
+    @override_settings(
+        COS_KEY_PREFIX="../bad",
+        COS_REGION="ap-singapore",
+        COS_SECRET_ID="secret-id",
+        COS_SECRET_KEY="secret-key",
+        COS_BUCKET="shared-bucket",
+    )
+    @patch("files.storage.cos_client")
+    def test_invalid_prefix_is_rejected_before_cos_upload(self, cos_client):
+        for invalid_prefix in (
+            "../bad",
+            "/leading",
+            "trailing/",
+            "empty//segment",
+            "https://example.test/path",
+            "https:example.test",
+        ):
+            with self.subTest(prefix=invalid_prefix):
+                with override_settings(COS_KEY_PREFIX=invalid_prefix):
+                    with self.assertRaises(ImproperlyConfigured):
+                        upload_file(
+                            "/tmp/image.png", "files/image/17/2026/10/14/photo.png"
+                        )
+        cos_client.assert_not_called()
+
+
+class NamespacedDeleteApiTests(TestCase):
+    def setUp(self):
+        self.media_root = tempfile.mkdtemp()
+        override = override_settings(
+            MEDIA_ROOT=self.media_root,
+            COS_KEY_PREFIX="xiangsheng-box",
+            COS_REGION="ap-singapore",
+            COS_SECRET_ID="secret-id",
+            COS_SECRET_KEY="secret-key",
+            COS_BUCKET="shared-bucket",
+            PUBLIC_BACKEND_URL="https://files.example.test",
+        )
+        override.enable()
+        self.addCleanup(override.disable)
+        self.addCleanup(shutil.rmtree, self.media_root, ignore_errors=True)
+        self.user = User.objects.create_user(
+            username="namespace-collector", password="pw"
+        )
+        self.client = Client()
+        self.file_path = os.path.join(
+            self.media_root,
+            "image",
+            str(self.user.id),
+            "2026_10_14_photo.png",
+        )
+        os.makedirs(os.path.dirname(self.file_path), exist_ok=True)
+        with open(self.file_path, "wb") as image:
+            image.write(b"synthetic image")
+
+    def _delete(self, url):
+        return self.client.delete(
+            "/files",
+            data=json.dumps({"url": url}),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=bearer(self.user),
+        )
+
+    @patch("files.views.delete_file")
+    def test_delete_accepts_exact_app_cos_namespace(self, delete_file):
+        response = self._delete(
+            f"https://cos.edialect.top/xiangsheng-box/files/image/{self.user.id}/"
+            "2026/10/14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(os.path.exists(self.file_path))
+        delete_file.assert_called_once_with(
+            f"files/image/{self.user.id}/2026/10/14/photo.png"
+        )
+
+    @patch("files.views.delete_file")
+    def test_delete_accepts_public_backend_url_without_cos_prefix(self, delete_file):
+        response = self._delete(
+            f"https://files.example.test/files/image/{self.user.id}/"
+            "2026/10/14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        delete_file.assert_called_once_with(
+            f"files/image/{self.user.id}/2026/10/14/photo.png"
+        )
+
+    @patch("files.views.delete_file")
+    def test_delete_rejects_foreign_cos_prefix(self, delete_file):
+        response = self._delete(
+            f"https://cos.edialect.top/other-app/files/image/{self.user.id}/"
+            "2026/10/14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(os.path.exists(self.file_path))
+        delete_file.assert_not_called()
+
+    @patch("files.views.delete_file")
+    def test_delete_rejects_legacy_unprefixed_cos_url_when_namespace_is_set(
+        self, delete_file
+    ):
+        response = self._delete(
+            f"https://cos.edialect.top/files/image/{self.user.id}/"
+            "2026/10/14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(os.path.exists(self.file_path))
+        delete_file.assert_not_called()
+
+    @patch("files.views.delete_file")
+    def test_delete_rejects_foreign_host(self, delete_file):
+        response = self._delete(
+            f"https://attacker.example/files/image/{self.user.id}/2026/10/14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(os.path.exists(self.file_path))
+        delete_file.assert_not_called()
+
+    @patch("files.views.delete_file")
+    def test_delete_rejects_path_traversal(self, delete_file):
+        response = self._delete(
+            f"https://cos.edialect.top/xiangsheng-box/files/image/{self.user.id}/"
+            "2026/10/../14/photo.png"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(os.path.exists(self.file_path))
+        delete_file.assert_not_called()

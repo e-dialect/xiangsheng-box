@@ -323,4 +323,38 @@ describe('httpClient compatibility wrappers', () => {
       data: 'not-json',
     });
   });
+
+  it('preserves a JSON-string upload error and structured diagnostics', async () => {
+    uni.uploadFile.mockResolvedValue({
+      statusCode: 400,
+      errMsg: 'uploadFile:ok',
+      data: JSON.stringify({
+        code: 400, message: '无法解析音频文件', data: { file: '损坏的音频' }, request_id: 'upload-error-1',
+      }),
+    });
+    await expect(httpClient.upload('/tmp/broken.webm')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 400,
+      message: '无法解析音频文件',
+      data: { file: '损坏的音频' },
+      requestId: 'upload-error-1',
+    });
+  });
+
+  it('accepts an object error body from upload adapters', async () => {
+    uni.uploadFile.mockResolvedValue({ statusCode: 503, data: { message: '录音服务维护中' }, errMsg: 'uploadFile:ok' });
+    await expect(httpClient.upload('/tmp/audio.mp3')).rejects.toMatchObject({ message: '录音服务维护中' });
+  });
+
+  it.each(['', '<html>Bad Gateway</html>', '{broken', 'null', '[]'])('uses a readable HTTP fallback for an unusable upload error body: %s', async (data) => {
+    uni.uploadFile.mockResolvedValue({ statusCode: 503, data, errMsg: 'uploadFile:ok' });
+    await expect(httpClient.upload('/tmp/audio.mp3')).rejects.toMatchObject({
+      statusCode: 503, message: '服务暂不可用，请稍后重试', data: {},
+    });
+  });
+
+  it('preserves the reason for a rejected upload transport', async () => {
+    uni.uploadFile.mockRejectedValue({ errMsg: '网络连接已断开' });
+    await expect(httpClient.upload('/tmp/audio.mp3')).rejects.toMatchObject({ statusCode: 0, message: '网络连接已断开' });
+  });
 });

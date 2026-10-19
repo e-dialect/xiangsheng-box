@@ -182,6 +182,9 @@ html[data-theme='dark'] page {
   --td-text-color-placeholder: var(--muted-color);
   --td-text-color-disabled: var(--muted-color);
   --td-text-color-anti: var(--on-accent-color);
+  /* Toast keeps a dark backdrop in both themes; accent foreground can be dark. */
+  --td-toast-color: #ffffff;
+  --td-toast-bg-color: rgba(0, 0, 0, 0.8);
   --td-text-color-brand: var(--accent-color);
   --td-text-color-link: var(--accent-color);
   --td-border-level-1-color: var(--border-color);

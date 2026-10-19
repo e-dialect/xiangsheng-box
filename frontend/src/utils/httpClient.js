@@ -61,18 +61,33 @@ function hideLoading(options) {
   hideGlobalLoading();
 }
 
+function parseUploadResponseData(data) {
+  if (typeof data !== 'string') return data || {};
+  if (!data.length) return {};
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    return { data };
+  }
+}
+
 export function createApiError(error) {
   const statusCode = error && error.statusCode ? error.statusCode : 0;
-  const payload = (error && error.data) || {};
-  const message = payload.message
-    || error.errMsg
-    || error.message
-    || '';
+  // uploadFile returns response.data as a JSON string even for HTTP errors.
+  const parsed = parseUploadResponseData(error && error.data);
+  const payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  const transportMessage = error?.errMsg && !/:ok$/.test(error.errMsg) ? error.errMsg : '';
+  const serverMessage = typeof payload.message === 'string' ? payload.message.trim() : '';
+  const message = serverMessage
+    || transportMessage
+    || error?.message
+    || (statusCode >= 500 ? '服务暂不可用，请稍后重试' : '')
+    || (statusCode ? `请求失败（HTTP ${statusCode}）` : '网络错误，请检查网络后重试');
   return {
     statusCode,
     code: payload.code || statusCode,
     message,
-    data: payload.data || {},
+    data: payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data) ? payload.data : {},
     requestId: payload.request_id || '',
     payload,
     raw: error,
@@ -133,16 +148,6 @@ export async function request(method = 'GET', url = '', data = {}, options = {})
     throw requestError;
   }
   return response.data;
-}
-
-function parseUploadResponseData(data) {
-  if (typeof data !== 'string') return data || {};
-  if (!data.length) return {};
-  try {
-    return JSON.parse(data);
-  } catch (error) {
-    return { data };
-  }
 }
 
 export async function upload(file, options = {}) {

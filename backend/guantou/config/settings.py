@@ -18,6 +18,8 @@ else:
     environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 ENVIRONMENT = env.str("ENVIRONMENT", "development").strip().lower()
+# Resolve writable defaults before this module creates the log directory.
+DEFAULT_DATA_DIR = "/data" if ENVIRONMENT == "production" else BASE_DIR
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
@@ -109,7 +111,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": env.str("SQLITE_PATH", os.path.join(BASE_DIR, "db.sqlite3")),
+        "NAME": env.str("SQLITE_PATH", os.path.join(DEFAULT_DATA_DIR, "db.sqlite3")),
     }
 }
 
@@ -166,7 +168,7 @@ DEFAULT_AVATAR_URL = env.str(
 
 # 媒体图片下载到media/下
 MEDIA_URL = "/media/"
-MEDIA_ROOT = env.str("MEDIA_ROOT", os.path.join(BASE_DIR, "media"))
+MEDIA_ROOT = env.str("MEDIA_ROOT", os.path.join(DEFAULT_DATA_DIR, "media"))
 # Public origin used to build local file URLs when COS is not configured.
 PUBLIC_BACKEND_URL = env.str("PUBLIC_BACKEND_URL", "http://localhost:8000")
 
@@ -297,7 +299,7 @@ if ENVIRONMENT == "production":
             "Missing production settings: " + ", ".join(sorted(missing))
         )
 
-log_path = env.str("LOG_DIR", os.path.join(BASE_DIR, "logs"))
+log_path = env.str("LOG_DIR", os.path.join(DEFAULT_DATA_DIR, "logs"))
 os.makedirs(log_path, exist_ok=True)
 
 LOGGING = {
