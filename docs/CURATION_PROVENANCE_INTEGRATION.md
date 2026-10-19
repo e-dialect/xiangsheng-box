@@ -1,5 +1,13 @@
 # 整理溯源基础迁移
 
+## 2026-10-19 历史权限修复：词汇同行读取竞争解释
+
+- 词汇整理员可创建 `preserve_competing`，动作实际以 Recording 为 target。历史查询现明确允许有效词汇整理员读取这类动作，但要求目标录音及快照 `competing_link.entry_id` 对应词条当前均可见；没有开放普通录音 review/narrow_scope。
+- 将已有 JSON entry_id 文本提取及可见 ID 子查询共享给词汇/地区分支，保留 PostgreSQL 类型兼容。地区分支的当前及历史范围限制不变；actor 本人历史及同行字段/证据裁剪规则不变。
+- 新增六项测试，覆盖真实创建后同行详情/列表、脱敏、录音隐藏/删除、词条可见集合/删除、缺失及损坏快照、撤权与无授权用户、其他录音动作隔离。词汇整理员原本可见私有词条，测试不把 visibility=false 当作词汇角色不可见。
+- 实际运行 scope/provenance/governance 定向测试共 46 项，45 通过、1 项 SQLite 行锁跳过；API contract 通过。独立 agent 只读复核未发现本轮阻塞或权限扩大。
+- 本轮未新增迁移、未改前端、未部署、未实测 PostgreSQL 或在线账号旅程，未重复完整后端测试；最新远端 CI 以本轮 head 为准。
+
 ## 2026-10-19 二次审查修复：拆分产物也是决策参与者
 
 - `split_entry` 的动作目标是原词条，新建词条只记录在 `after_snapshot.created`。范围保护现按 `action_type=split_entry`、`target_type=entry` 和 `after_snapshot.created.id` 精确匹配新词条；即使其全部内容仍是草稿、metadata 被清空，普通地区更新也不能绕过治理操作。
