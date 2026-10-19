@@ -19,6 +19,12 @@
     <view v-if="source.original_writing">
       原写法：{{ source.original_writing }}
     </view>
+    <view
+      v-if="source.original_pronunciation"
+      class="source-card__pronunciation"
+    >
+      原读音：{{ source.original_pronunciation }}
+    </view>
     <view v-if="source.original_gloss">
       原大意：{{ source.original_gloss }}
     </view>

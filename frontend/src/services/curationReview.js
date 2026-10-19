@@ -74,8 +74,9 @@ export function actionLabel(type) {
     narrow_scope: '缩小地区范围',
     review: '审核',
     resolve_legacy: '处理旧库候选',
-    split: '拆分',
-    merge: '合并',
+    split_entry: '拆分',
+    merge_entries: '合并',
+    link_concept: '关联概念',
     preserve_competing: '保留竞争解释',
   })[type] || '整理操作';
 }

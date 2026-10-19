@@ -3,6 +3,35 @@ import { describe, expect, it } from 'vitest';
 import EvidenceSource from '@/components/EvidenceSource.vue';
 
 describe('evidence source reading', () => {
+  it('renders pronunciation-only evidence with its original tone characters', () => {
+    const wrapper = shallowMount(EvidenceSource, {
+      props: { source: { original_pronunciation: 'kiaⁿ2' } },
+    });
+    expect(wrapper.find('.source-card__pronunciation').text()).toBe('原读音：kiaⁿ2');
+  });
+
+  it('renders pronunciation safely alongside the other original fields', () => {
+    const pronunciation = '<img src=x onerror="alert(1)">kiaⁿ2';
+    const wrapper = shallowMount(EvidenceSource, {
+      props: { source: {
+        original_text: '原始材料', original_writing: '原写法',
+        original_gloss: '原大意', original_pronunciation: pronunciation,
+      } },
+    });
+    expect(wrapper.find('.source-card__pronunciation').text()).toContain(pronunciation);
+    expect(wrapper.text()).toContain('原始材料');
+    expect(wrapper.text()).toContain('原写法');
+    expect(wrapper.text()).toContain('原大意');
+    expect(wrapper.find('img').exists()).toBe(false);
+  });
+
+  it.each([undefined, null, ''])('omits an absent pronunciation (%s)', (pronunciation) => {
+    const wrapper = shallowMount(EvidenceSource, {
+      props: { source: { original_pronunciation: pronunciation } },
+    });
+    expect(wrapper.find('.source-card__pronunciation').exists()).toBe(false);
+  });
+
   it('renders quoted source markup as text without introducing executable elements', () => {
     const text = '<img src=x onerror="alert(1)">原始材料';
     const wrapper = shallowMount(EvidenceSource, {

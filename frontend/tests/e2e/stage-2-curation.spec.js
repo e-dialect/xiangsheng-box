@@ -6,7 +6,7 @@ const original = { id: 3, name: '莆仙方言', qualified_code: '闽.莆仙', pa
 const target = { id: 4, name: '莆田', qualified_code: '闽.莆仙.莆田', path_names: ['闽语', '莆仙方言', '莆田'] };
 const source = { id: 91, source_type: 'book', original_text: '合成材料：该用法暂仅在莆田得到支持，其他地区待核实。', citation: '合成来源卡，第 2 页', created_at: '2026-10-17T00:00:00Z' };
 
-async function setup(page, theme) {
+async function setup(page, theme, evidence = source) {
   await installVisualFixture(page, { persona: 'member', theme });
   const state = { dialect: original, posts: [], action: null, denied: false, staff: false };
   await page.route('http://localhost:8000/**', async (route) => {
@@ -22,8 +22,8 @@ async function setup(page, theme) {
       id: 21, display_writing: '落大雨', summary: '合成范围修正验收材料', status: 'reviewed',
       usage_dialect: state.dialect, evidence_count: 1,
     } });
-    if (pathname === '/evidence-records/') return route.fulfill({ json: { results: [source], next: null } });
-    if (pathname === '/evidence-records/91/') return route.fulfill({ json: source });
+    if (pathname === '/evidence-records/') return route.fulfill({ json: { results: [evidence], next: null } });
+    if (pathname === '/evidence-records/91/') return route.fulfill({ json: evidence });
     if (pathname === '/curation/') return route.fulfill({ json: { grants: state.staff ? [] : [
       { id: 71, is_active: true, role: 'regional_curator', dialect: original },
     ] } });
@@ -61,6 +61,30 @@ async function openReview(page) {
   await page.evaluate(() => new Promise((resolve, reject) => uni.navigateTo({
     url: '/pages/curation/entry-review?entry_id=21', success: resolve, fail: reject,
   })));
+}
+
+for (const theme of ['light', 'dark']) {
+  test(`pronunciation-only evidence and persisted history labels ${theme}`, async ({ page }, testInfo) => {
+    const state = await setup(page, theme, {
+      id: 91, source_type: 'user_statement', original_pronunciation: 'kiaⁿ2',
+    });
+    for (const [type, label] of [
+      ['split_entry', '拆分'], ['merge_entries', '合并'], ['link_concept', '关联概念'],
+    ]) {
+      state.action = {
+        id: 92, target_type: 'entry', target_id: 21, action_type: type,
+        reason: '合成历史验证', evidence_ids: [91],
+      };
+      await openReview(page);
+      await expect(page.getByText('原读音：kiaⁿ2', { exact: true })).toBeVisible();
+      await expect(page.locator('.history-row')).toContainText(label);
+      await page.getByRole('button', { name: '查看决定与依据', exact: true }).click();
+      await expect(page.locator('.eyebrow')).toHaveText(label);
+      await expect(page.getByText('原读音：kiaⁿ2', { exact: true })).toBeVisible();
+      expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);
+    }
+    await stableScreenshot(page, { path: testInfo.outputPath('pronunciation-history.png'), fullPage: true });
+  });
 }
 
 for (const theme of ['light', 'dark']) {
