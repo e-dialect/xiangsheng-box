@@ -86,6 +86,97 @@ describe('stage two curation loop', () => {
     expect(service.canNarrow({ grants: [{ ...grant, is_active: false }] }, dialects[0], dialects)).toBe(false);
   });
 
+  it.each([
+    ['original_pronunciation', 'kiaⁿ2', '原读音'],
+    ['original_writing', '落大雨', '原写法'],
+    ['original_gloss', '雨突然下大', '原大意'],
+  ])('includes %s in the final confirmation even without text or citation', async (field, value, label) => {
+    const ctx = readyEntry();
+    ctx.evidence = [{ id: 9, [field]: value }];
+    confirm.mockResolvedValue(false);
+    await ctx.submit();
+    expect(confirm.mock.calls[0][0].content).toContain(`${label}：${value}`);
+    expect(request.post).not.toHaveBeenCalled();
+    expect(ctx.busy).toBe(false);
+  });
+
+  it('includes every original field and the citation without rewriting evidence', () => {
+    expect(service.evidenceSummary({
+      original_text: '原话', original_writing: '写法', original_pronunciation: '<b>kiaⁿ2</b>',
+      original_gloss: '大意', citation: '第 2 页',
+    })).toBe('原文：原话；原写法：写法；原读音：<b>kiaⁿ2</b>；原大意：大意；出处：第 2 页');
+    expect(service.evidenceSummary({})).toBe('内容与出处均未提供');
+  });
+
+  it('distinguishes unscoped lexical grants from missing regional and legacy authority', () => {
+    const snapshot = { status: 'captured', mode: 'grant', role: 'lexical_curator', dialect: null };
+    expect(service.authorityLines(snapshot)).toEqual(['词条整理员', '词条整理授权（不限定地区）']);
+    expect(service.authorityLines({ ...snapshot, role: 'regional_curator' })).toContain('地区待补充');
+    expect(service.authorityLines({ ...snapshot, role: 'regional_curator', dialect: dialects[0] })).toContain('原范围');
+    expect(service.authorityLines({ ...snapshot, mode: 'staff', role: 'staff' })).toEqual(['站点审核员', '站点审核权限']);
+    expect(service.authorityLines(null)).toEqual(['旧记录未保存当时授权']);
+  });
+
+  it('clears cross-page selections on a full retry and refreshes the selector owner', async () => {
+    const ctx = readyEntry();
+    ctx.ownerId = 1;
+    ctx.evidence.push({ id: 10, citation: '第二页证据' });
+    ctx.selectedEvidence = [10];
+    ctx.evidencePage = 2;
+    ctx.entry = null;
+    ctx.entryError = '网络错误';
+    session = { id: 2, token: 'session-b' };
+    await ctx.load();
+    expect(ctx.ownerId).toBe(2);
+    expect(ctx.selectedEvidence).toEqual([]);
+    expect(ctx.submitError).toContain('重新选择');
+    await ctx.submit();
+    expect(confirm).not.toHaveBeenCalled();
+    expect(request.post).not.toHaveBeenCalled();
+  });
+
+  it('blocks missing evidence before confirmation and POST', async () => {
+    const ctx = readyEntry();
+    ctx.selectedEvidence = [10];
+    await ctx.submit();
+    expect(ctx.submitError).toContain('重新加载并选择');
+    expect(confirm).not.toHaveBeenCalled();
+    expect(request.post).not.toHaveBeenCalled();
+  });
+
+  it('keeps selections across appended pages and blocks submitting during evidence loading', async () => {
+    const ctx = readyEntry();
+    let resolvePage;
+    request.get.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve; }));
+    const pending = ctx.loadEvidence(2);
+    expect(ctx.canSubmit).toBe(false);
+    ctx.toggleEvidence(9);
+    await ctx.submit();
+    expect(ctx.selectedEvidence).toEqual([9]);
+    expect(confirm).not.toHaveBeenCalled();
+    resolvePage({ results: [{ id: 10, citation: '第二页证据' }], next: null });
+    await pending;
+    ctx.toggleEvidence(10);
+    expect(ctx.selectedEvidence).toEqual([9, 10]);
+    confirm.mockResolvedValue(false);
+    await ctx.submit();
+    expect(confirm.mock.calls[0][0].content).toContain('出处：资料第 2 页');
+    expect(confirm.mock.calls[0][0].content).toContain('出处：第二页证据');
+  });
+
+  it('does not refresh sources while a confirmation is pending', async () => {
+    const ctx = readyEntry();
+    let rejectConfirmation;
+    confirm.mockImplementation(() => new Promise((resolve) => { rejectConfirmation = resolve; }));
+    const pending = ctx.submit();
+    await Promise.resolve();
+    await ctx.loadEvidence(1);
+    expect(request.get).not.toHaveBeenCalled();
+    expect(ctx.selectedEvidence).toEqual([9]);
+    rejectConfirmation(false);
+    await pending;
+  });
+
   it('keeps evidence pagination in the service and never requests an arbitrary next URL', async () => {
     await service.listEntryEvidence(7, 2);
     await service.listEntryActions(7, 3);
@@ -297,7 +388,17 @@ describe('stage two curation loop', () => {
     expect(ctx.evidence).toEqual([]);
     expect(ctx.form.reason).toBe('');
     expect(ctx.entryError).toContain('账号已变更');
+    expect(ctx.ownerId).toBe(2);
     service.reviewSession.beforeUnmount.call(ctx);
+  });
+
+  it('uses the guest selector namespace on logout', () => {
+    const ctx = readyEntry();
+    ctx.ownerId = 1;
+    session = {};
+    service.reviewSession.methods.clearReview.call(ctx);
+    ctx.sessionChanged();
+    expect(ctx.ownerId).toBe('guest');
   });
 
   it('opens own history without requesting the curator summary or hidden evidence IDs', async () => {

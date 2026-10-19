@@ -84,9 +84,23 @@ export function actionLabel(type) {
 export function authorityLines(snapshot) {
   if (!snapshot || snapshot.status !== 'captured') return ['旧记录未保存当时授权'];
   const role = ({ regional_curator: '地区整理员', lexical_curator: '词条整理员', staff: '站点审核员' })[snapshot.role] || '角色未提供';
-  return [role, snapshot.mode === 'staff' ? '站点审核权限' : dialectBreadcrumb(snapshot.dialect),
+  let scope = dialectBreadcrumb(snapshot.dialect);
+  if (snapshot.mode === 'staff') scope = '站点审核权限';
+  else if (snapshot.mode === 'grant' && snapshot.role === 'lexical_curator') scope = '词条整理授权（不限定地区）';
+  return [role, scope,
     snapshot.valid_from ? `有效期：${snapshot.valid_from} 至 ${snapshot.valid_until || '未提供'}` : '',
     snapshot.captured_at ? `快照时间：${snapshot.captured_at}` : ''].filter(Boolean);
+}
+
+export function evidenceSummary(source) {
+  return [
+    ['原文', source.original_text],
+    ['原写法', source.original_writing],
+    ['原读音', source.original_pronunciation],
+    ['原大意', source.original_gloss],
+    ['出处', source.citation],
+  ].filter(([, value]) => value).map(([label, value]) => `${label}：${value}`).join('；')
+    || '内容与出处均未提供';
 }
 
 // No shared evidence/history cache. Invalidate pending work on hide/unload and

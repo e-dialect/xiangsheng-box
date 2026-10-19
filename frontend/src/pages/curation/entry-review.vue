@@ -57,7 +57,7 @@
             size="small"
             :variant="selectedEvidence.includes(source.id) ? 'primary' : 'ghost'"
             :text="selectedEvidence.includes(source.id) ? '已选为依据' : '选为范围修正依据'"
-            :disabled="busy"
+            :disabled="busy || evidenceLoading"
             @click="toggleEvidence(source.id)"
           />
         </EvidenceSource>
@@ -70,7 +70,7 @@
           v-if="evidenceNext"
           variant="ghost"
           text="加载更多来源"
-          :disabled="evidenceLoading"
+          :disabled="busy || evidenceLoading"
           @click="loadEvidence(evidencePage + 1)"
         />
       </view>
@@ -234,7 +234,7 @@ import { confirm, cancelConfirmation } from '@/services/feedback';
 import { openPage, ROUTES } from '@/services/navigation';
 import {
   listEntryEvidence, listEntryActions, strictDescendants, canNarrow, narrowPayload, getReviewStaff,
-  submitNarrowScope, reviewError, actionLabel, reviewSession,
+  submitNarrowScope, reviewError, actionLabel, reviewSession, evidenceSummary,
 } from '@/services/curationReview';
 
 function initialState() {
@@ -301,7 +301,7 @@ export default {
       ] || '待整理';
     },
     canSubmit() {
-      return !this.busy && !this.unknownResult && !this.disabledReason
+      return !this.busy && !this.evidenceLoading && !this.unknownResult && !this.disabledReason
         && Boolean(this.target) && this.selectedEvidence.length > 0;
     },
     descendants() { return strictDescendants(this.dialects, this.entry?.usage_dialect?.id); },
@@ -325,12 +325,15 @@ export default {
     dialectBreadcrumb,
     actionLabel,
     resetReview() { cancelConfirmation(this); Object.assign(this, initialState()); },
-    sessionChanged() { this.entryError = '账号已变更，请重新加载'; },
+    sessionChanged() {
+      this.ownerId = uni.getStorageSync('id') || 'guest';
+      this.entryError = '账号已变更，请重新加载';
+    },
     openEntry() { openPage(ROUTES.entryDetail, { id: this.id }); },
     openAction(id) { openPage(ROUTES.curationActionDetail, { id, entry_id: this.id }); },
     selectDialect({ value }) { if (!this.busy) this.form.dialectId = value; },
     toggleEvidence(id) {
-      if (this.busy) return;
+      if (this.busy || this.evidenceLoading) return;
       this.selectedEvidence = this.selectedEvidence.includes(id)
         ? this.selectedEvidence.filter((value) => value !== id) : [...this.selectedEvidence, id];
     },
@@ -345,6 +348,7 @@ export default {
       } finally { if (valid()) this.loading = false; }
     },
     async load() {
+      this.ownerId = uni.getStorageSync('id') || 'guest';
       if (!this.id) { this.entryError = '缺少有效词条链接'; return; }
       await Promise.allSettled([
         this.loadEntry(), this.loadEvidence(1), this.loadHistory(1), this.loadContext(),
@@ -371,7 +375,11 @@ export default {
       this.contextLoading = false;
     },
     async loadEvidence(page) {
-      if (this.evidenceLoading) return;
+      if (this.busy || this.evidenceLoading) return;
+      if (page === 1 && this.selectedEvidence.length) {
+        this.selectedEvidence = [];
+        this.submitError = '来源已重新加载，请重新选择依据';
+      }
       const valid = this.reviewGuard();
       this.evidenceLoading = true; this.evidenceError = '';
       this.evidenceRetryPage = page;
@@ -423,7 +431,7 @@ export default {
       }
     },
     async submit() {
-      if (this.busy || this.unknownResult || this.disabledReason
+      if (this.busy || this.evidenceLoading || this.unknownResult || this.disabledReason
         || !this.target || !this.selectedEvidence.length) return;
       this.busy = true; this.submitError = '';
       const valid = this.reviewGuard();
@@ -437,10 +445,14 @@ export default {
         if (payload.reason.length < 4 || payload.reason.length > 2000) {
           this.submitError = '理由需要 4–2000 字'; return;
         }
-        const sources = this.evidence.filter((item) => payload.evidence_ids.includes(item.id));
-        const citation = sources.map((item) => (
-          item.citation || item.original_text || '未提供出处'
-        )).join('；');
+        const sources = payload.evidence_ids.map((id) => (
+          this.evidence.find((item) => Number(item.id) === id)
+        ));
+        if (sources.some((item) => !item)) {
+          this.submitError = '所选依据已不在当前来源中，请重新加载并选择';
+          return;
+        }
+        const citation = sources.map(evidenceSummary).join('\n');
         const change = `${dialectBreadcrumb(this.entry.usage_dialect)} → ${dialectBreadcrumb(this.target, this.dialects)}`;
         const accepted = await confirm({
           owner: this,

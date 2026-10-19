@@ -7,6 +7,8 @@ feedback 确认层；范围和验证状态见
 
 2026-10-18 review 修复：本人 staff 能力确认、复制链接部署前缀与 H5 启动路径识别已补回归；对应 [PR #532](https://github.com/e-dialect/xiangsheng-box/pull/532)、[工作包 #530](https://github.com/e-dialect/xiangsheng-box/issues/530)，后端依赖 [PR #531](https://github.com/e-dialect/xiangsheng-box/pull/531)。
 
+2026-10-19 后续 review 修复：确认摘要补齐原始证据字段，词条整理授权显示为不限定地区，跨标签切号刷新地区偏好归属，来源重新加载时清空旧选择并拦截缺失依据。全量 606 项单测、根路径与子路径各 11 项 H5 回归通过，详见实施记录；仍未执行微信真机或本轮在线账号验收。
+
 > 本页保留 2026 年 V2 切换前的控件迁移证据。表中 Can/Nameplate 等页面已在
 > Entry/Recording V2 切换后退役，不再表示当前页面清单或待办；当前前端边界见
 > [`FRONTEND_GUIDE.md`](FRONTEND_GUIDE.md)。

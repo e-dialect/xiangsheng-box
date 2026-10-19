@@ -74,18 +74,83 @@ for (const theme of ['light', 'dark']) {
       state.action = {
         id: 92, target_type: 'entry', target_id: 21, action_type: type,
         reason: '合成历史验证', evidence_ids: [91],
+        authority_snapshot: { status: 'captured', mode: 'grant', role: 'lexical_curator', dialect: null },
       };
       await openReview(page);
       await expect(page.getByText('原读音：kiaⁿ2', { exact: true })).toBeVisible();
       await expect(page.locator('.history-row')).toContainText(label);
       await page.getByRole('button', { name: '查看决定与依据', exact: true }).click();
       await expect(page.locator('.eyebrow')).toHaveText(label);
+      await expect(page.getByText('词条整理授权（不限定地区）', { exact: true })).toBeVisible();
+      await expect(page.getByText('地区待补充', { exact: true })).toHaveCount(0);
       await expect(page.getByText('原读音：kiaⁿ2', { exact: true })).toBeVisible();
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);
     }
     await stableScreenshot(page, { path: testInfo.outputPath('pronunciation-history.png'), fullPage: true });
+    await page.getByRole('button', { name: '返回词条来源与历史', exact: true }).click();
+    await page.getByRole('button', { name: '选为范围修正依据', exact: true }).click();
+    await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
+    await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
+    await page.locator('textarea').fill('按原读音证据确认地区范围');
+    await page.getByRole('button', { name: '核对并提交范围修正', exact: true }).click();
+    await expect(page.locator('.t-dialog')).toContainText('原读音：kiaⁿ2');
+    await expect(page.locator('.t-dialog__button--cancel')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('pronunciation-confirmation.png'), animations: 'disabled' });
+    await page.locator('.t-dialog__button--cancel').click();
+    expect(state.posts).toHaveLength(0);
   });
 }
+
+test('retry after an account switch reads and writes only the new selector namespace', async ({ page }) => {
+  await setup(page, 'light');
+  await openReview(page);
+  await page.evaluate(() => {
+    uni.setStorageSync('dialect-selector:recent:7', '[4,999]');
+    uni.setStorageSync('dialect-selector:recent:8', '[]');
+  });
+  const secondTab = await page.context().newPage();
+  await secondTab.goto(process.env.E2E_H5_BASE || '/');
+  await secondTab.evaluate(() => {
+    localStorage.setItem('token', 'visual-review-b'); localStorage.setItem('id', '8');
+  });
+  await expect(page.getByText('账号已变更，请重新加载', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重试', exact: true }).click();
+  await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^最近 ·/ })).toHaveCount(0);
+  await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
+  expect(await page.evaluate(() => ({
+    previous: uni.getStorageSync('dialect-selector:recent:7'),
+    current: uni.getStorageSync('dialect-selector:recent:8'),
+  }))).toEqual({ previous: '[4,999]', current: '[4]' });
+  await secondTab.close();
+});
+
+test('a full page retry clears evidence selected on a later page', async ({ page }) => {
+  const state = await setup(page, 'light');
+  let entryUnavailable = true;
+  await page.route('http://localhost:8000/entries/21/', (route) => (
+    entryUnavailable ? route.fulfill({ status: 503, json: { message: '词条读取暂时失败' } }) : route.fallback()
+  ));
+  await page.route('http://localhost:8000/evidence-records/**', (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== '/evidence-records/') return route.fallback();
+    return route.fulfill({ json: url.searchParams.get('page') === '2'
+      ? { results: [{ id: 93, original_text: '第二页合成证据' }], next: null }
+      : { results: [source], next: '?page=2' } });
+  });
+  await openReview(page);
+  await expect(page.getByText('词条读取暂时失败', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '加载更多来源', exact: true }).click();
+  await page.locator('.source-card').filter({ hasText: '第二页合成证据' })
+    .getByRole('button', { name: '选为范围修正依据', exact: true }).click();
+  entryUnavailable = false;
+  await page.getByRole('button', { name: '重试', exact: true }).click();
+  await expect(page.getByText('来源已重新加载，请重新选择依据', { exact: true })).toBeVisible();
+  await expect(page.getByText('已选 0 条依据', { exact: false })).toBeVisible();
+  await expect(page.getByText('第二页合成证据', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '核对并提交范围修正', exact: true })).toBeDisabled();
+  expect(state.posts).toHaveLength(0);
+});
 
 for (const theme of ['light', 'dark']) {
   for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 1000 }]) {
