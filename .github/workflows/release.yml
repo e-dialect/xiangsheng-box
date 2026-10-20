@@ -159,6 +159,7 @@ jobs:
           # avoids rewriting immutable assets on its read-only root filesystem.
           build-args: |
             VITE_BACKEND_URL=
+            VITE_PHONE_CODE_LOGIN_ENABLED=false
           cache-from: type=gha,scope=frontend-production
           cache-to: type=gha,mode=max,scope=frontend-production
       - name: Accept the exact production image pair before publication

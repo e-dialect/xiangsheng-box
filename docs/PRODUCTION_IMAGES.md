@@ -31,12 +31,12 @@ development runtime replacement.
 
 Phone-code login is hidden by default through the frontend Dockerfile's
 `VITE_PHONE_CODE_LOGIN_ENABLED=false` build argument. The GHCR release workflow
-does not override it, so changing a container environment variable cannot
-expose the UI. After SMS delivery has been verified, explicitly add
-`VITE_PHONE_CODE_LOGIN_ENABLED=true` to the frontend `build-args` in
-`.github/workflows/release.yml`; for the separate COS H5 workflow, set the same
-value in the `Build H5` step environment. Rebuild and publish the frontend
-artifact before expecting the option to appear.
+passes `false` explicitly and records it in `build.frontend` in the release
+manifest, so changing a container environment variable cannot expose the UI.
+After SMS delivery has been verified, change the release workflow build argument
+and its manifest contract/tests to `true`; for the separate COS H5 workflow, set
+the same value in the `Build H5` step environment. Rebuild and publish the
+frontend artifact before expecting the option to appear.
 
 Object storage can share a bucket only with an explicit isolated prefix. New COS
 uploads and deletions use that prefix; deletion URLs outside it are rejected.

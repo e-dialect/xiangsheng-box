@@ -226,6 +226,7 @@ jobs:
           tags: guantou-frontend-production:latest
           build-args: |
             VITE_BACKEND_URL=
+            VITE_PHONE_CODE_LOGIN_ENABLED=false
           outputs: type=docker,dest=${{ runner.temp }}/guantou-frontend-production.tar
           cache-from: type=gha,scope=frontend-production
           cache-to: type=gha,mode=max,scope=frontend-production

@@ -149,6 +149,24 @@ describe('login page intent', () => {
     expect(loginWithPhone).not.toHaveBeenCalled();
   });
 
+  it('clears stale password errors before a valid phone login when enabled', async () => {
+    if (!phoneCodeLoginEnabled) return;
+    peekInterceptIntent.mockReturnValue(null);
+    const wrapper = mountLogin();
+
+    wrapper.vm.changeMode({ detail: { value: 'password' } });
+    await wrapper.vm.passwordLogin();
+    expect(wrapper.vm.errors.username).toBe('请输入用户名');
+
+    wrapper.vm.changeMode({ detail: { value: 'phone' } });
+    wrapper.vm.phone = '13800000000';
+    wrapper.vm.code = '123456';
+    await wrapper.vm.phoneLogin();
+
+    expect(wrapper.vm.errors.username).toBe('');
+    expect(loginWithPhone).toHaveBeenCalledWith('13800000000', '123456');
+  });
+
   it('maps server field errors onto the matching field without a toast', async () => {
     if (!phoneCodeLoginEnabled) return;
     peekInterceptIntent.mockReturnValue(null);
