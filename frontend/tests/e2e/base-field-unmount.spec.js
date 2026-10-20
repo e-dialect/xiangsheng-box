@@ -5,6 +5,8 @@ import {
   openVisualRoute,
 } from './helpers/visualReviewFixture';
 
+const phoneCodeLoginEnabled = process.env.VITE_PHONE_CODE_LOGIN_ENABLED === 'true';
+
 async function leavePage(page) {
   await page.evaluate(() => new Promise((resolve, reject) => {
     uni.navigateBack({
@@ -20,11 +22,14 @@ test('standalone auth fields switch and unmount without runtime noise', async ({
   await installVisualFixture(page, { persona: 'guest', theme: 'light' });
 
   await openVisualRoute(page, '/pages/login/login');
-  await expect(page.locator('.phone-form .base-field')).toHaveCount(2);
-  await page.getByText('账号密码', { exact: true }).click();
   await expect(page.locator('.password-form .base-field')).toHaveCount(2);
-  await page.getByText('手机验证码', { exact: true }).click();
-  await expect(page.locator('.phone-form .base-field')).toHaveCount(2);
+  if (phoneCodeLoginEnabled) {
+    await page.getByText('账号密码', { exact: true }).click();
+    await page.getByText('手机验证码', { exact: true }).click();
+    await expect(page.locator('.phone-form .base-field')).toHaveCount(2);
+  } else {
+    await expect(page.locator('.phone-form')).toHaveCount(0);
+  }
   await leavePage(page);
 
   await openVisualRoute(page, '/pages/login/register');
