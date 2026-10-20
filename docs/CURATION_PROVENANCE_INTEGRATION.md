@@ -1,5 +1,31 @@
 # 整理溯源基础迁移
 
+## 2026-10-19 历史权限修复：词汇同行读取竞争解释
+
+- 词汇整理员可创建 `preserve_competing`，动作实际以 Recording 为 target。历史查询现明确允许有效词汇整理员读取这类动作，但要求目标录音及快照 `competing_link.entry_id` 对应词条当前均可见；没有开放普通录音 review/narrow_scope。
+- 将已有 JSON entry_id 文本提取及可见 ID 子查询共享给词汇/地区分支，保留 PostgreSQL 类型兼容。地区分支的当前及历史范围限制不变；actor 本人历史及同行字段/证据裁剪规则不变。
+- 新增六项测试，覆盖真实创建后同行详情/列表、脱敏、录音隐藏/删除、词条可见集合/删除、缺失及损坏快照、撤权与无授权用户、其他录音动作隔离。词汇整理员原本可见私有词条，测试不把 visibility=false 当作词汇角色不可见。
+- 实际运行 scope/provenance/governance 定向测试共 46 项，45 通过、1 项 SQLite 行锁跳过；API contract 通过。独立 agent 只读复核未发现本轮阻塞或权限扩大。
+- 本轮未新增迁移、未改前端、未部署、未实测 PostgreSQL 或在线账号旅程，未重复完整后端测试；最新远端 CI 以本轮 head 为准。
+
+## 2026-10-19 二次审查修复：拆分产物也是决策参与者
+
+- `split_entry` 的动作目标是原词条，新建词条只记录在 `after_snapshot.created`。范围保护现按 `action_type=split_entry`、`target_type=entry` 和 `after_snapshot.created.id` 精确匹配新词条；即使其全部内容仍是草稿、metadata 被清空，普通地区更新也不能绕过治理操作。
+- 新增三项回归：真实拆分出的草稿拒绝普通 PATCH/PUT，允许同值/无关字段更新及有依据的治理缩小范围，原拆分快照保持不变；不相关拆分产物或其他动作的同形快照不会误伤普通草稿。
+- 核对其他多对象动作：合并的 canonical/sources 分别为 reviewed/redirected，由状态保护；竞争解释的范围归属 Recording，直接动作及已审核关联均保护，不把仅关联的 Entry 当作继承该录音地区。
+- 实际验证：`python manage.py test guantou.tests_v2_scope guantou.tests_v2_provenance guantou.tests_v2_governance --noinput` 共 40 项，39 通过、1 项 SQLite 行锁跳过；API contract 检查通过。独立 agent 复核本轮差异未发现阻塞。
+- 本轮未新增迁移、未部署、未重复完整后端/真实并发或在线验收；上轮本机 config 失败已在修改前基线复现，不能声称本地完整测试全通过。以最新提交的远端 CI 为准。
+
+## 2026-10-19 审查修复：子对象决定保护父范围
+
+- 普通地区更新除目标自身状态/历史外，还检查 Entry 的义项和写法关联、Recording 的录音关联的整理状态与动作历史；查询包含非当前关联版本。
+- 保留纯草稿、同值保存及无关字段编辑。录制者初始著录/补充关联的服务端 accepted 标记不冒充整理审核：仅创建者为录制者、无审核标记、无前继版本且标记完全匹配时例外；任何动作历史仍触发保护。不明旧 accepted 关联保守保护。
+- 子对象审核和义项概念关联先锁父对象，再锁子对象并复核归属，与普通地区更新共用父锁；没有新增数据库迁移。
+- 定向命令：`python manage.py test guantou.tests_v2_scope guantou.tests_v2_provenance guantou.tests_v2_governance --noinput`：37 项，36 通过、1 跳过（SQLite 无行锁）。Black、API contract、`makemigrations --check --dry-run` 和 `git diff --check` 通过。
+- 独立 agent 复核了子对象范围、历史版本、锁顺序与著录例外，未发现本轮新增阻塞。初轮测试断言未适配统一错误响应，且将不支持的 Recording PUT 误期待为 400；已修正测试，未放宽产品校验。
+- 未验证：真实 PostgreSQL 双连接行锁测试（已提供 NOWAIT 用例；本机 Docker 未运行，SQLite 明确跳过）、在线账号旅程及生产环境；这次修复不声称完整并发安全或维护者人工验收。
+- 另行发现的既有风险：普通 EntrySense 接口允许修改 `entry_id`，其权限和重新挂父对象的治理边界应单独修复；本次只处理父地区修改与子对象治理审核，不把该问题标为已解决。
+
 日期：2026-10-18。将测试站点已使用的后端修复移植到主项目，供来源展示、范围修正与历史回溯 UI 使用。本次不部署、不操作在线数据库。
 
 ## 分支与依赖

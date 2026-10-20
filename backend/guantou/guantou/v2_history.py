@@ -34,6 +34,19 @@ class CurationHistoryPermission(permissions.BasePermission):
 def history_for_user(queryset, user, visible_entries, visible_recordings):
     if user.is_staff:
         return queryset
+    # Compare text on both sides: PostgreSQL JSON values cannot be compared
+    # directly with an integer subquery. Text also fails closed for malformed IDs.
+    queryset = queryset.annotate(
+        _history_competing_entry_id=Cast(
+            KeyTextTransform(
+                "entry_id", KeyTransform("competing_link", "after_snapshot")
+            ),
+            output_field=CharField(),
+        )
+    )
+    visible_entry_ids = visible_entries.annotate(
+        _history_entry_id=Cast("id", output_field=CharField())
+    ).values("_history_entry_id")
     # Revocation blocks new decisions, not the actor's access to their own records.
     allowed = Q(actor=user)
     if is_lexical_curator(user):
@@ -67,6 +80,12 @@ def history_for_user(queryset, user, visible_entries, visible_recordings):
                 target_type="legacy_candidate",
                 target_id__in=LegacyReviewCandidate.objects.values("id"),
             )
+        )
+        allowed |= Q(
+            target_type="recording",
+            action_type="preserve_competing",
+            target_id__in=visible_recordings.values("id"),
+            _history_competing_entry_id__in=visible_entry_ids,
         )
     scopes = regional_curator_scope_ids(user)
     if scopes:
@@ -107,19 +126,6 @@ def history_for_user(queryset, user, visible_entries, visible_recordings):
             & Q(action_type__in=["review", "narrow_scope"])
             & dialect_snapshots
         )
-        # Compare text on both sides: PostgreSQL JSON values cannot be compared
-        # directly with an integer subquery. Text also fails closed for malformed IDs.
-        queryset = queryset.annotate(
-            _history_competing_entry_id=Cast(
-                KeyTextTransform(
-                    "entry_id", KeyTransform("competing_link", "after_snapshot")
-                ),
-                output_field=CharField(),
-            )
-        )
-        visible_entry_ids = visible_entries.annotate(
-            _history_entry_id=Cast("id", output_field=CharField())
-        ).values("_history_entry_id")
         allowed |= recording_targets & Q(
             action_type="preserve_competing",
             before_snapshot__usage_dialect__id__in=scopes,

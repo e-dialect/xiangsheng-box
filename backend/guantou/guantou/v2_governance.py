@@ -17,6 +17,7 @@ from .models import (
     Recording,
     RecordingEntryLink,
 )
+from .v2_scope import lock_scope_child
 from .v2_permissions import (
     active_curator_grants,
     is_lexical_curator,
@@ -196,11 +197,7 @@ def _review(actor, target_type, target_id, changes, reason):
         obj.save(update_fields=["status", "updated_at"])
         return grant, before, _entry_snapshot(obj), _entry_label(obj)
     if target_type == CurationAction.TargetType.SENSE:
-        obj = (
-            EntrySense.objects.select_for_update()
-            .select_related("entry")
-            .get(pk=target_id)
-        )
+        obj = lock_scope_child(EntrySense, target_id, Entry, "entry")
         grant = _require_lexical(actor)
         _choice(
             status,
@@ -218,11 +215,7 @@ def _review(actor, target_type, target_id, changes, reason):
         after = {**before, "status": obj.status}
         return grant, before, after, obj.gloss[:240]
     if target_type == CurationAction.TargetType.WRITING:
-        obj = (
-            EntryWriting.objects.select_for_update()
-            .select_related("entry", "writing")
-            .get(pk=target_id)
-        )
+        obj = lock_scope_child(EntryWriting, target_id, Entry, "entry")
         grant = _require_lexical(actor)
         _choice(status, EntryWriting.Status.choices, "changes.status")
         before = {
@@ -272,10 +265,8 @@ def _review(actor, target_type, target_id, changes, reason):
         obj.save(update_fields=["status", "visibility", "updated_at"])
         return grant, before, _recording_snapshot(obj), str(obj)[:240]
     if target_type == CurationAction.TargetType.RECORDING_LINK:
-        obj = (
-            RecordingEntryLink.objects.select_for_update()
-            .select_related("recording__usage_dialect", "entry")
-            .get(pk=target_id, is_current=True)
+        obj = lock_scope_child(
+            RecordingEntryLink, target_id, Recording, "recording", is_current=True
         )
         grant = (
             _grant_for(actor, CuratorGrant.Role.LEXICAL)
@@ -570,11 +561,7 @@ def perform_curation_action(actor, validated_data):
         elif action_type == CurationAction.ActionType.LINK_CONCEPT:
             if target_type != CurationAction.TargetType.SENSE:
                 _fail("概念只能关联到词条义项", "target_type")
-            sense = (
-                EntrySense.objects.select_for_update()
-                .prefetch_related("concept_links")
-                .get(pk=target_id)
-            )
+            sense = lock_scope_child(EntrySense, target_id, Entry, "entry")
             grant, before, after, label = _link_concept(actor, sense, changes)
         elif action_type == CurationAction.ActionType.PRESERVE_COMPETING:
             if target_type != CurationAction.TargetType.RECORDING:

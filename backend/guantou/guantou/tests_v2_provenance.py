@@ -438,3 +438,128 @@ class CurationProvenanceTests(TestCase):
         self.entry.delete()
         self.assertEqual(self.client_for(self.peer).get(url).status_code, 404)
         self.assertEqual(self.client_for(self.actor).get(url).status_code, 200)
+
+    def lexical_competing_history(self):
+        author = User.objects.create_user("lexical-author")
+        peer = User.objects.create_user("lexical-history-peer")
+        author_grant = self.issue(author, role="lexical_curator")
+        peer_grant = self.issue(peer, role="lexical_curator")
+        recording = Recording.objects.create(
+            original_gloss="Public competing clip",
+            audio_url="https://example.test/a.wav",
+            recorder=self.owner,
+            usage_dialect=self.root,
+            visibility=True,
+        )
+        response = self.client_for(author).post(
+            "/curation/actions/",
+            {
+                "action_type": "preserve_competing",
+                "target_type": "recording",
+                "target_id": recording.id,
+                "reason": "Preserve lexical alternative",
+                "evidence_ids": [self.evidence.id],
+                "changes": {"entry_id": self.entry.id},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        return author, peer, author_grant, peer_grant, recording, response.data["id"]
+
+    def assert_history_access(self, user, action_id, allowed):
+        client = self.client_for(user)
+        detail = client.get(f"/curation/actions/{action_id}/")
+        self.assertEqual(detail.status_code, 200 if allowed else 404, detail.data)
+        listed = client.get("/curation/actions/", {"target_type": "recording"})
+        self.assertEqual(listed.status_code, 200, listed.data)
+        rows = listed.data["results"] if isinstance(listed.data, dict) else listed.data
+        self.assertEqual(action_id in [row["id"] for row in rows], allowed)
+        return detail
+
+    def test_lexical_peer_reads_competing_history_with_redacted_response(self):
+        author, peer, _, _, _, aid = self.lexical_competing_history()
+        private = EvidenceRecord.objects.create(
+            original_text="Unlinked secret", contributor=self.staff
+        )
+        CurationAction.objects.get(pk=aid).evidence.add(private)
+        detail = self.assert_history_access(peer, aid, True)
+        self.assertEqual(detail.data["actor"], {"id": author.id})
+        self.assertIsNone(detail.data["grant"])
+        self.assertNotIn(private.id, detail.data["evidence_ids"])
+        self.assertNotIn("Administrative grant note", str(detail.data))
+        self.assertEqual(detail.data["authority_snapshot"]["role"], "lexical_curator")
+
+    def test_lexical_peer_competing_history_requires_visible_recording(self):
+        author, peer, _, _, recording, aid = self.lexical_competing_history()
+        self.assert_history_access(peer, aid, True)
+        recording.visibility = False
+        recording.save(update_fields=["visibility"])
+        self.assert_history_access(peer, aid, False)
+        self.assert_history_access(author, aid, True)
+        recording.delete()
+        self.assert_history_access(peer, aid, False)
+        self.assert_history_access(author, aid, True)
+
+    def test_lexical_peer_competing_history_requires_existing_visible_entry(self):
+        from .v2_history import history_for_user
+
+        author, peer, _, _, recording, aid = self.lexical_competing_history()
+        # Lexical curators currently see private entries too. Check the supplied
+        # visibility boundary directly rather than claiming visibility=False hides one.
+        rows = history_for_user(
+            CurationAction.objects.all(),
+            peer,
+            Entry.objects.none(),
+            Recording.objects.all(),
+        )
+        self.assertFalse(rows.filter(pk=aid).exists())
+        RecordingEntryLink.objects.filter(recording=recording).delete()
+        self.entry.delete()
+        self.assert_history_access(peer, aid, False)
+        self.assert_history_access(author, aid, True)
+
+    def test_lexical_peer_competing_history_rejects_malformed_entry_snapshot(self):
+        _, peer, _, _, _, aid = self.lexical_competing_history()
+        for snapshot in (
+            {},
+            {"competing_link": {}},
+            {"competing_link": {"entry_id": None}},
+            {"competing_link": {"entry_id": "invalid"}},
+            {"competing_link": {"entry_id": {"id": self.entry.id}}},
+            {"competing_link": {"entry_id": self.entry.id + 1000}},
+        ):
+            with self.subTest(snapshot=snapshot):
+                # Model historical corrupt/legacy data without changing append-only API.
+                CurationAction.objects.filter(pk=aid).update(after_snapshot=snapshot)
+                self.assert_history_access(peer, aid, False)
+
+    def test_revoked_lexical_peer_denied_but_actor_keeps_own_history(self):
+        author, peer, author_grant, peer_grant, _, aid = (
+            self.lexical_competing_history()
+        )
+        for grant in (peer_grant, author_grant):
+            grant.revoked_at = timezone.now()
+            grant.save(update_fields=["revoked_at"])
+        self.assert_history_access(peer, aid, False)
+        self.assert_history_access(author, aid, True)
+        self.assert_history_access(self.owner, aid, False)
+
+    def test_lexical_competing_access_does_not_expose_other_recording_actions(self):
+        _, peer, _, _, recording, aid = self.lexical_competing_history()
+        self.assert_history_access(peer, aid, True)
+        narrow = self.narrow(target=recording, target_type="recording")
+        self.assertEqual(narrow.status_code, 201, narrow.data)
+        review = self.client_for(self.actor).post(
+            "/curation/actions/",
+            {
+                "action_type": "review",
+                "target_type": "recording",
+                "target_id": recording.id,
+                "reason": "Review recording state",
+                "changes": {"status": "published"},
+            },
+            format="json",
+        )
+        self.assertEqual(review.status_code, 201, review.data)
+        for other in (narrow, review):
+            self.assert_history_access(peer, other.data["id"], False)
