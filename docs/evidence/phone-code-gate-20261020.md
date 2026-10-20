@@ -11,7 +11,7 @@ Base commit: `bde136f8763452cf95d18cd2605b997fd0263e00` (GitHub `main` SHA check
 - Existing login-page unit coverage confirms the email registration and password-reset entry buttons remain visible and route to their existing handlers.
 - `yarn vitest run --no-cache` — 83 files, 607 tests passed with the flag off.
 - `yarn lint` — passed.
-- `/Users/sheeplin/Documents/Codex/2026-10-14/s-s/work/wanyu-ci-venv/bin/python scripts/test_release_scripts.py` — 15 tests passed, including the production build-argument and release-manifest contract.
+- `python scripts/test_release_scripts.py` — 15 tests passed, including the production build-argument and release-manifest contract.
 - `yarn build:h5:checked` — passed with the flag unset/off; warning audit reported no tracked notices.
 - `VITE_PHONE_CODE_LOGIN_ENABLED=true yarn build:h5:checked` — passed; warning audit reported no tracked notices.
 - Ruby Psych parsed `docker-compose.yml` and `docker-compose.traefik.yml`; `git diff --check` passed. The enabled-mode E2E test now checks the initially visible phone form before switching to password and back; E2E itself was not run because no local backend/browser fixture was started.
