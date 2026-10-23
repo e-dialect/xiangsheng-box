@@ -355,6 +355,28 @@ def resolve_dialect(qualified_code):
     return parent
 
 
+def resolve_legacy_recording_location(location):
+    """Use the seeded branch when a legacy town has no seeded leaf.
+
+    Keep the original county/town in ``legacy``. Never infer another town, and
+    never hide a missing branch or broader dialect seed behind this fallback.
+    """
+    code = location["qualified_code"]
+    dialect = resolve_dialect(code)
+    if dialect is not None or not code:
+        return dialect, location
+    branch, separator, _ = code.rpartition(".")
+    if separator and branch in ("闽.莆仙.仙游", "闽.莆仙.莆田"):
+        dialect = resolve_dialect(branch)
+        if dialect is not None:
+            return dialect, {
+                **location,
+                "qualified_code": branch,
+                "reason": "unseeded_leaf_branch_fallback",
+            }
+    return None, location
+
+
 def row_fingerprint(row):
     payload = {key: row[key] for key in row.keys()}
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
@@ -579,10 +601,15 @@ class HinghwaImporter:
         ).fetchall()
         for row in pronunciation_locations:
             mapping = normalize_legacy_location(row["county"], row["town"])
+            dialect, mapping = resolve_legacy_recording_location(mapping)
             if mapping["reason"] != "mapped":
                 key = f"{row['county']}|{row['town']}->{mapping['qualified_code']}"
                 self.report["unknown_locations"][key] += row["count"]
-            if resolve_dialect(mapping["qualified_code"]) is None:
+            if mapping["reason"] == "unseeded_leaf_branch_fallback":
+                self.report["normalized"]["unseeded_leaf_branch_fallback"] += row[
+                    "count"
+                ]
+            if dialect is None:
                 self.report["failed"].append(
                     {
                         "table": "word_pronunciation",
@@ -1096,7 +1123,7 @@ class HinghwaImporter:
                 )
                 continue
             location = normalize_legacy_location(row["county"], row["town"])
-            dialect = resolve_dialect(location["qualified_code"])
+            dialect, location = resolve_legacy_recording_location(location)
             if dialect is None:
                 self.report["failed"].append(
                     {
@@ -1459,7 +1486,7 @@ class HinghwaImporter:
                 continue
 
             location = normalize_legacy_location(row["county"], row["town"])
-            dialect = resolve_dialect(location["qualified_code"])
+            dialect, location = resolve_legacy_recording_location(location)
             if dialect is None:
                 dialect = broad_dialect
                 self.report["normalized"]["v2_recording_dialect_fallback"] += 1
@@ -1553,6 +1580,7 @@ class HinghwaImporter:
                         "town": str(row["town"] or ""),
                         "visibility": bool(row["visibility"]),
                         "views": max(0, int(row["views"] or 0)),
+                        "location_mapping": location["reason"],
                         "verifier_id": row["verifier_id"],
                         "upload_time": str(row["upload_time"] or ""),
                     },

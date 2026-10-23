@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import json
+import hashlib
 from importlib import import_module
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from .legacy_import import (
     open_legacy_database,
     parse_legacy_datetime,
     resolve_dialect,
+    resolve_legacy_recording_location,
 )
 from .models import (
     Can,
@@ -81,6 +83,35 @@ class LegacyLocationTests(TestCase):
                 "qualified_code"
             ]
         )
+
+    def test_unseeded_leaf_uses_only_its_known_branch(self):
+        original = normalize_legacy_location("仙游县", "未列镇")
+        dialect, mapped = resolve_legacy_recording_location(original)
+        self.assertEqual(dialect.qualified_code, "闽.莆仙.仙游")
+        self.assertEqual(mapped["reason"], "unseeded_leaf_branch_fallback")
+        self.assertEqual(mapped["legacy"], {"county": "仙游县", "town": "未列镇"})
+        self.assertEqual(original["qualified_code"], "闽.莆仙.仙游.未列")
+        putian, putian_mapping = resolve_legacy_recording_location(
+            normalize_legacy_location("涵江", "未列镇")
+        )
+        self.assertEqual(putian.qualified_code, "闽.莆仙.莆田")
+        self.assertEqual(putian_mapping["reason"], "unseeded_leaf_branch_fallback")
+
+        for county, town, expected, reason in (
+            ("仙游县", "枫亭镇", "闽.莆仙.仙游.枫亭", "mapped"),
+            ("涵江", "国欢镇", "闽.莆仙.莆田.国欢", "mapped"),
+            ("福州市", "鼓楼区", "闽.莆仙", "unrecognized_location"),
+        ):
+            dialect, mapped = resolve_legacy_recording_location(
+                normalize_legacy_location(county, town)
+            )
+            self.assertEqual(dialect.qualified_code, expected)
+            self.assertEqual(mapped["reason"], reason)
+        dialect, mapping = resolve_legacy_recording_location(
+            normalize_legacy_location("福州市", "鼓楼区", for_user=True)
+        )
+        self.assertIsNone(dialect)
+        self.assertIsNone(mapping["qualified_code"])
 
 
 class AccountPriorityTests(TestCase):
@@ -396,6 +427,68 @@ class LegacyImportTests(TestCase):
         self.assertTrue(self.target.is_superuser)
         target_info.refresh_from_db()
         self.assertEqual((target_info.points_now, target_info.points_sum), (7, 13))
+
+    def test_unseeded_legacy_town_imports_without_dropping_recording(self):
+        connection = sqlite3.connect(self.source_path)
+        connection.execute(
+            "UPDATE word_pronunciation SET town = ? WHERE id = ?", ("未列镇", 20)
+        )
+        connection.commit()
+        connection.close()
+        source_hash = hashlib.sha256(Path(self.source_path).read_bytes()).hexdigest()
+
+        with open_legacy_database(self.source_path) as source:
+            dry_report = HinghwaImporter(source, apply=False).run()
+        self.assertEqual(dry_report["failed"], [])
+        self.assertEqual(dry_report["normalized"]["unseeded_leaf_branch_fallback"], 1)
+
+        with open_legacy_database(self.source_path) as source:
+            report = HinghwaImporter(source, apply=True).run()
+        self.assertEqual(report["failed"], [])
+        self.assertEqual(report["source_counts"]["word_pronunciation"], 1)
+        self.assertEqual(Recording.objects.count(), 1)
+        recording = Recording.objects.get()
+        self.assertEqual(recording.usage_dialect.qualified_code, "闽.莆仙.仙游")
+        self.assertEqual(
+            recording.metadata["location_mapping"], "unseeded_leaf_branch_fallback"
+        )
+        evidence = EvidenceRecord.objects.get(
+            source_metadata__table="word_pronunciation"
+        )
+        self.assertEqual(evidence.source_metadata["county"], "仙游县")
+        self.assertEqual(evidence.source_metadata["town"], "未列镇")
+        self.assertEqual(
+            evidence.source_metadata["location_mapping"],
+            "unseeded_leaf_branch_fallback",
+        )
+        self.assertEqual(
+            hashlib.sha256(Path(self.source_path).read_bytes()).hexdigest(), source_hash
+        )
+
+    def test_unknown_county_keeps_broad_dialect_and_original_area(self):
+        connection = sqlite3.connect(self.source_path)
+        connection.execute(
+            "UPDATE word_pronunciation SET county = ?, town = ? WHERE id = ?",
+            ("外地", "未识别区", 20),
+        )
+        connection.commit()
+        connection.close()
+        with open_legacy_database(self.source_path) as source:
+            report = HinghwaImporter(source, apply=True).run()
+        self.assertEqual(report["failed"], [])
+        recording = Recording.objects.get()
+        self.assertEqual(recording.usage_dialect.qualified_code, "闽.莆仙")
+        self.assertEqual(
+            recording.metadata["location_mapping"], "unrecognized_location"
+        )
+        evidence = EvidenceRecord.objects.get(
+            source_metadata__table="word_pronunciation"
+        )
+        self.assertEqual(evidence.source_metadata["county"], "外地")
+        self.assertEqual(evidence.source_metadata["town"], "未识别区")
+        self.assertEqual(
+            evidence.source_metadata["location_mapping"], "unrecognized_location"
+        )
 
     def test_existing_v1_archive_does_not_block_independent_v2_import(self):
         with open_legacy_database(self.source_path) as connection:
