@@ -13,6 +13,12 @@ let nextLoadingClosureId = 0;
 const loadingClosures = new Set();
 let pendingNativeNotification = null;
 const feedbackHosts = [];
+const ownedConfirmations = new WeakMap();
+
+export function cancelConfirmation(owner) {
+  ownedConfirmations.get(owner)?.();
+  ownedConfirmations.delete(owner);
+}
 
 export function registerFeedbackHost(host) {
   if (!host || feedbackHosts.includes(host)) return;
@@ -87,17 +93,30 @@ export function confirm({
   confirmText = '确认',
   cancelText = '取消',
   danger = false,
+  owner = null,
 } = {}) {
   const host = activeFeedbackHost();
   if (host && typeof host.confirm === 'function') {
-    return host.confirm({
+    const result = host.confirm({
       title,
       content,
       confirmText,
       cancelText,
       danger,
     });
+    if (!owner) return result;
+    const resolver = host.dialogResolver;
+    const cancel = () => {
+      if (host.dialogResolver === resolver) host.resolveDialog(false);
+    };
+    ownedConfirmations.set(owner, cancel);
+    return Promise.resolve(result).finally(() => {
+      if (ownedConfirmations.get(owner) === cancel) ownedConfirmations.delete(owner);
+    });
   }
+
+  // Sensitive, page-owned confirmations must be cancellable on session change.
+  if (owner) return Promise.resolve(false);
 
   return new Promise((resolve) => {
     uni.showModal({

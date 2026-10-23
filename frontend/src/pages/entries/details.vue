@@ -236,6 +236,11 @@
         <view class="evidence-note">
           状态表示目前的整理进度；新录音和地区确认会继续补充这个词条。
         </view>
+        <BaseButton
+          variant="ghost"
+          :text="`来源与依据（${entry.evidence_count || 0}）· 整理记录`"
+          @click="openReview"
+        />
       </view>
 
       <DiscussionThread
@@ -299,7 +304,7 @@ import {
   unbookmarkEntry,
 } from '@/services/entryRecording';
 import { notifySuccess } from '@/services/feedback';
-import { goRecord } from '@/services/navigation';
+import { goRecord, openPage, ROUTES } from '@/services/navigation';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
@@ -337,6 +342,9 @@ export default {
   },
   methods: {
     entryTitle,
+    openReview() {
+      openPage(ROUTES.entryReview, { entry_id: this.id });
+    },
     statusLabel(status) {
       return {
         draft: '初稿',

@@ -21,6 +21,7 @@ from .models import (
     UsageAttestation,
     WritingForm,
 )
+from .v2_scope import has_scope_decisions
 from .shared_serializers import DialectRefSerializer, UserLiteSerializer
 from .v2_permissions import (
     active_curator_grants,
@@ -195,7 +196,33 @@ class EntrySenseSerializer(serializers.ModelSerializer):
         return instance
 
 
-class PronunciationVariantSerializer(serializers.ModelSerializer):
+class ProtectedScopeUpdateMixin:
+    """Only uncurated drafts may edit scope outside the semantic service."""
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            instance = type(instance).objects.select_for_update().get(pk=instance.pk)
+            scope = validated_data.get(self.scope_field, serializers.empty)
+            if scope is not serializers.empty:
+                new_id = scope.pk if scope is not None else None
+                old_id = getattr(instance, f"{self.scope_field}_id")
+                if new_id != old_id and (
+                    instance.status != "draft"
+                    or has_scope_decisions(instance, self.scope_target_type)
+                ):
+                    raise serializers.ValidationError(
+                        {
+                            f"{self.scope_field}_id": "已整理对象的地区变更须通过整理操作并提供依据与理由"
+                        }
+                    )
+            return super().update(instance, validated_data)
+
+
+class PronunciationVariantSerializer(
+    ProtectedScopeUpdateMixin, serializers.ModelSerializer
+):
+    scope_field = "dialect"
+    scope_target_type = "pronunciation"
     entry = EntryRefSerializer(read_only=True)
     entry_id = serializers.PrimaryKeyRelatedField(
         source="entry", queryset=Entry.objects.all(), write_only=True
@@ -303,7 +330,9 @@ class EntryCardSerializer(serializers.ModelSerializer):
         return self.get_recording_count(obj) == 0
 
 
-class EntrySerializer(EntryCardSerializer):
+class EntrySerializer(ProtectedScopeUpdateMixin, EntryCardSerializer):
+    scope_field = "usage_dialect"
+    scope_target_type = "entry"
     summary = serializers.CharField(
         required=False, allow_blank=True, trim_whitespace=False
     )
@@ -483,7 +512,9 @@ class RecordingEntryLinkRefSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class RecordingSerializer(serializers.ModelSerializer):
+class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer):
+    scope_field = "usage_dialect"
+    scope_target_type = "recording"
     usage_dialect = DialectRefSerializer(read_only=True)
     usage_dialect_id = serializers.PrimaryKeyRelatedField(
         source="usage_dialect", queryset=Dialect.objects.all(), write_only=True
@@ -1033,8 +1064,35 @@ class CurationActionSerializer(serializers.ModelSerializer):
             "target_label",
             "before_snapshot",
             "after_snapshot",
+            "authority_snapshot",
             "reason",
             "evidence_ids",
             "created_at",
         ]
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not instance.authority_snapshot:
+            data["authority_snapshot"] = {
+                "status": "unavailable",
+                "reason": "legacy_record",
+            }
+        request = self.context.get("request")
+        user = request.user if request else None
+        if user and not user.is_staff and instance.actor_id != user.id:
+            # Authorized peers need attribution and the historical authority, not profiles
+            # or the grant's current administrative reason/revocation notes.
+            data["actor"] = {"id": instance.actor_id}
+            data["grant"] = None
+            visible_evidence = self.context.get("visible_evidence")
+            data["evidence_ids"] = (
+                list(
+                    visible_evidence.filter(pk__in=data["evidence_ids"]).values_list(
+                        "pk", flat=True
+                    )
+                )
+                if visible_evidence is not None
+                else []
+            )
+        return data

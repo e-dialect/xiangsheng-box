@@ -17,6 +17,7 @@ from .models import (
     Recording,
     RecordingEntryLink,
 )
+from .v2_scope import lock_scope_child
 from .v2_permissions import (
     active_curator_grants,
     is_lexical_curator,
@@ -93,7 +94,7 @@ def _recording_snapshot(recording):
 def _grant_for(user, role, dialect=None):
     if user.is_staff:
         return None
-    grants = active_curator_grants(user, role)
+    grants = active_curator_grants(user, role).select_for_update(of=("self",))
     if role == CuratorGrant.Role.LEXICAL:
         return grants.first()
     if dialect:
@@ -196,11 +197,7 @@ def _review(actor, target_type, target_id, changes, reason):
         obj.save(update_fields=["status", "updated_at"])
         return grant, before, _entry_snapshot(obj), _entry_label(obj)
     if target_type == CurationAction.TargetType.SENSE:
-        obj = (
-            EntrySense.objects.select_for_update()
-            .select_related("entry")
-            .get(pk=target_id)
-        )
+        obj = lock_scope_child(EntrySense, target_id, Entry, "entry")
         grant = _require_lexical(actor)
         _choice(
             status,
@@ -218,11 +215,7 @@ def _review(actor, target_type, target_id, changes, reason):
         after = {**before, "status": obj.status}
         return grant, before, after, obj.gloss[:240]
     if target_type == CurationAction.TargetType.WRITING:
-        obj = (
-            EntryWriting.objects.select_for_update()
-            .select_related("entry", "writing")
-            .get(pk=target_id)
-        )
+        obj = lock_scope_child(EntryWriting, target_id, Entry, "entry")
         grant = _require_lexical(actor)
         _choice(status, EntryWriting.Status.choices, "changes.status")
         before = {
@@ -272,10 +265,8 @@ def _review(actor, target_type, target_id, changes, reason):
         obj.save(update_fields=["status", "visibility", "updated_at"])
         return grant, before, _recording_snapshot(obj), str(obj)[:240]
     if target_type == CurationAction.TargetType.RECORDING_LINK:
-        obj = (
-            RecordingEntryLink.objects.select_for_update()
-            .select_related("recording__usage_dialect", "entry")
-            .get(pk=target_id, is_current=True)
+        obj = lock_scope_child(
+            RecordingEntryLink, target_id, Recording, "recording", is_current=True
         )
         grant = (
             _grant_for(actor, CuratorGrant.Role.LEXICAL)
@@ -283,6 +274,8 @@ def _review(actor, target_type, target_id, changes, reason):
             else _require_regional(actor, obj.recording.usage_dialect)
         )
         before, after, label = _review_link(obj, status, actor, reason)
+        before["usage_dialect"] = _dialect_snapshot(obj.recording.usage_dialect)
+        after["usage_dialect"] = _dialect_snapshot(obj.recording.usage_dialect)
         return grant, before, after, label
     _fail("该对象不支持状态审核", "target_type")
 
@@ -568,11 +561,7 @@ def perform_curation_action(actor, validated_data):
         elif action_type == CurationAction.ActionType.LINK_CONCEPT:
             if target_type != CurationAction.TargetType.SENSE:
                 _fail("概念只能关联到词条义项", "target_type")
-            sense = (
-                EntrySense.objects.select_for_update()
-                .prefetch_related("concept_links")
-                .get(pk=target_id)
-            )
+            sense = lock_scope_child(EntrySense, target_id, Entry, "entry")
             grant, before, after, label = _link_concept(actor, sense, changes)
         elif action_type == CurationAction.ActionType.PRESERVE_COMPETING:
             if target_type != CurationAction.TargetType.RECORDING:
@@ -627,6 +616,36 @@ def perform_curation_action(actor, validated_data):
     ):
         _fail("待整理对象不存在", "target_id")
 
+    captured_at = timezone.now()
+    if grant is None and not actor.is_staff:
+        _fail("授权已失效，请重新检查整理权限")
+    if grant is not None:
+        if not (
+            grant.revoked_at is None
+            and grant.valid_from <= captured_at < grant.valid_until
+        ):
+            _fail("授权已失效，请重新检查整理权限")
+        authority_snapshot = {
+            "version": 1,
+            "status": "captured",
+            "captured_at": captured_at.isoformat(),
+            "mode": "grant",
+            "grant_id": grant.id,
+            "role": grant.role,
+            "dialect": _dialect_snapshot(grant.dialect),
+            "valid_from": grant.valid_from.isoformat(),
+            "valid_until": grant.valid_until.isoformat(),
+            "revoked_at": None,
+        }
+    else:
+        authority_snapshot = {
+            "version": 1,
+            "status": "captured",
+            "captured_at": captured_at.isoformat(),
+            "mode": "staff",
+            "role": "staff",
+            "dialect": None,
+        }
     action = CurationAction.objects.create(
         actor=actor,
         grant=grant,
@@ -636,6 +655,7 @@ def perform_curation_action(actor, validated_data):
         target_label=label,
         before_snapshot=before,
         after_snapshot=after,
+        authority_snapshot=authority_snapshot,
         reason=reason,
     )
     if evidence:

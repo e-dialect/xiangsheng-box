@@ -89,6 +89,13 @@
         <view class="task-summary">
           {{ task.summary }}
         </view>
+        <BaseButton
+          v-if="task.target_type === 'entry' || task.target_type === 'recording'"
+          size="small"
+          variant="ghost"
+          text="查看材料与详情"
+          @click="openMaterial(task)"
+        />
 
         <view class="decision-label">
           选择处理结果
@@ -169,6 +176,7 @@ import {
   pageResults,
 } from '@/services/entryRecording';
 import { notify, notifySuccess } from '@/services/feedback';
+import { openPage, ROUTES } from '@/services/navigation';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
 const LABELS = {
@@ -217,6 +225,13 @@ export default {
   },
   onLoad() { this.load(); },
   methods: {
+    openMaterial(task) {
+      if (task.target_type === 'entry') {
+        openPage(ROUTES.entryReview, { entry_id: task.id });
+      } else if (task.target_type === 'recording') {
+        openPage(ROUTES.recordingDetail, { id: task.id });
+      }
+    },
     taskKey(task) { return `${task.kind}-${task.id}`; },
     kindLabel(kind) {
       return ({

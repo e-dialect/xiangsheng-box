@@ -1,5 +1,5 @@
 <script>
-import { goNotFound } from '@/services/navigation';
+import { appRoutePath, goNotFound } from '@/services/navigation';
 // app.js
 import { getLoginStatus } from '@/services/login';
 import { hydrateCapabilities } from '@/services/capabilities';
@@ -31,7 +31,7 @@ export default {
     }
     if (uni.getSystemInfoSync().uniPlatform === 'web') {
       const pages = pagesJson.pages.map((page) => `/${page.path}`);
-      const currentPath = window.location.pathname;
+      const currentPath = appRoutePath(window.location.pathname, import.meta.env.BASE_URL);
       // history 模式下 '/' 已由路由原生渲染首页（pages.json 第一项），
       // 不能再 reLaunch：重建已挂载页面会使首页 feed 接口重复发起一次。
       if (currentPath !== '/' && currentPath !== '' && !pages.includes(currentPath)) {

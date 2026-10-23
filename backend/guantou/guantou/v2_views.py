@@ -63,6 +63,7 @@ from .v2_serializers import (
     WritingFormSerializer,
 )
 from .v2_governance import perform_curation_action
+from .v2_history import CurationHistoryPermission, history_for_user
 
 
 def parse_boolean(value, name):
@@ -132,6 +133,18 @@ def available_recording_links_for_user(user):
             Q(recording__visibility=True) | Q(recording__recorder=user) | scope_filter
         )
     return queryset.filter(recording__visibility=True)
+
+
+def visible_evidence_for_user(user):
+    entries = visible_entries_for_user(user)
+    recordings = visible_recordings_for_user(user)
+    return EvidenceRecord.objects.filter(
+        Q(claim_links__entry__in=entries)
+        | Q(claim_links__sense__entry__in=entries)
+        | Q(claim_links__pronunciation_variant__entry__in=entries)
+        | Q(claim_links__recording__in=recordings)
+        | Q(claim_links__recording_entry_link__recording__in=recordings)
+    ).distinct()
 
 
 class DialectWritePermission(permissions.BasePermission):
@@ -1143,7 +1156,12 @@ class CuratorApplicationViewSet(viewsets.ModelViewSet):
 
 class CurationActionViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "head", "options"]
-    permission_classes = [IsActiveCurator]
+    permission_classes = [CurationHistoryPermission]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["visible_evidence"] = visible_evidence_for_user(self.request.user)
+        return context
 
     def get_serializer_class(self):
         return (
@@ -1156,8 +1174,12 @@ class CurationActionViewSet(viewsets.ModelViewSet):
         queryset = CurationAction.objects.select_related(
             "actor", "actor__user_info", "grant", "grant__dialect"
         ).prefetch_related("evidence")
-        if not self.request.user.is_staff:
-            queryset = queryset.filter(actor=self.request.user)
+        queryset = history_for_user(
+            queryset,
+            self.request.user,
+            visible_entries_for_user(self.request.user),
+            visible_recordings_for_user(self.request.user),
+        )
         for parameter in ("action_type", "target_type", "target_id"):
             value = self.request.query_params.get(parameter)
             if value:

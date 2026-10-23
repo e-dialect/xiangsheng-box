@@ -74,6 +74,14 @@
       "style": {}
     },
     {
+      "path": "pages/curation/entry-review",
+      "style": {}
+    },
+    {
+      "path": "pages/curation/action-detail",
+      "style": {}
+    },
+    {
       "path": "pages/curation/apply",
       "style": {}
     },
