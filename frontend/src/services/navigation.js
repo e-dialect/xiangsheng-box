@@ -17,6 +17,8 @@ export const ROUTES = Object.freeze({
   contributionHistory: '/pages/users/contributions',
   entryBookmarks: '/pages/users/bookmarks',
   curationWorkbench: '/pages/curation/index',
+  entryReview: '/pages/curation/entry-review',
+  curationActionDetail: '/pages/curation/action-detail',
   curatorApplication: '/pages/curation/apply',
   loginRegister: '/pages/login/register',
   loginWechatRegister: '/pages/login/register/wechat',
@@ -47,6 +49,13 @@ function queryString(params = {}) {
 
 export function pageUrl(path, params = {}) {
   return `${path}${queryString(params)}`;
+}
+
+// H5 history paths include the deployment mount; pages.json routes do not.
+export function appRoutePath(pathname, base = '/') {
+  const mount = base.replace(/\/$/, '');
+  if (mount && pathname === mount) return '/';
+  return mount && pathname.startsWith(`${mount}/`) ? pathname.slice(mount.length) : pathname;
 }
 
 export function routeDestination(path, params = {}) {

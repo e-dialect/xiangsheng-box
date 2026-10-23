@@ -11,6 +11,7 @@ nameplates、flavors、packages、shelves、posts 或 discovery 页面。
 - Entry、EntrySense、PronunciationVariant、Recording、关联、补证、收藏和整理接口：
   `src/services/entryRecording.js`。
 - 方言树和方言圈：`src/services/guantou.js`。
+- 词条来源、整理历史与范围缩小：`src/services/curationReview.js`；独立的来源/历史读取不依赖当前工作台授权摘要。
 - 听页筛选和分页编排：`src/services/listenFeed.js`。
 - 所有请求最终经过 `src/utils/httpClient.js`；页面中不要直接调用 `uni.request`。
 

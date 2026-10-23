@@ -37,6 +37,17 @@ describe('httpClient compatibility wrappers', () => {
     vi.useRealTimers();
   });
 
+  it('requires the expected creation status without treating another 2xx as saved', async () => {
+    uni.request.mockResolvedValueOnce({ statusCode: 200, data: { id: 4 } });
+    await expect(request.post('/curation/actions/', {}, true, {
+      expectedStatus: 201, loading: false,
+    })).rejects.toMatchObject({ statusCode: 0 });
+    uni.request.mockResolvedValueOnce({ statusCode: 201, data: { id: 4 } });
+    await expect(request.post('/curation/actions/', {}, true, {
+      expectedStatus: 201, loading: false,
+    })).resolves.toEqual({ id: 4 });
+  });
+
   it('request wrapper sends Bearer token and resolves JSON data', async () => {
     uni.request.mockResolvedValue({
       statusCode: 200,

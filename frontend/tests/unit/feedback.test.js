@@ -147,4 +147,21 @@ describe('feedback service', () => {
     await expect(confirmation).resolves.toBe(true);
     wrapper.unmount();
   });
+
+  it('cancels an owned confirmation and removes its sensitive text on session cleanup', async () => {
+    const wrapper = mount(FeedbackHost);
+    const owner = {};
+    const pending = feedback.confirm({ owner, title: '范围修正', content: '仅供 A 读取的依据及理由' });
+    expect(wrapper.vm.dialog.visible).toBe(true);
+    feedback.cancelConfirmation(owner);
+    await expect(pending).resolves.toBe(false);
+    expect(wrapper.vm.dialog.visible).toBe(false);
+    expect(wrapper.vm.dialog.content).toBe('');
+    expect(wrapper.vm.dialog.title).toBe('');
+    wrapper.unmount();
+  });
+
+  it('does not fall back to an uncancellable native modal for a sensitive owned confirmation', async () => {
+    await expect(feedback.confirm({ owner: {}, content: '私有依据' })).resolves.toBe(false);
+  });
 });
