@@ -72,6 +72,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_PHONE_CODE_LOGIN_ENABLED: ${VITE_PHONE_CODE_LOGIN_ENABLED:-false}
     image: ${FRONTEND_IMAGE:-guantou-frontend}
     container_name: ${FRONTEND_CONTAINER:-guantou-frontend}
     restart: unless-stopped

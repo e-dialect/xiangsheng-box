@@ -87,6 +87,10 @@ yarn dev:h5
 VITE_BACKEND_URL=http://localhost:8000 yarn dev:h5
 ```
 
+手机验证码登录默认隐藏。只有后端验证码投递已可用时，才在 H5 开发或构建前设置
+`VITE_PHONE_CODE_LOGIN_ENABLED=true`；Docker Compose 构建会读取根目录 `.env` 中的该值。
+账号密码登录、邮箱注册和邮箱找回密码始终可用。
+
 新页面优先使用 `src/services/entryRecording.js` 调用 Entry / Recording 根路径资源接口；方言树和方言圈使用 `src/services/guantou.js`。不要恢复 Can/Nameplate 客户端流程，也不要新增 api 前缀。页面、服务层和组件约定见 `docs/FRONTEND_GUIDE.md`。
 
 ## 前端工具边界
