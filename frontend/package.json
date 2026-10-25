@@ -71,7 +71,7 @@
     "@dcloudio/uni-quickapp-webview": "3.0.0-5020620260917001",
     "@dcloudio/uni-ui": "^1.4.24",
     "@rollup/plugin-alias": "^6.0.0",
-    "@tdesign/uniapp": "^0.10.3",
+    "@tdesign/uniapp": "^1.0.0",
     "marked": "^18.1.1",
     "postcss": "^8.5.31",
     "vue": "3.4.21"

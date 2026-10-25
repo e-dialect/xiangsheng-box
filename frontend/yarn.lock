@@ -2393,10 +2393,10 @@
   resolved "https://registry.npmmirror.com/@standard-schema/spec/-/spec-1.1.0.tgz#a79b55dbaf8604812f52d140b2c9ab41bc150bb8"
   integrity sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==
 
-"@tdesign/uniapp@^0.10.3":
-  version "0.10.3"
-  resolved "https://registry.yarnpkg.com/@tdesign/uniapp/-/uniapp-0.10.3.tgz#dc8801f16e3439600341ad00a0f8339ed5508f53"
-  integrity sha512-daIhyOyIQXsoV2yyU3iIuccCN7RaQ9SNvbet5JabaQmYspdVBpe55LEEHMCAI9KB4uS0OeZaEUVSQhGVQkaXEA==
+"@tdesign/uniapp@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@tdesign/uniapp/-/uniapp-1.0.0.tgz#4d462aecce78caddc79d8b43182ccbe9ee6953fa"
+  integrity sha512-QWJKTs4LUS1TOyIX6LYm8Ot0EGq2NCp1TjUjS7mBslkfh3PYwco76PI3Z6ueUP6YpPV8pVGWIAoKXiz+bF6sjw==
 
 "@types/estree@1.0.9", "@types/estree@^1.0.0":
   version "1.0.9"
