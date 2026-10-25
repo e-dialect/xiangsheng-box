@@ -73,7 +73,7 @@
     "@rollup/plugin-alias": "^6.0.0",
     "@tdesign/uniapp": "^1.0.0",
     "marked": "^18.1.1",
-    "postcss": "^8.5.30",
+    "postcss": "^8.5.31",
     "vue": "3.4.21"
   },
   "devDependencies": {
@@ -85,7 +85,7 @@
     "@playwright/test": "^1.64.1",
     "@vitejs/plugin-vue": "6.0.10",
     "@vue/compiler-dom": "3.5.44",
-    "@vue/runtime-core": "3.5.42",
+    "@vue/runtime-core": "3.5.44",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^8.31.0",
     "eslint-config-airbnb-base": "^15.0.0",
@@ -93,7 +93,7 @@
     "eslint-plugin-html": "^8.2.1",
     "eslint-plugin-import": "^2.27.4",
     "eslint-plugin-vue": "^9.9.0",
-    "jsdom": "^30.1.2",
+    "jsdom": "^30.1.3",
     "less": "^4.9.1",
     "mini-types": "*",
     "miniprogram-api-typings": "*",
