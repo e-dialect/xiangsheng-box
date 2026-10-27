@@ -1,6 +1,10 @@
 import { expect, test } from '@playwright/test';
 
 test('guest signs in with the visible demo phone code', async ({ page }) => {
+  test.skip(
+    process.env.VITE_PHONE_CODE_LOGIN_ENABLED !== 'true',
+    'phone-code login is disabled for this build',
+  );
   const phoneNumber = `139${String(Date.now()).slice(-8)}`;
   await page.goto('/');
   /* 新首页：「我的」入口在底部 HomeTabBar（role=button + aria-label） */
