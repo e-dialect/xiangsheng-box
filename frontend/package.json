@@ -70,7 +70,7 @@
     "@dcloudio/uni-mp-xhs": "3.0.0-5030320261023001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-5030320261023001",
     "@dcloudio/uni-ui": "^1.4.24",
-    "@rollup/plugin-alias": "^6.0.0",
+    "@rollup/plugin-alias": "^6.0.1",
     "@tdesign/uniapp": "^1.0.0",
     "marked": "^18.1.1",
     "postcss": "^8.5.31",
