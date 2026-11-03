@@ -63,7 +63,8 @@ class AuthorizationTests(unittest.TestCase):
             self.assertIs(build['with']['push'], False)
             self.assertIs(build['with']['load'], True)
             if service == 'frontend':
-                self.assertEqual(build['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+                self.assertEqual(build['with']['build-args'].strip(),
+                                 'VITE_BACKEND_URL=\nVITE_PHONE_CODE_LOGIN_ENABLED=false')
             else:
                 self.assertNotIn('build-args', build['with'])
             self.assertNotIn('secrets', build['with'])
@@ -71,6 +72,7 @@ class AuthorizationTests(unittest.TestCase):
             ignored = (ROOT / context / '.dockerignore').read_text().splitlines()
             self.assertIn('.env*', ignored)
         self.assertIn('VITE_BACKEND_URL_RUNTIME_REPLACEMENT', (ROOT / 'frontend/Dockerfile').read_text())
+        self.assertIn('ARG VITE_PHONE_CODE_LOGIN_ENABLED=false', (ROOT / 'frontend/Dockerfile').read_text())
         cos_original = subprocess.check_output(['git', 'show', SHA + ':.github/workflows/deploy-cos.yml'], cwd=ROOT)
         self.assertEqual((ROOT / '.github/workflows/deploy-cos.yml').read_bytes(), cos_original)
         self.assertNotIn('TENCENT_CLOUD', (ROOT / '.github/workflows/release.yml').read_text())
@@ -78,7 +80,8 @@ class AuthorizationTests(unittest.TestCase):
     def test_ci_production_runtime_uses_the_same_compiled_frontend_contract(self):
         steps = CI['jobs']['docker']['steps']
         production = next(step for step in steps if step.get('name') == 'Build production frontend image')
-        self.assertEqual(production['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+        self.assertEqual(production['with']['build-args'].strip(),
+                         'VITE_BACKEND_URL=\nVITE_PHONE_CODE_LOGIN_ENABLED=false')
         self.assertEqual(production['with']['platforms'], 'linux/amd64')
         self.assertNotIn('push', production['with'])
         smoke = next(step for step in steps if step.get('name') == 'Check real production runtime without external services')
@@ -184,7 +187,10 @@ class ManifestTests(unittest.TestCase):
         result = self.create()
         self.assertEqual(result.returncode, 0, result.stderr)
         release = json.loads((self.directory / 'release-manifest.json').read_text())
-        self.assertEqual(release['build']['frontend'], {'VITE_BACKEND_URL': ''})
+        self.assertEqual(release['build']['frontend'], {
+            'VITE_BACKEND_URL': '',
+            'VITE_PHONE_CODE_LOGIN_ENABLED': 'false',
+        })
         self.assertEqual(release['recovery']['compatibility'], 'server-local-attestation-required')
         self.assertFalse(release['recovery']['rollbackSafe'])
         entries = []

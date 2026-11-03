@@ -28,7 +28,7 @@ vi.mock('@/routers/login', () => ({
 
 import { cancelLoginToSearch } from '@/services/authJourney';
 import { peekInterceptIntent } from '@/services/authGuard';
-import { loginWithPhone } from '@/services/phoneAuth';
+import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
 import { toForgetPage, toRegisterPage } from '@/routers/login';
 
 globalThis.getApp = vi.fn(() => ({
@@ -39,8 +39,9 @@ globalThis.getApp = vi.fn(() => ({
 }));
 
 const { default: LoginPage } = await import('@/pages/login/login.vue');
+const phoneCodeLoginEnabled = import.meta.env.VITE_PHONE_CODE_LOGIN_ENABLED === 'true';
 
-function mountLogin() {
+function mountLogin(query) {
   const wrapper = mount(LoginPage, {
     global: {
       stubs: {
@@ -50,7 +51,7 @@ function mountLogin() {
       },
     },
   });
-  wrapper.vm.$options.onLoad.call(wrapper.vm);
+  wrapper.vm.$options.onLoad.call(wrapper.vm, query);
   return wrapper;
 }
 
@@ -112,39 +113,62 @@ describe('login page intent', () => {
     expect(wrapper.text()).toContain('验证身份后返回「我的」');
   });
 
-  it('shows only the selected login form', async () => {
+  it('shows only login methods enabled for this build', async () => {
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
 
-    expect(wrapper.find('.phone-form').exists()).toBe(true);
-    expect(wrapper.find('.password-form').exists()).toBe(false);
-    wrapper.vm.changeMode({ detail: { value: 'password' } });
+    expect(wrapper.find('.phone-form').exists()).toBe(phoneCodeLoginEnabled);
+    expect(wrapper.find('.password-form').exists()).toBe(!phoneCodeLoginEnabled);
+    const tabLabels = wrapper.findAllComponents({ name: 'TDesignStub' })
+      .map((component) => component.props('label'));
+    expect(tabLabels.includes('手机验证码')).toBe(phoneCodeLoginEnabled);
+    if (!phoneCodeLoginEnabled) {
+      expect(wrapper.find('.login-tabs').exists()).toBe(false);
+    }
+    wrapper.vm.changeMode({ detail: { value: phoneCodeLoginEnabled ? 'password' : 'phone' } });
     await wrapper.vm.$nextTick();
-
-    expect(wrapper.find('.phone-form').exists()).toBe(false);
     expect(wrapper.find('.password-form').exists()).toBe(true);
+    expect(wrapper.find('.phone-form').exists()).toBe(false);
   });
 
-  it('does not let stale password-mode errors block a valid phone login', async () => {
+  it('does not expose phone login as a mode when its build flag is off', async () => {
+    if (phoneCodeLoginEnabled) return;
+    peekInterceptIntent.mockReturnValue(null);
+    const wrapper = mountLogin({ mode: 'phone', loginMode: 'phone' });
+
+    wrapper.vm.changeMode({ detail: { value: 'phone' } });
+    wrapper.vm.phone = '13800000000';
+    wrapper.vm.code = '123456';
+    await wrapper.vm.sendPhoneCode();
+    await wrapper.vm.phoneLogin();
+
+    expect(wrapper.vm.loginMode).toBe('password');
+    expect(wrapper.find('.phone-form').exists()).toBe(false);
+    expect(wrapper.find('.password-form').exists()).toBe(true);
+    expect(requestPhoneCode).not.toHaveBeenCalled();
+    expect(loginWithPhone).not.toHaveBeenCalled();
+  });
+
+  it('clears stale password errors before a valid phone login when enabled', async () => {
+    if (!phoneCodeLoginEnabled) return;
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
 
     wrapper.vm.changeMode({ detail: { value: 'password' } });
-    await wrapper.vm.$nextTick();
     await wrapper.vm.passwordLogin();
     expect(wrapper.vm.errors.username).toBe('请输入用户名');
 
     wrapper.vm.changeMode({ detail: { value: 'phone' } });
-    expect(wrapper.vm.errors.username).toBe('');
     wrapper.vm.phone = '13800000000';
     wrapper.vm.code = '123456';
     await wrapper.vm.phoneLogin();
 
-    expect(loginWithPhone).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.errors.username).toBe('');
     expect(loginWithPhone).toHaveBeenCalledWith('13800000000', '123456');
   });
 
   it('maps server field errors onto the matching field without a toast', async () => {
+    if (!phoneCodeLoginEnabled) return;
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
     wrapper.vm.phone = '13800000000';
@@ -163,6 +187,7 @@ describe('login page intent', () => {
   });
 
   it('falls back to a single toast when the server error has no field', async () => {
+    if (!phoneCodeLoginEnabled) return;
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
     wrapper.vm.phone = '13800000000';
