@@ -2,7 +2,7 @@
 
 11 月 5 日追加成员反馈优化，详见[反馈处理记录](UI_FEEDBACK_2026-11-05.md)。下文保留 11 月 3 日首轮实施记录。
 
-分支：`codex/ui-phase-one`。依据本次产品评审实施，尚未创建 PR。
+分支：`codex/ui-phase-one`。依据本次产品评审实施，代码整理与主线同步见[版本对齐记录](RELEASE_ALIGNMENT_2026-11-06.md)。
 
 ## 范围
 
@@ -27,7 +27,7 @@
 
 待人工验收：微信 iOS / Android 真机、麦克风系统授权、软键盘、长内容和装扮抽查，以及五名目标用户任务走查。
 
-## 本次验证记录
+## 本次验证记录（11 月 3 日原分支）
 
 - `npm run lint`：通过。
 - `npm run test:unit -- --reporter=dot`：82 个测试文件、553 项测试通过。
@@ -36,4 +36,4 @@
 - `git diff --check`：通过。
 - 五页浅暗主题与精选卡片共 12 张截图已复核，保存在 `output/ui-phase-one/`。
 
-截图示例：[首页](../output/ui-phase-one/listen-dark.png)、[录音](../output/ui-phase-one/record-light.png)、[词条](../output/ui-phase-one/entry-dark.png)。截图使用模拟数据，不代表生产内容。
+截图示例：[首页](assets/ui-phase-one/listen-dark.png)、[录音](assets/ui-phase-one/record-light.png)、[词条](assets/ui-phase-one/entry-dark.png)。截图使用模拟数据，不代表生产内容。
