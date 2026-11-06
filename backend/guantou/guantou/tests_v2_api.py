@@ -252,6 +252,69 @@ class EntryFirstApiTests(TestCase):
         self.assertNotIn("location", recording.metadata)
         self.assertNotIn("device_location", recording.metadata)
 
+    def test_submitted_draft_is_public_but_explicit_and_historical_private_stay_hidden(
+        self,
+    ):
+        payload = {
+            "audio_url": "https://example.test/submitted.mp3",
+            "usage_dialect_id": self.group.id,
+            "original_gloss": "公开初稿",
+        }
+        public = self.client.post("/recordings/", payload, format="json")
+        self.assertEqual(public.status_code, 201, public.data)
+        self.assertEqual(public.data["status"], Recording.Status.DRAFT)
+        self.assertTrue(public.data["visibility"])
+        private = self.client.post(
+            "/recordings/", {**payload, "visibility": False}, format="json"
+        )
+        self.assertEqual(private.status_code, 201, private.data)
+        historical = Recording.objects.create(
+            audio_url=payload["audio_url"],
+            usage_dialect=self.group,
+            recorder=self.owner,
+            original_gloss="历史私有录音",
+        )
+        viewer = APIClient()
+        viewer.force_authenticate(self.other)
+        listed = viewer.get("/recordings/")
+        self.assertIn(public.data["id"], {row["id"] for row in listed.data["results"]})
+        detail = viewer.get(f"/recordings/{public.data['id']}/")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.data["audio_url"], payload["audio_url"])
+        entry_id = (
+            Recording.objects.get(pk=public.data["id"]).entry_links.get().entry_id
+        )
+        linked = viewer.get("/recordings/", {"entry_id": entry_id})
+        self.assertEqual(
+            [row["id"] for row in linked.data["results"]], [public.data["id"]]
+        )
+        for recording_id in (private.data["id"], historical.id):
+            self.assertEqual(
+                viewer.get(f"/recordings/{recording_id}/").status_code, 404
+            )
+        self.other.is_staff = True
+        self.other.save(update_fields=["is_staff"])
+        rejected = viewer.post(
+            "/curation/actions/",
+            {
+                "action_type": "review",
+                "target_type": "recording",
+                "target_id": public.data["id"],
+                "reason": "授权待核实，暂时退回",
+                "changes": {"status": "rejected"},
+            },
+            format="json",
+        )
+        self.assertEqual(rejected.status_code, 201, rejected.data)
+        self.other.is_staff = False
+        self.other.save(update_fields=["is_staff"])
+        self.assertEqual(
+            viewer.get(f"/recordings/{public.data['id']}/").status_code, 404
+        )
+        self.assertEqual(
+            viewer.get("/recordings/", {"entry_id": entry_id}).data["results"], []
+        )
+
     def test_recording_can_link_mentions_and_competing_entries(self):
         primary, _ = self.make_entry("走", "行")
         mentioned, _ = self.make_entry("回家", "归")
