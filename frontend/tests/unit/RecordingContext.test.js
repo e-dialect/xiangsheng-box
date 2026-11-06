@@ -11,10 +11,20 @@ describe('recording context is explicit about known and missing facts', () => {
     expect(wrapper.text()).toContain(recording.rights_statement);
     expect(wrapper.text()).toContain('公开可见不表示已核对或获准引用');
   });
+  it.each([
+    ['published', '已公开'],
+    ['disputed', '有不同说法'],
+    ['rejected', '本次未采用'],
+    ['future_status', '状态待确认'],
+  ])('uses the shared status contract for %s', (status, label) => {
+    const wrapper = mount(RecordingContext, { props: { recording: { status, visibility: false } } });
+    expect(wrapper.text()).toContain(label);
+    expect(wrapper.text()).toContain('未公开');
+  });
   it('does not infer review or permission when fields are missing', () => {
     const wrapper = mount(RecordingContext, { props: { recording: {} } });
     expect(wrapper.text()).toContain('可见性未提供');
-    expect(wrapper.text()).toContain('整理状态未提供');
+    expect(wrapper.text()).toContain('状态待确认');
     expect(wrapper.text()).toContain('暂未补充引用授权说明');
     expect(wrapper.text()).not.toContain('审核通过');
   });
