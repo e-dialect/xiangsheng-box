@@ -38,45 +38,16 @@
           @click="goEntryDetail(entry.id)"
         />
       </view>
-      <view
-        v-if="!filters.keyword"
-        class="entry-search__suggestions"
-        aria-label="搜索辅助"
-      >
+      <view class="entry-search__scope">
         <BaseButton
           variant="ghost"
-          text="逛主题集盒"
-          @click="goCollections()"
+          size="small"
+          :text="`地区：${selectedDialectLabel}`"
+          @click="dialectPickerVisible = true"
         />
-        <text v-if="history.length">
-          最近查过
+        <text v-if="activeFilters">
+          已启用 {{ activeFilters }} 项筛选
         </text>
-        <BaseButton
-          v-for="term in history"
-          :key="term"
-          size="small"
-          variant="ghost"
-          :text="term"
-          @click="quickSearch(term)"
-        />
-        <BaseButton
-          v-if="history.length"
-          size="small"
-          variant="ghost"
-          text="清空历史"
-          @click="clearHistory"
-        />
-        <text v-if="popular.length">
-          大家在听
-        </text>
-        <BaseButton
-          v-for="entry in popular"
-          :key="entry.id"
-          size="small"
-          variant="ghost"
-          :text="entryTitle(entry)"
-          @click="goEntryDetail(entry.id)"
-        />
       </view>
       <DialectSelector
         v-model:visible="dialectPickerVisible"
@@ -134,6 +105,13 @@
         class="entry-search__state"
         data-search-state="empty"
       >
+        <BaseButton
+          v-if="activeFilters"
+          block
+          variant="ghost"
+          text="清空筛选，重新查找"
+          @click="resetAdvancedFilters"
+        />
         <EmptyState
           title="没有找到匹配词条"
           description="换一个写法、意思或读音再试；也可以先录下你听到的说法。"
@@ -176,10 +154,50 @@
           找到 {{ total }} 个独立词条
         </text>
         <text class="entry-results__summary-copy">
-          相同写法的不同意思会各自保留，点开后再看地区、读音和证据。
+          不同意思分别收录，点开可听对应地区的读音。
         </text>
       </view>
 
+      <view
+        v-if="!searched && !filters.keyword"
+        class="entry-search__suggestions"
+        aria-label="搜索辅助"
+      >
+        <BaseButton
+          variant="ghost"
+          text="逛主题集盒"
+          @click="goCollections()"
+        />
+        <text v-if="history.length">
+          最近查过
+        </text>
+        <BaseButton
+          v-for="term in history"
+          :key="term"
+          size="small"
+          variant="ghost"
+          :text="term"
+          @click="quickSearch(term)"
+        />
+        <BaseButton
+          v-if="history.length"
+          size="small"
+          variant="ghost"
+          text="清空历史"
+          @click="clearHistory"
+        />
+        <text v-if="popular.length">
+          大家在听
+        </text>
+        <BaseButton
+          v-for="entry in popular"
+          :key="entry.id"
+          size="small"
+          variant="ghost"
+          :text="entryTitle(entry)"
+          @click="goEntryDetail(entry.id)"
+        />
+      </view>
       <t-collapse
         v-model:value="openSections"
         class="entry-search__advanced"
@@ -341,7 +359,7 @@
               {{ dialectLabel(entry.usage_dialect) }}
             </text>
             <text class="entry-result__meta-item">
-              {{ entry.recording_count }} 段录音
+              {{ entry.recording_count > 0 ? `${entry.recording_count} 段录音可听` : '暂无录音' }}
             </text>
             <text
               v-if="entry.needs_audio"
@@ -878,5 +896,21 @@ export default {
   color: var(--accent-color);
   font-size: 23rpx;
   font-weight: 800;
+}
+.entry-search__scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted-color);
+  font-size: var(--font-size-xs);
+}
+.entry-result__summary {
+  font-size: var(--font-size-lg);
+  overflow-wrap: anywhere;
+}
+.entry-result:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 3px;
 }
 </style>

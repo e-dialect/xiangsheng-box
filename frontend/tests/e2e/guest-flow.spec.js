@@ -53,7 +53,7 @@ test('guest listens to the Recording stream, opens an Entry, and searches entrie
   await expect(page.getByText('巴适', { exact: true })).toBeVisible();
   await expect(page.getByText('表示安逸、舒服', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '听录音' }).click();
-  await expect(page.getByRole('button', { name: '停止' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '停止播放' })).toBeVisible();
 
   await page.getByRole('button', { name: '看词条' }).click();
   await expect(page).toHaveURL(/\/pages\/entries\/details\?id=21/);

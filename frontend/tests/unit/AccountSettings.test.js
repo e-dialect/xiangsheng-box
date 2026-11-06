@@ -222,7 +222,7 @@ describe('account UI tokens', () => {
     expect(source).toContain('录乡音');
     expect(source).toContain('录音与授权');
     expect(source).toContain('贡献履历');
-    expect(source).toContain('地区足迹');
+    expect(source).toContain('查看贡献履历');
     expect(source).not.toContain('作品');
     expect(source).not.toContain('短视频');
     expect(source).not.toContain('titleLabel');
@@ -676,8 +676,7 @@ describe('mine page logout', () => {
     const wrapper = mountForm(MePage);
     await flushPromises();
     wrapper.vm.recordingsCount = 3;
-    wrapper.vm.worksTab = 'recordings';
-    expect(wrapper.vm.worksPanelTitle).toBe('留下 3 段录音');
+    expect(wrapper.vm.contributionMetrics[0]).toEqual({ label: '录音', value: 3 });
   });
 
   it('keeps profile stats read-only and one contribution entry surface', async () => {
@@ -707,12 +706,10 @@ describe('mine page logout', () => {
     expect(wrapper.find('.tool-grid').exists()).toBe(false);
     expect(wrapper.text()).not.toContain('既有录音');
     expect(wrapper.text()).not.toContain('查看完整贡献履历');
-    expect(wrapper.get('[role="tablist"]').attributes('aria-label')).toBe('贡献类型');
-
-    const tabs = wrapper.findAll('[role="tab"]');
-    expect(tabs).toHaveLength(3);
-    await tabs[1].trigger('keydown', { key: 'Enter' });
-    expect(wrapper.vm.worksTab).toBe('entries');
+    expect(wrapper.find('[role="tablist"]').exists()).toBe(false);
+    expect(wrapper.vm.contributionMetrics).toEqual([
+      { label: '录音', value: 12 }, { label: '词条', value: 5 }, { label: '义项', value: 8 },
+    ]);
 
     const archiveCells = wrapper.get('.archive-menu').findAllComponents({ name: 'TCell' });
     expect(archiveCells).toHaveLength(4);

@@ -15,9 +15,6 @@
           <view class="dialect-selector__title">
             {{ title }}
           </view>
-          <view class="dialect-selector__hint">
-            不确定更细地点时，可以直接选择当前范围
-          </view>
         </view>
         <BaseButton
           size="small"
@@ -29,6 +26,7 @@
 
       <BaseField
         v-model="query"
+        class="dialect-selector__search"
         name="dialect_search"
         label="搜索地区或方言"
         clearable
@@ -40,7 +38,7 @@
         class="dialect-selector__shortcuts"
       >
         <view class="dialect-selector__section-label">
-          快速选择
+          默认与最近使用
         </view>
         <view class="dialect-selector__chips">
           <BaseButton
@@ -130,8 +128,16 @@
             class="dialect-selector__current"
           >
             <view>
-              <view class="dialect-selector__current-kicker">
-                当前已知范围
+              <view class="dialect-selector__level">
+                <BaseButton
+                  size="small"
+                  variant="ghost"
+                  text="返回上一级"
+                  @click="goToLevel(cursorPath.length - 2)"
+                />
+                <text class="dialect-selector__current-kicker">
+                  当前已知范围
+                </text>
               </view>
               <view class="dialect-selector__current-name">
                 {{ labelFor(currentNode) }}
@@ -140,11 +146,16 @@
                 {{ breadcrumbFor(currentNode) }}
               </view>
             </view>
-            <BaseButton
-              :variant="isSelected(currentNode) ? 'primary' : 'ghost'"
-              :text="isSelected(currentNode) ? '已选择这里' : '就选这里'"
-              @click="selectNode(currentNode)"
-            />
+            <view class="dialect-selector__confirm">
+              <text class="dialect-selector__hint">
+                不确定更细地点时，可以直接选择当前范围
+              </text>
+              <BaseButton
+                :variant="isSelected(currentNode) ? 'primary' : 'ghost'"
+                :text="isSelected(currentNode) ? '已选择这里' : '就选这里'"
+                @click="selectNode(currentNode)"
+              />
+            </view>
           </view>
 
           <view class="dialect-selector__section-label">
@@ -490,4 +501,27 @@ export default {
   padding: 46rpx 12rpx;
   text-align: center;
 }
+.dialect-selector__sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 88vh;
+}
+.dialect-selector__body {
+  flex: 1 1 auto;
+  min-height: 120rpx;
+  overflow-y: auto;
+}
+.dialect-selector__header { margin-bottom: var(--space-2); }
+.dialect-selector__shortcuts { padding: var(--space-2); margin-top: var(--space-2); }
+.dialect-selector__current { align-items: flex-start; flex-wrap: wrap; }
+.dialect-selector__current > view { min-width: 0; overflow-wrap: anywhere; }
+.dialect-selector__level {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.dialect-selector__confirm { display: grid; gap: var(--space-2); width: 100%; }
+.dialect-selector__confirm :deep(.base-button) { justify-self: end; }
 </style>

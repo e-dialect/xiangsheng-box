@@ -40,7 +40,7 @@
             主方言（必选）
           </view>
           <view class="field-hint">
-            列表来自真实方言树；选择最接近你日常乡音的节点。
+            选择你日常最常说的方言。
           </view>
           <view
             v-if="loadingDialects"
@@ -229,7 +229,7 @@ export default {
     },
     stepTitle() {
       if (this.step === 1) return this.isNewUser ? '先认识一下' : '确认你的昵称';
-      return '哪一种是你的乡音？';
+      return '选择主方言';
     },
     stepCopy() {
       if (this.step === 1) {
@@ -237,7 +237,7 @@ export default {
           ? '昵称和主方言会组成你的基础方言身份。'
           : '你的账号还没有主方言，补全后才能继续贡献。';
       }
-      return '主方言用于默认标注和后续个性化，不会限制你浏览其他方言。';
+      return '设置后仍可浏览和贡献其他方言。';
     },
     selectedDialect() {
       return this.dialects.find((dialect) => dialect.id === this.selectedDialectId) || null;
@@ -460,7 +460,7 @@ export default {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   margin-top: 24rpx;
 }
@@ -493,5 +493,12 @@ export default {
     var(--page-color) 36%,
     var(--surface-subtle-color) 100%
   );
+}
+.button-row > .base-button {
+  width: 100%;
+}
+.dialect-selection > view {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>
