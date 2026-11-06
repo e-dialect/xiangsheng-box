@@ -359,6 +359,7 @@ import {
 } from '@/services/entryRecording';
 import { uploadFile } from '@/services/file';
 import { confirm, notify, notifySuccess } from '@/services/feedback';
+import { contributionSuccessMessage } from '@/services/contributionStatus';
 import { listAllDialects } from '@/services/guantou';
 import { goRecordingDetail, goRecordingDrafts } from '@/services/navigation';
 import {
@@ -717,7 +718,7 @@ export default {
         });
         this.submitted = true;
         clearTimeout(this.draftTimer);
-        notifySuccess('乡音已公开为初稿，待核对');
+        notifySuccess(contributionSuccessMessage());
         if (this.draftId) {
           try { await deleteRecordingDraft(this.draftId, this.ownerScope); } catch (error) { notify({ title: '乡音已提交，请手动清理旧草稿' }); }
         }

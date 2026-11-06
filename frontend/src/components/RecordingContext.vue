@@ -23,6 +23,8 @@
 </template>
 
 <script>
+import { contributionStatus } from '@/services/contributionStatus';
+
 export default {
   name: 'RecordingContext',
   props: {
@@ -36,12 +38,11 @@ export default {
       return '可见性未提供';
     },
     statusLabel() {
-      return {
-        draft: this.recording.visibility === false ? '未公开初稿' : '初稿·待核对',
-        published: '记录状态：已公开',
-        disputed: '有分歧',
-        rejected: '不采用',
-      }[this.recording.status] || '整理状态未提供';
+      const status = contributionStatus('recording', this.recording.status);
+      if (this.recording.status === 'draft') {
+        return this.recording.visibility === false ? '未公开初稿' : `${status.label}·待核对`;
+      }
+      return status.label;
     },
     rightsText() {
       return String(this.recording.rights_statement || '').trim() || '暂未补充引用授权说明';
