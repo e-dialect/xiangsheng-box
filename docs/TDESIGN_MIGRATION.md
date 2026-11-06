@@ -1,5 +1,13 @@
 # TDesign UI migration tracker
 
+## 2026-11-05 · 成员反馈 UI 收敛
+
+沿用 `codex/ui-phase-one`，处理录音授权与状态一致性、原始大意标识、常驻草稿工具区、方言层级返回和账户贡献概览。具体反馈映射、回归与待确认数据依赖见[成员反馈迭代记录](UI_FEEDBACK_2026-11-05.md)。本轮未创建 PR，微信真机和线上证据核查仍待验收。
+
+## 2026-11-03 · 第一阶段核心 UI 迭代
+
+执行分支 `codex/ui-phase-one`，范围与验收见[第一阶段方案](UI_PHASE_ONE.md)。覆盖听首页、录音卡片、搜索、词条详情、录音表单和个人中心，沿用既有组件、API 与权限边界。新增 `ui-phase-one.spec.js` 检查浅暗主题、首屏播放、录音按钮尺寸、公开提交文案及跨视口溢出。PR / Issue 待创建后补链；微信真机与用户走查尚待人工验收。
+
 2026-10-17：阶段二新增词条来源/整理历史、范围缩小和动作详情，复用
 BaseForm/BaseField/BaseButton/BaseLoading/EmptyState/PageShell/DialectSelector 与
 feedback 确认层；范围和验证状态见
@@ -237,3 +245,7 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 ### 二次补缺：词条讨论与草稿生命周期
 
 关联 #405、#407。新增共享 DiscussionThread，词条与录音详情共用 BaseForm/BaseField/BaseButton、加载与错误反馈；词条讨论为独立内容区。草稿箱用 BaseLoading 展示实际音频状态检查，录音页沿用原表单和保存反馈，增加编辑与离页保存。
+
+## 2026-10-24：公开初稿标识
+
+依据 [H5 可见性核查](audits/2026-10-24-h5-recording-visibility.md)，录音卡片（含紧凑模式与详情复用）区分“初稿·待核对”和“未公开初稿”，普通提交成功提示说明已公开。沿用现有组件和样式，没有新增交互控件。回归覆盖见 RecordingDraftVisibility.test.js；本次未创建 PR。

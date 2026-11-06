@@ -29,61 +29,62 @@
       />
     </view>
 
-    <BaseButton
-      v-if="!audio.path || recording"
-      class="record-primary"
-      :disabled="!supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
-      variant="light"
-      shape="circle"
-      :aria-label="primaryLabel"
-      @click="handlePrimaryAction"
-    >
-      <view class="record-primary__content">
-        <text class="record-primary__icon">
-          {{ primaryIcon }}
-        </text>
-        <text class="record-primary__label">
-          {{ primaryLabel }}
-        </text>
+    <view class="record-controls">
+      <view class="record-actions">
+        <BaseButton
+          class="record-action"
+          variant="light"
+          size="small"
+          :disabled="!fileSelectionSupported || selectingFile"
+          @click="chooseFile"
+        >
+          {{ audio.path ? '选择其他录音' : '选择本地录音' }}
+        </BaseButton>
       </view>
-    </BaseButton>
-
-    <view
-      v-if="audio.path && !recording"
-      class="record-ready-actions"
-    >
       <BaseButton
-        class="record-ready-action record-ready-action--secondary"
-        variant="ghost"
-        size="large"
-        icon="refresh"
-        :disabled="selectingFile || (nativeBusy && !nativeStopFailed)"
-        block
-        @click="restartRecording"
-      >
-        {{ nativeStopFailed ? '重试停止' : '重新录制' }}
-      </BaseButton>
-      <BaseButton
-        class="record-ready-action record-ready-action--primary"
-        size="large"
-        :icon="playing ? 'pause-circle' : 'play-circle'"
-        block
-        @click="togglePlayback"
-      >
-        {{ playing ? '暂停播放' : '播放录音' }}
-      </BaseButton>
-    </view>
-
-    <view class="record-actions">
-      <BaseButton
-        class="record-action"
+        v-if="!audio.path || recording"
+        class="record-primary"
+        :disabled="!supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
         variant="light"
-        size="small"
-        :disabled="!fileSelectionSupported || selectingFile"
-        @click="chooseFile"
+        shape="circle"
+        :aria-label="primaryLabel"
+        @click="handlePrimaryAction"
       >
-        {{ audio.path ? '选择其他录音' : '选择已有录音' }}
+        <view class="record-primary__content">
+          <text class="record-primary__icon">
+            {{ primaryIcon }}
+          </text>
+          <text class="record-primary__label">
+            {{ primaryLabel }}
+          </text>
+        </view>
       </BaseButton>
+
+      <view
+        v-if="audio.path && !recording"
+        class="record-ready-actions"
+      >
+        <BaseButton
+          class="record-ready-action record-ready-action--secondary"
+          variant="ghost"
+          size="large"
+          icon="refresh"
+          :disabled="selectingFile || (nativeBusy && !nativeStopFailed)"
+          block
+          @click="restartRecording"
+        >
+          {{ nativeStopFailed ? '重试停止' : '重新录制' }}
+        </BaseButton>
+        <BaseButton
+          class="record-ready-action record-ready-action--primary"
+          size="large"
+          :icon="playing ? 'pause-circle' : 'play-circle'"
+          block
+          @click="togglePlayback"
+        >
+          {{ playing ? '暂停播放' : '播放录音' }}
+        </BaseButton>
+      </view>
     </view>
   </view>
 </template>
@@ -600,13 +601,17 @@ export default {
   animation-delay: 240ms;
 }
 
-.record-primary {
+.audio-capture :deep(.record-primary.t-button) {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   width: 184rpx;
+  min-width: 184rpx;
+  max-width: 184rpx;
   height: 184rpx;
+  min-height: 184rpx;
+  box-sizing: border-box;
   margin-top: var(--space-3);
   padding: 0;
   border: 12rpx solid var(--accent-subtle-color);
@@ -639,6 +644,7 @@ export default {
   margin-top: 14rpx;
   font-size: var(--font-size-xs);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .record-actions {
@@ -698,5 +704,40 @@ export default {
 @keyframes wave-pulse {
   from { transform: scaleY(0.55); }
   to { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-capture--recording .sound-wave__bar--active {
+    animation: none;
+  }
+}
+.record-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+.record-controls .record-actions {
+  margin: 0;
+  min-width: 0;
+}
+.record-controls .record-ready-actions {
+  grid-column: 1 / -1;
+}
+.audio-capture :deep(.record-action.t-button) {
+  white-space: normal;
+  height: auto;
+  min-height: 88rpx;
+}
+@media screen and (max-width: 360px) {
+  .record-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .record-controls .record-actions {
+    order: 2;
+    margin-top: var(--space-2);
+  }
 }
 </style>

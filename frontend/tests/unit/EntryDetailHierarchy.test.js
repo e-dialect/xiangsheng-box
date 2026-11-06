@@ -93,7 +93,7 @@ function mountPage() {
 }
 
 describe('entry detail information hierarchy', () => {
-  it('presents meaning, pronunciation, recordings, evidence, then actions', () => {
+  it('presents meaning, recordings, pronunciation, evidence, then actions', () => {
     const wrapper = mountPage();
     const sections = wrapper.findAll('[data-detail-section]').map(
       (section) => section.attributes('data-detail-section'),
@@ -101,8 +101,8 @@ describe('entry detail information hierarchy', () => {
 
     expect(sections).toEqual([
       'meaning',
-      'pronunciation',
       'recordings',
+      'pronunciation',
       'evidence',
       'actions',
     ]);

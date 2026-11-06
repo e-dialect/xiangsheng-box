@@ -19,12 +19,9 @@
           乡声集盒 · 听见一个地方
         </text>
         <text class="box-title">
-          {{ recording.original_gloss || '一段待整理的乡音' }}
+          录音详情
         </text>
         <text>{{ dialectLabel(recording.usage_dialect) }} · {{ recorderName }}</text>
-        <text class="box-note">
-          {{ recording.rights_statement || '录制者暂未补充引用授权说明' }}
-        </text>
       </view>
       <view class="box-panel">
         <EntryRecordingCard
@@ -54,7 +51,7 @@
       </view>
       <view class="box-panel">
         <text class="box-heading">
-          关联词条
+          关联词条与整理内容
         </text>
         <text
           v-if="!recording.entry_links?.length"

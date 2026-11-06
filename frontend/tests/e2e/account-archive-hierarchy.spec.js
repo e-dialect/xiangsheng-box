@@ -43,7 +43,7 @@ VIEWPORTS.forEach((viewport) => {
     await expect(page.locator('.tool-grid')).toHaveCount(0);
     await expect(page.getByText('既有录音', { exact: true })).toHaveCount(0);
     await expect(page.getByText('查看完整贡献履历', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '查看既有贡献' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: '查看贡献履历' })).toHaveCount(1);
 
     const archive = page.locator('.archive-menu');
     await expect(archive.locator('.t-cell')).toHaveCount(4);
@@ -76,10 +76,8 @@ test('account archive keeps keyboard tabs and both surviving destinations', asyn
   const runtimeIssues = observeRuntime(page);
   await openMemberAccount(page);
 
-  const entryTab = page.getByRole('tab', { name: /词条 5/ });
-  await entryTab.focus();
-  await page.keyboard.press('Enter');
-  await expect(entryTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tablist', { name: '贡献类型' })).toHaveCount(0);
+  await expect(page.locator('.contribution-stat')).toHaveCount(3);
 
   const bookmarks = page.getByRole('button', { name: '查看词条收藏' });
   await bookmarks.focus();

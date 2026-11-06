@@ -31,7 +31,7 @@ function shortWav() {
     await openVisualRoute(page, '/pages/recordings/create', { persona: 'member' });
     await page.locator('textarea:visible').first().fill('上传错误回归测试');
     const chooser = page.waitForEvent('filechooser');
-    await page.getByText('选择已有录音', { exact: true }).click();
+    await page.getByText('选择本地录音', { exact: true }).click();
     const firstChooser = await chooser;
     await expect(page.locator('.record-action')).toHaveAttribute('aria-disabled', 'true');
     await expect(page.locator('.record-primary')).toHaveAttribute('aria-disabled', 'true');
@@ -45,10 +45,10 @@ function shortWav() {
     await replacementChooser.setFiles({ name: 'replacement.wav', mimeType: 'audio/wav', buffer: shortWav() });
     await expect(page.locator('.record-action')).toHaveAttribute('aria-disabled', 'false');
     await expect(page.locator('.record-ready-action--secondary')).toHaveAttribute('aria-disabled', 'false');
-    await expect(page.getByText('三项必要信息已齐，可以保存')).toBeVisible();
+    await expect(page.getByText('三项必要信息已齐，可以提交')).toBeVisible();
     await expect(page.getByText('保存草稿', { exact: true })).toBeEnabled();
-    await page.getByText('保存这段乡音', { exact: true }).click();
-    const message = page.locator('.record-draft-actions [aria-live="polite"]');
+    await page.getByText('提交并公开', { exact: true }).click();
+    const message = page.locator('.record-draft-message');
     await expect(message).toContainText('提交失败：上传服务暂不可用，请稍后重试');
     await expect(message).toContainText('尚未加入个人贡献');
     await expect(message).toContainText('草稿已保存，可从草稿箱重试');
