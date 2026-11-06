@@ -1,6 +1,6 @@
 # 2026-11-06：核心 UI 与演示站版本对齐
 
-任务：[工作包 #559](https://github.com/e-dialect/xiangsheng-box/issues/559)。执行分支：`codex/ui-phase-one`。
+任务：[工作包 #559](https://github.com/e-dialect/xiangsheng-box/issues/559)；审查：[Draft PR #560](https://github.com/e-dialect/xiangsheng-box/pull/560)。执行分支：`codex/ui-phase-one`。
 
 ## 对齐结论
 
