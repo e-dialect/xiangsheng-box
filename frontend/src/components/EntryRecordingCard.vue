@@ -9,24 +9,6 @@
       aria-hidden="true"
     />
     <view
-      class="recording-card__author"
-    >
-      <AvatarFrame
-        :src="recording.recorder?.avatar || ''"
-        :name="recorderName"
-        :size="compact ? 36 : 48"
-      />
-      <text class="recording-card__author-name">
-        {{ recorderName }}
-      </text>
-      <text
-        v-if="compact"
-        class="recording-card__duration"
-      >
-        · {{ Math.round((recording.duration_ms || 0) / 1000) }} 秒
-      </text>
-    </view>
-    <view
       v-if="!compact"
       class="recording-card__meta"
     >
@@ -44,9 +26,17 @@
     >
       {{ title }}
     </view>
+    <text class="recording-card__gloss-label">
+      贡献者原始大意
+    </text>
     <view class="recording-card__gloss">
       {{ recording.original_gloss || '贡献者暂未补充大意' }}
     </view>
+
+    <RecordingContext
+      :recording="recording"
+      :expanded="!detailLink"
+    />
 
     <view
       v-if="pronunciationText && !compact"
@@ -57,23 +47,42 @@
 
     <view class="recording-card__actions">
       <BaseButton
-        v-if="detailLink"
-        size="small"
-        variant="ghost"
-        text="录音详情"
-        @click="goRecordingDetail(recording.id)"
-      />
-      <BaseButton
-        size="small"
-        :text="playing ? '停止' : '听录音'"
+        :size="compact ? 'small' : 'medium'"
+        :icon="playing ? 'stop-circle' : 'play-circle'"
+        :text="playing ? '停止播放' : '听录音'"
         @click="toggleAudio"
       />
+      <text
+        v-if="recording.duration_ms"
+        class="recording-card__duration"
+      >
+        {{ Math.round(recording.duration_ms / 1000) }} 秒
+      </text>
       <BaseButton
         v-if="entry && !compact"
         size="small"
         variant="ghost"
         text="看词条"
         @click="$emit('open-entry', entry.id)"
+      />
+    </view>
+    <view
+      class="recording-card__author"
+    >
+      <AvatarFrame
+        :src="recording.recorder?.avatar || ''"
+        :name="recorderName"
+        :size="32"
+      />
+      <text class="recording-card__author-name">
+        {{ recorderName }}
+      </text>
+      <BaseButton
+        v-if="detailLink"
+        size="small"
+        variant="ghost"
+        text="录音详情"
+        @click="goRecordingDetail(recording.id)"
       />
     </view>
 
@@ -102,6 +111,7 @@
 import { goRecordingDetail } from '@/services/navigation';
 import BaseButton from '@/components/BaseButton.vue';
 import AvatarFrame from '@/components/AvatarFrame.vue';
+import RecordingContext from '@/components/RecordingContext.vue';
 import {
   dialectLabel,
   entryTitle,
@@ -118,7 +128,7 @@ const TYPE_LABELS = {
 
 export default {
   name: 'EntryRecordingCard',
-  components: { AvatarFrame, BaseButton },
+  components: { AvatarFrame, BaseButton, RecordingContext },
   props: {
     recording: { type: Object, required: true },
     community: { type: Boolean, default: true },
@@ -229,6 +239,8 @@ export default {
 }
 
 .recording-card__author {
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 12rpx;
@@ -258,7 +270,8 @@ export default {
 }
 
 .recording-card__meta {
-  margin-top: 16rpx;
+  margin-top: 0;
+  flex-wrap: wrap;
   justify-content: space-between;
   color: var(--muted-color);
   font-size: 22rpx;
@@ -285,8 +298,8 @@ export default {
 .recording-card__gloss {
   margin-top: 12rpx;
   color: var(--text-secondary-color);
-  font-size: 28rpx;
-  line-height: 1.65;
+  font-size: var(--font-size-lg);
+  line-height: 1.6;
 }
 
 .recording-card__pronunciation {
@@ -296,7 +309,8 @@ export default {
 }
 
 .recording-card__actions {
-  margin-top: 24rpx;
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
 }
 
 .recording-card__community {
@@ -304,5 +318,35 @@ export default {
   padding-top: 18rpx;
   border-top: 1rpx solid var(--border-color);
   flex-wrap: wrap;
+}
+.recording-card__status {
+  display: inline-block;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle-color);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-xs);
+}
+.recording-card__duration {
+  color: var(--muted-color);
+  font-size: var(--font-size-sm);
+}
+.recording-card__actions :deep(.base-button) {
+  min-height: 88rpx;
+}
+.recording-card__community :deep(.base-button) {
+  white-space: normal;
+  height: auto;
+  min-height: 88rpx;
+}
+.recording-card__gloss {
+  overflow-wrap: anywhere;
+}
+.recording-card__gloss-label {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--muted-color);
+  font-size: var(--font-size-xs);
 }
 </style>

@@ -89,7 +89,13 @@ test('editing saves automatically before leaving the recording page', async ({ p
   await installVisualFixture(page, { persona: 'member', preserveStorage: true });
   await openVisualRoute(page, '/pages/recordings/create', { persona: 'member' });
   await page.locator('textarea').first().fill('没有点保存也留住了');
-  await expect(page.getByText('草稿已保存，可稍后继续', { exact: true }).first()).toBeVisible();
+  // Assert persistence before navigation: opening the draft box also flushes edits.
+  // Silent autosave deliberately has no persistent success message.
+  await expect.poll(() => page.evaluate(() => {
+    const drafts = JSON.parse(localStorage.getItem('recording_drafts:v2:user:7') || '[]');
+    return drafts.some((draft) => draft.form.original_gloss === '没有点保存也留住了');
+  })).toBe(true);
+  await expect(page.locator('.record-draft-message')).toHaveCount(0);
   await page.getByText('草稿箱', { exact: true }).click();
   await expect(page.getByText('没有点保存也留住了', { exact: true })).toBeVisible();
   await page.getByText('继续录制', { exact: true }).click();

@@ -19,14 +19,11 @@
         <text class="recording-feed__title">
           先听这一句
         </text>
-        <text class="recording-feed__copy">
-          听懂意思，再看词条，或录下你那边的说法。
-        </text>
       </view>
 
       <view
         v-if="tab === 'today' || tab === 'recommended'"
-        class="recording-feed__intro"
+        class="recording-feed__intro recording-feed__discovery"
       >
         <view class="box-actions">
           <BaseButton
@@ -297,7 +294,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 6rpx;
-  padding: 24rpx 30rpx 20rpx;
+  padding: var(--space-2) var(--space-3);
   color: var(--on-immersive-color);
 }
 
@@ -447,6 +444,7 @@ export default {
   font-size: 20rpx;
 }
 
+.recording-feed__opening :deep(.recording-card),
 .recording-feed__list :deep(.recording-card) {
   display: flex;
   flex-direction: column;
@@ -455,22 +453,19 @@ export default {
   backdrop-filter: blur(18rpx);
 }
 
+.recording-feed__opening :deep(.recording-card__title),
 .recording-feed__list :deep(.recording-card__title) {
-  order: 1;
   margin-top: 0;
   color: var(--on-immersive-color);
 }
 
-.recording-feed__list :deep(.recording-card__gloss) {
-  order: 2;
-}
-
+.recording-feed__opening :deep(.recording-card__meta),
 .recording-feed__list :deep(.recording-card__meta) {
-  order: 3;
   justify-content: flex-start;
   margin-top: 18rpx;
 }
 
+.recording-feed__opening :deep(.recording-card__dialect),
 .recording-feed__list :deep(.recording-card__dialect) {
   padding: 6rpx 14rpx;
   border-radius: var(--radius-pill);
@@ -479,31 +474,31 @@ export default {
   font-weight: 800;
 }
 
+.recording-feed__opening :deep(.recording-card__type),
 .recording-feed__list :deep(.recording-card__type),
+.recording-feed__opening :deep(.recording-card__gloss),
 .recording-feed__list :deep(.recording-card__gloss) {
   color: var(--on-immersive-muted-color);
 }
 
+.recording-feed__opening :deep(.recording-card__pronunciation),
 .recording-feed__list :deep(.recording-card__pronunciation) {
-  order: 4;
   color: var(--immersive-accent-color);
 }
 
-.recording-feed__list :deep(.recording-card__actions) {
-  order: 5;
-}
-
+.recording-feed__opening :deep(.recording-card__community),
 .recording-feed__list :deep(.recording-card__community) {
-  order: 6;
   border-color: var(--immersive-border-color);
 }
 
+.recording-feed__opening :deep(.recording-card .base-button),
 .recording-feed__list :deep(.base-button) {
   --td-brand-color: var(--immersive-accent-color);
   --td-brand-color-active: var(--immersive-wave-active-color);
   --td-text-color-anti: var(--immersive-bg-color);
 }
 
+.recording-feed__opening :deep(.recording-card .base-button--ghost),
 .recording-feed__list :deep(.base-button--ghost) {
   --td-bg-color-container: transparent;
   --td-bg-color-container-active: var(--immersive-surface-strong-color);
@@ -636,4 +631,31 @@ export default {
   }
 }
 /* #endif */
+.box-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.recording-feed__discovery {
+  padding-top: 0;
+}
+.recording-feed__discovery :deep(.recording-card) {
+  width: 100%;
+  box-sizing: border-box;
+}
+.recording-feed__opening :deep(.recording-card__author),
+.recording-feed__list :deep(.recording-card__author),
+.recording-feed__opening :deep(.recording-card__duration),
+.recording-feed__list :deep(.recording-card__duration) {
+  color: var(--on-immersive-muted-color);
+}
+.recording-feed :deep(.recording-context),
+.recording-feed :deep(.recording-card__gloss-label) {
+  color: var(--on-immersive-muted-color);
+  border-color: var(--immersive-border-color);
+}
+.recording-feed :deep(.recording-context__states text) {
+  color: var(--on-immersive-color);
+  background: var(--immersive-surface-strong-color);
+}
 </style>

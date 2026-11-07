@@ -46,7 +46,7 @@ async function routeRecordings(page, response) {
   });
 }
 
-test('normal listening view presents entry, evidence, then actions', async ({ page }) => {
+test('normal listening view presents region, entry, original gloss, context, then actions', async ({ page }) => {
   await routeCapabilities(page);
   await routeRecordings(page, {
     json: {
@@ -70,13 +70,17 @@ test('normal listening view presents entry, evidence, then actions', async ({ pa
     return {
       current: top('.recording-feed__list-heading'),
       entry: top('.recording-card__title'),
-      evidence: top('.recording-card__meta'),
+      region: top('.recording-card__meta'),
+      gloss: top('.recording-card__gloss'),
+      context: top('.recording-context'),
       actions: top('.recording-card__actions'),
     };
   });
-  expect(positions.current).toBeLessThan(positions.entry);
-  expect(positions.entry).toBeLessThan(positions.evidence);
-  expect(positions.evidence).toBeLessThan(positions.actions);
+  expect(positions.current).toBeLessThan(positions.region);
+  expect(positions.region).toBeLessThan(positions.entry);
+  expect(positions.entry).toBeLessThan(positions.gloss);
+  expect(positions.gloss).toBeLessThan(positions.context);
+  expect(positions.context).toBeLessThan(positions.actions);
 });
 
 test('empty and error states always provide a working next step', async ({ page }) => {

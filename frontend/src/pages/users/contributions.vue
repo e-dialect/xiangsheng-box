@@ -131,7 +131,7 @@
               v-if="event.kind === 'recording'"
               size="small"
               variant="ghost"
-              text="收听这段乡音"
+              text="查看录音详情"
               @click="goRecordingDetail(event.target_id)"
             />
           </view>

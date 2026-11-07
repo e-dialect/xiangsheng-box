@@ -4,41 +4,21 @@
     active="record"
   >
     <view class="record-page">
-      <view class="record-draft-actions">
-        <BaseButton
-          variant="ghost"
-          text="草稿箱"
-          @click="goRecordingDrafts"
-        />
-        <BaseButton
-          variant="ghost"
-          text="保存草稿"
-          :loading="savingDraft"
-          :disabled="submitting || savingDraft"
-          @click="saveDraft"
-        />
-        <text
-          v-if="draftMessage"
-          aria-live="polite"
-        >
-          {{ draftMessage }}
-        </text>
-      </view>
-      <view class="record-page__intro">
-        <view class="record-page__intro-meta">
-          <text class="record-page__eyebrow">
-            一分钟采集
-          </text>
-          <text class="record-page__progress-copy">
-            {{ requiredProgressLabel }}
-          </text>
+      <view class="record-tools">
+        <view class="record-draft-actions">
+          <BaseButton
+            variant="ghost"
+            text="草稿箱"
+            @click="goRecordingDrafts"
+          />
+          <BaseButton
+            variant="ghost"
+            text="保存草稿"
+            :loading="savingDraft"
+            :disabled="submitting || savingDraft || !capabilityAvailable"
+            @click="saveDraft"
+          />
         </view>
-        <text class="record-page__title">
-          会说，就能把乡音留下来
-        </text>
-        <text class="record-page__copy">
-          最低只需一段录音、使用地区和大意。不会写汉字、不会 IPA，都可以先留空。
-        </text>
         <view
           class="record-progress"
           role="list"
@@ -50,7 +30,6 @@
             class="record-progress__item"
             :class="{
               'record-progress__item--complete': step.complete,
-              'record-progress__item--current': step.current,
             }"
             role="listitem"
             :aria-label="`${step.label}：${step.stateLabel}`"
@@ -64,6 +43,16 @@
           </view>
         </view>
       </view>
+      <text class="record-page__copy">
+        不会写方言字或音标也可以，先录音、选地区、说大意。
+      </text>
+      <text
+        v-if="draftMessage"
+        class="record-draft-message"
+        aria-live="polite"
+      >
+        {{ draftMessage }}
+      </text>
 
       <view
         v-if="!capabilityAvailable"
@@ -93,7 +82,7 @@
                   录下这句乡音
                 </text>
                 <text class="record-section__caption">
-                  说一次你日常会用的词或短语
+                  说一个日常用的词或短句，最长 15 秒
                 </text>
               </view>
               <text
@@ -145,11 +134,16 @@
             </view>
             <t-cell
               title="使用地区"
+              role="button"
+              aria-label="选择使用地区"
+              tabindex="0"
               required
               :note="selectedDialectLabel"
               arrow
               hover
               @click="dialectPickerVisible = true"
+              @keydown.enter="dialectPickerVisible = true"
+              @keydown.space.prevent="dialectPickerVisible = true"
             />
             <view
               v-if="fieldErrors.usage_dialect_id"
@@ -206,7 +200,7 @@
         >
           <t-collapse-panel
             value="optional"
-            header="我还知道一些（可选）"
+            header="补充这段乡音的信息（选填）"
             header-right-content="写法、读音、已有词条、来源"
           >
             <view class="optional-fields">
@@ -305,10 +299,10 @@
 
         <view class="record-submit">
           <view class="record-submit__title">
-            先保存，再慢慢补全
+            提交前，请确认公开范围
           </view>
           <view class="record-submit__note">
-            提交后先成为可追溯初稿，写法和专业读音可以由你或整理员继续补充。
+            提交后将公开为初稿，其他用户可以收听，审核状态为待核对。写法和专业读音可以由你或整理员继续补充；保存草稿仅保留在当前设备的浏览器中。
           </view>
           <view
             class="record-submit__status"
@@ -320,10 +314,13 @@
             block
             size="large"
             :loading="submitting"
-            :disabled="submitting"
-            text="保存这段乡音"
+            :disabled="submitting || savingDraft"
+            text="提交并公开"
             @click="submit"
           />
+          <text class="record-section__help">
+            草稿仅保存在当前设备，不会公开。
+          </text>
         </view>
       </BaseForm>
 
@@ -362,6 +359,7 @@ import {
 } from '@/services/entryRecording';
 import { uploadFile } from '@/services/file';
 import { confirm, notify, notifySuccess } from '@/services/feedback';
+import { contributionSuccessMessage } from '@/services/contributionStatus';
 import { listAllDialects } from '@/services/guantou';
 import { goRecordingDetail, goRecordingDrafts } from '@/services/navigation';
 import {
@@ -444,7 +442,6 @@ export default {
         const current = index === currentIndex;
         let stateLabel = '待填写';
         if (step.complete) stateLabel = '已完成';
-        else if (current) stateLabel = '当前';
         return { ...step, current, stateLabel };
       });
     },
@@ -456,7 +453,7 @@ export default {
     },
     recordSubmitHint() {
       const remaining = 3 - this.completedRequiredSteps;
-      return remaining === 0 ? '三项必要信息已齐，可以保存' : `还差 ${remaining} 项必要信息`;
+      return remaining === 0 ? '三项必要信息已齐，可以提交' : `还差 ${remaining} 项必要信息`;
     },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
@@ -604,8 +601,10 @@ export default {
           this.savedDraftSignature = this.draftSignature();
         }
         if (draft.audioError) this.draftMessage = '仅文字已保存，音频保存失败，请保留本页重试';
-        else this.draftMessage = unchanged ? '草稿已保存，可稍后继续' : '上一版已保存，新修改仍待保存';
-        if (!silent || draft.audioError) notify({ title: this.draftMessage });
+        else this.draftMessage = unchanged ? '' : '上一版已保存，新修改仍待保存';
+        if (!silent || draft.audioError) {
+          notify({ title: this.draftMessage || '草稿已保存，可稍后继续' });
+        }
         return { restorable: unchanged && !draft.audioError, message: this.draftMessage };
       } catch (error) {
         if (error.persistedAudio && this.audio.path === audioPath) {
@@ -719,7 +718,7 @@ export default {
         });
         this.submitted = true;
         clearTimeout(this.draftTimer);
-        notifySuccess('乡音已保存为可追溯初稿');
+        notifySuccess(contributionSuccessMessage());
         if (this.draftId) {
           try { await deleteRecordingDraft(this.draftId, this.ownerScope); } catch (error) { notify({ title: '乡音已提交，请手动清理旧草稿' }); }
         }
@@ -761,10 +760,17 @@ export default {
 .record-page__intro,
 .record-submit,
 .entry-linker {
-  padding: 28rpx;
+  padding: var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--surface-color);
   border: 1rpx solid var(--border-color);
+}
+
+.record-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .record-page__intro {
@@ -790,7 +796,7 @@ export default {
 }
 
 .record-page__title {
-  font-size: 38rpx;
+  font-size: var(--font-size-xl);
   font-weight: 800;
   line-height: 1.35;
 }
@@ -1002,5 +1008,28 @@ export default {
 .entry-candidate__meta {
   margin-top: 8rpx;
   font-size: 23rpx;
+}
+.record-tools {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-color);
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.record-draft-actions {
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+}
+.record-draft-message {
+  color: var(--danger-color);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.record-page :deep(input),
+.record-page :deep(textarea),
+.record-page :deep(.field-error) {
+  scroll-margin-top: 180rpx;
 }
 </style>

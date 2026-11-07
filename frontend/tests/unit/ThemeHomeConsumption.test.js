@@ -56,7 +56,7 @@ describe('home theme consumers', () => {
     expect(wrapper.getComponent(AvatarFrame).props()).toMatchObject({
       src: '/avatar.png',
       name: '阿青',
-      size: 48,
+      size: 32,
     });
     expect(wrapper.get('.recording-card__dialect').text()).toBe('莆仙话');
     wrapper.unmount();
