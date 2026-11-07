@@ -57,3 +57,15 @@
 Not manually verified：当前线上容器版本、真实 A/B/C 账号的新提交/播放/整理闭环、微信 iOS/Android 真机、麦克风系统权限、实际软键盘、Parent Test、生产备份恢复以及 PostgreSQL 并发撤权。以上均不因本次源码对齐视为已完成。
 
 未纳入本 PR：工作区原有阶段汇报、演示手册和整个 `output/`（包含旧工作树、打包产物及本地验证材料），均原样保留。
+
+
+## 2026-11-07：收尾 H5 回归断言
+
+上轮 head `e14bd46` 的 [Linux CI](https://github.com/e-dialect/xiangsheng-box/actions/runs/42196108781) 中，后端、前端单元测试、H5/微信严格构建、Docker 隔离运行、Release safety 与提交格式均通过。全站 H5 为 274 项，272 通过、2 失败，汇总 gate 因此失败。
+
+两处失败均为旧 UI 断言未随本轮体验更新：
+
+- `listening-states.spec.js` 改为验证“当前录音 → 地区 → 词条 → 原始大意 → 状态/授权 → 操作”的完整顺序。
+- `restoration.spec.js` 不再依赖静默自动保存的常驻成功文字。在点击草稿箱前轮询浏览器存储，要求已经存在本次大意，再验证草稿箱与恢复表单。这样能区分定时自动保存和离页补存，保留持久化行为门禁。
+
+本轮仅修改这两份浏览器测试与本记录，不改产品源码、接口、依赖或构建规则。实际运行 `playwright test tests/e2e/listening-states.spec.js tests/e2e/restoration.spec.js --workers=1`：本机 Edge 12/12 通过；`git diff --check` 通过。日志为 `tmp/p0-resume-e2e.log`。最终远端结果以 [PR #560 Checks](https://github.com/e-dialect/xiangsheng-box/pull/560/checks) 为准；R2 人工验收及发布边界继续有效。
