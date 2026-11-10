@@ -188,9 +188,7 @@ jobs:
             find data/backend/logs -maxdepth 1 -type f -print -exec tail -n 200 {} \;
           fi
 
-  docker:
-    name: Docker
-    runs-on: ubuntu-latest
+1ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
