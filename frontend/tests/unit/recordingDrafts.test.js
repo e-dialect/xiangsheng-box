@@ -254,7 +254,7 @@ describe('historical owned can draft recovery', () => {
     const legacy = historicDraft();
     storeLegacy([legacy]);
     uni.removeStorageSync.mockImplementationOnce(() => { throw new Error('storage unavailable'); });
-    await expect(migrateLegacyRecordingDrafts()).rejects.toThrow('storage unavailable');
+    expect(await migrateLegacyRecordingDrafts()).toBe(1);
     await saveRecordingDraft({ id: legacy.id, form: { original_gloss: 'newer edit' } });
     const raw = storage.get('recording_drafts:v2:user:1');
     expect(await migrateLegacyRecordingDrafts()).toBe(0);
@@ -274,9 +274,12 @@ describe('historical owned can draft recovery', () => {
     storage.set('recording_drafts:v2:user:1', 'broken');
     expect(await migrateLegacyRecordingDrafts()).toBe(0);
     expect(storage.get('recording_drafts:v2:user:1')).toBe('broken');
-    storage.delete('recording_drafts:v2:user:1');
+    await saveRecordingDraft({ id: 'existing-v2', form: { original_gloss: 'existing' } });
+    const current = storage.get('recording_drafts:v2:user:1');
     uni.setStorageSync.mockImplementationOnce(() => { throw new Error('quota'); });
-    await expect(migrateLegacyRecordingDrafts()).rejects.toThrow('quota');
+    expect(await migrateLegacyRecordingDrafts()).toBe(0);
+    expect(storage.get('recording_drafts:v2:user:1')).toBe(current);
+    expect(listRecordingDrafts().map(({ id }) => id)).toEqual(['existing-v2']);
     expect(storage.get('can_drafts:user:1')).toBe(raw);
     expect(removeDraftAudio).not.toHaveBeenCalled();
   });

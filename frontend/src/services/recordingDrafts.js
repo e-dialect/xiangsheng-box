@@ -349,15 +349,12 @@ function mapLegacyDraft(draft, owner) {
 export async function migrateLegacyRecordingDrafts(owner = draftOwner()) {
   const legacyKey = `${LEGACY_PREFIX}${owner}`;
   let records;
-  try {
-    records = JSON.parse(uni.getStorageSync(legacyKey) || '[]');
-  } catch (error) { return 0; }
-  if (!Array.isArray(records) || !records.length) return 0;
-  const currentRaw = uni.getStorageSync(key(owner));
   let current;
   try {
-    current = JSON.parse(currentRaw || '[]');
+    records = JSON.parse(uni.getStorageSync(legacyKey) || '[]');
+    current = JSON.parse(uni.getStorageSync(key(owner)) || '[]');
   } catch (error) { return 0; }
+  if (!Array.isArray(records) || !records.length) return 0;
   // Do not overwrite a corrupt/foreign V2 index by treating it as an empty list.
   if (!Array.isArray(current)
     || current.some((item) => !isRecord(item) || item.owner !== owner)) return 0;
@@ -371,11 +368,17 @@ export async function migrateLegacyRecordingDrafts(owner = draftOwner()) {
     } else recovered.push(item);
   });
   if (!recovered.length) return 0;
-  // No await/audio mutation between snapshot and commit. A failure writing the V2
-  // index leaves legacy intact; failed cleanup leaves a duplicate, never lost data.
-  uni.setStorageSync(key(owner), JSON.stringify([...recovered, ...current]));
-  if (remaining.length) uni.setStorageSync(legacyKey, JSON.stringify(remaining));
-  else uni.removeStorageSync(legacyKey);
+  // Keep existing drafts accessible when automatic recovery cannot write.
+  try {
+    uni.setStorageSync(key(owner), JSON.stringify([...recovered, ...current]));
+  } catch (error) { return 0; }
+  try {
+    if (remaining.length) uni.setStorageSync(legacyKey, JSON.stringify(remaining));
+    else uni.removeStorageSync(legacyKey);
+  } catch (error) {
+    // Recovery has already been saved. A later attempt skips matching V2 IDs.
+    return recovered.length;
+  }
   return recovered.length;
 }
 
