@@ -96,6 +96,7 @@ export async function saveRecordingDraft({
 
   const item = {
     id: draftId,
+    ...(old?.legacySource ? { legacySource: old.legacySource } : {}),
     owner,
     schemaVersion: RECORDING_DRAFT_SCHEMA_VERSION,
     formatVersion: RECORDING_DRAFT_SCHEMA_VERSION,
@@ -229,48 +230,153 @@ export function listLegacyRecordingDrafts() {
   ));
 }
 
-function canMigrateLegacyDraft(draft) {
-  return Boolean(
-    draft.form
-    && typeof draft.form === 'object'
-    && draft.form.original_gloss
-    && draft.form.usage_dialect_id,
-  );
+function isRecord(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
 }
 
-/** Migrate only records whose field names already match the V2 recording schema. */
+function hasOnlyKeys(value, keys) {
+  return isRecord(value) && Object.keys(value).every((field) => keys.includes(field));
+}
+
+function emptyLegacyValue(value) {
+  return value === undefined || value === null || value === '' || value === 0;
+}
+
+// Reject conflicting aliases rather than silently choosing one user's text/region.
+function legacyAlias(values, valid, normalize = (value) => value) {
+  const present = values.filter((value) => !emptyLegacyValue(value));
+  if (!present.length || !present.every(valid)) return null;
+  const normalized = present.map(normalize);
+  return normalized.every((value) => value === normalized[0]) ? normalized[0] : null;
+}
+
+function isPositiveId(value) {
+  return ['string', 'number'].includes(typeof value)
+    && /^(?:[1-9][0-9]*)$/.test(String(value)) && Number.isSafeInteger(Number(value));
+}
+
+function mapLegacyDraft(draft, owner) {
+  if (!hasOnlyKeys(draft, [
+    'id', 'ownerScope', 'owner', 'mode', 'targetFlavor', 'dialectName', 'form', 'label',
+    'audio', 'reason', 'createdAt', 'updatedAt', 'entryId', 'recordingType',
+  ]) || typeof draft.id !== 'string' || !draft.id
+    || (draft.ownerScope && draft.ownerScope !== owner)
+    || (draft.owner && draft.owner !== owner)
+    || (draft.mode && draft.mode !== 'free')
+    || (draft.targetFlavor && (!hasOnlyKeys(draft.targetFlavor, ['id', 'name'])
+      || Object.values(draft.targetFlavor).some((value) => !emptyLegacyValue(value))))) return null;
+
+  const { form } = draft;
+  const label = draft.label || {};
+  if (!hasOnlyKeys(form, [
+    'concept_text', 'submitted_dialect_id', 'dialect', 'audio_url', 'source_note',
+    'duration_ms', 'county', 'town', 'original_gloss', 'usage_dialect_id',
+    'original_writing', 'original_pronunciation', 'citation', 'rights_statement', 'recording_type',
+  ]) || !hasOnlyKeys(label, [
+    'text_content', 'definition', 'pronunciation_text', 'package_type',
+    'evidence_level', 'source', 'source_citation',
+  ])) return null;
+
+  // Flavor links, evidence claims and old location text have no safe V2 equivalent.
+  if (['audio_url', 'source_note', 'county', 'town'].some((field) => !emptyLegacyValue(form[field]))
+    || !emptyLegacyValue(label.source_citation)
+    || (label.package_type && label.package_type !== 'uncertain')
+    || (label.evidence_level !== undefined && label.evidence_level !== 1)) return null;
+  if (label.source && (!hasOnlyKeys(label.source, ['type', 'title', 'attributed_to', 'locator', 'note'])
+    || (label.source.type && label.source.type !== 'creator')
+    || ['title', 'attributed_to', 'locator', 'note'].some((field) => !emptyLegacyValue(label.source[field])))) return null;
+
+  const text = (value) => typeof value === 'string';
+  const gloss = [form.original_gloss, form.concept_text, label.definition];
+  const originalGloss = legacyAlias(gloss, text);
+  const usageDialectId = legacyAlias(
+    [form.usage_dialect_id, form.submitted_dialect_id, form.dialect],
+    isPositiveId,
+    Number,
+  );
+  const writing = [form.original_writing, label.text_content];
+  const pronunciation = [form.original_pronunciation, label.pronunciation_text];
+  const originalWriting = legacyAlias(writing, text);
+  const originalPronunciation = legacyAlias(pronunciation, text);
+  if (!originalGloss?.trim() || !usageDialectId
+    || (writing.some((value) => !emptyLegacyValue(value)) && originalWriting === null)
+    || (pronunciation.some((value) => !emptyLegacyValue(value)) && originalPronunciation === null)
+    || ['citation', 'rights_statement'].some((field) => form[field] !== undefined && !text(form[field]))) return null;
+  const types = [draft.recordingType, form.recording_type];
+  const validType = (value) => ['word', 'phrase', 'example', 'other'].includes(value);
+  const recordingType = types.every(emptyLegacyValue) ? 'word' : legacyAlias(types, validType);
+  // Only explicitly V2-shaped records can already carry a V2 Entry reference.
+  const hasEntry = !emptyLegacyValue(draft.entryId);
+  if (!recordingType || (hasEntry && (!form.original_gloss
+    || !isPositiveId(form.usage_dialect_id) || !isPositiveId(draft.entryId)))) return null;
+
+  // Old IndexedDB uses guantou-can-drafts, NOT V2's database. Do not move temporary
+  // files or drop an unreadable reference. Native saved files can be reused as-is.
+  const { audio } = draft;
+  if (audio && (!hasOnlyKeys(audio, [
+    'path', 'name', 'durationMs', 'origin', 'mediaId', 'storage', 'persisted', 'available', 'invalid',
+  ]) || audio.storage !== 'saved-file' || audio.persisted !== true
+    || typeof audio.path !== 'string' || !audio.path)) return null;
+  if (!emptyLegacyValue(form.duration_ms) && form.duration_ms !== audio?.durationMs) return null;
+
+  return {
+    id: draft.id,
+    // Retain labels/provenance verbatim for later inspection; references only, no audio bytes.
+    legacySource: { key: `${LEGACY_PREFIX}${owner}`, record: draft },
+    owner,
+    schemaVersion: RECORDING_DRAFT_SCHEMA_VERSION,
+    formatVersion: RECORDING_DRAFT_SCHEMA_VERSION,
+    form: {
+      original_gloss: originalGloss,
+      usage_dialect_id: usageDialectId,
+      original_writing: originalWriting || '',
+      original_pronunciation: originalPronunciation || '',
+      citation: form.citation || '',
+      rights_statement: form.rights_statement || '',
+      recording_type: recordingType,
+    },
+    recordingType,
+    entryId: hasEntry ? Number(draft.entryId) : null,
+    audio: audio ? { ...audio } : null,
+    audioError: false,
+    audioInvalid: Boolean(audio?.invalid),
+    createdAt: draft.createdAt || draft.updatedAt || Date.now(),
+    updatedAt: draft.updatedAt || draft.createdAt || Date.now(),
+  };
+}
+
+/** Recover only unambiguous owned records; leave all other legacy bytes available. */
 export async function migrateLegacyRecordingDrafts(owner = draftOwner()) {
   const legacyKey = `${LEGACY_PREFIX}${owner}`;
-  const records = parseLegacy(uni.getStorageSync(legacyKey));
-  if (!records.length) return 0;
+  let records;
+  try {
+    records = JSON.parse(uni.getStorageSync(legacyKey) || '[]');
+  } catch (error) { return 0; }
+  if (!Array.isArray(records) || !records.length) return 0;
+  const currentRaw = uni.getStorageSync(key(owner));
+  let current;
+  try {
+    current = JSON.parse(currentRaw || '[]');
+  } catch (error) { return 0; }
+  // Do not overwrite a corrupt/foreign V2 index by treating it as an empty list.
+  if (!Array.isArray(current)
+    || current.some((item) => !isRecord(item) || item.owner !== owner)) return 0;
   const remaining = [];
-  let migrated = 0;
-  const outcomes = [];
-  await records.reduce((chain, draft) => chain.then(async () => {
-    if (!canMigrateLegacyDraft(draft)) {
-      outcomes.push({ draft, migrated: false });
-      return;
-    }
-    try {
-      await saveRecordingDraft({
-        id: draft.id,
-        form: draft.form,
-        audio: draft.audio,
-        entryId: draft.entryId,
-        recordingType: draft.recordingType,
-      }, owner);
-      outcomes.push({ draft, migrated: true });
-    } catch (error) {
-      outcomes.push({ draft, migrated: false });
-    }
-  }), Promise.resolve());
-  outcomes.forEach((outcome) => {
-    if (outcome.migrated) migrated += 1;
-    else remaining.push(outcome.draft);
+  const recovered = [];
+  records.forEach((draft) => {
+    const item = mapLegacyDraft(draft, owner);
+    if (!item || current.length + recovered.length >= MAX_RECORDING_DRAFTS
+      || [...current, ...recovered].some((existing) => existing.id === item.id)) {
+      remaining.push(draft);
+    } else recovered.push(item);
   });
+  if (!recovered.length) return 0;
+  // No await/audio mutation between snapshot and commit. A failure writing the V2
+  // index leaves legacy intact; failed cleanup leaves a duplicate, never lost data.
+  uni.setStorageSync(key(owner), JSON.stringify([...recovered, ...current]));
   if (remaining.length) uni.setStorageSync(legacyKey, JSON.stringify(remaining));
   else uni.removeStorageSync(legacyKey);
-  return migrated;
+  return recovered.length;
 }
 
 export function discardLegacyRecordingDrafts({
