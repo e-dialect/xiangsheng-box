@@ -97,7 +97,7 @@
             class="code-button"
             variant="ghost"
             size="medium"
-            :disabled="isSending"
+            :disabled="Boolean(codeRequest)"
             @click="getCode"
           >
             {{ sendCodeMsg }}
@@ -137,16 +137,18 @@ import BaseField from '@/components/BaseField.vue';
 import { normalLogin } from '@/services/login';
 import { registerUser } from '@/services/user';
 import { sendEmailCode } from '@/services/verification';
+import { notify, notifySuccess } from '@/services/feedback';
 import { applyFieldErrors, readableErrorMessage } from '@/utils/apiError';
+import getCodeMixin from './mixin/getCodeMixin';
 
 const EMAIL_PATTERN = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-const SEND_COUNTDOWN = 30;
 
 export default {
   name: 'RegisterPage',
   components: {
     AuthJourney, PageShell, BaseButton, BaseField, TButton,
   },
+  mixins: [getCodeMixin],
   data() {
     return {
       username: '',
@@ -156,8 +158,6 @@ export default {
       code: '',
       formStep: 1,
       submitting: false,
-      isSending: false,
-      count: SEND_COUNTDOWN,
       errors: {
         username: '',
         password: '',
@@ -178,22 +178,8 @@ export default {
     journeyStepLabel() {
       return this.formStep === 1 ? '设置账号' : '验证邮箱';
     },
-    sendCodeMsg() {
-      return !this.isSending ? '获取验证码' : `重新获取(${this.count})`;
-    },
-  },
-  watch: {
-    isSending(value) {
-      if (value) {
-        const timer = setInterval(() => {
-          this.count -= 1;
-          if (this.count <= 0) {
-            this.isSending = false;
-            this.count = SEND_COUNTDOWN;
-            clearInterval(timer);
-          }
-        }, 1000);
-      }
+    codeDestination() {
+      return this.formStep === 2 ? this.email.trim().toLowerCase() : '';
     },
   },
   methods: {
@@ -232,18 +218,15 @@ export default {
         return;
       }
       this.errors.email = '';
-      try {
-        await sendEmailCode(email, 'register');
-        uni.showToast({ title: '验证码已发送', icon: 'success' });
-        this.isSending = true;
-      } catch (error) {
-        if (!applyFieldErrors(this.errors, error, ['email'])) {
-          uni.showToast({
-            title: readableErrorMessage(error) || '验证码发送失败',
-            icon: 'none',
-          });
-        }
-      }
+      await this.sendVerificationCode(
+        () => sendEmailCode(email, 'register', true),
+        () => notifySuccess('验证码已发送'),
+        (error) => {
+          if (!applyFieldErrors(this.errors, error, ['email'])) {
+            notify({ title: readableErrorMessage(error) || '验证码发送失败' });
+          }
+        },
+      );
     },
     async register() {
       const username = String(this.username || '').trim();
