@@ -1,5 +1,5 @@
 import {
-  describe, expect, it, vi,
+  beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
 vi.mock('@/services/feedback', () => ({
@@ -21,6 +21,7 @@ function pageContext(audio = {}, fields = {}) {
 }
 
 describe('first missing recording step', () => {
+  beforeEach(() => vi.clearAllMocks());
   it.each([
     [{}, {}, 'record-required-audio', '请先录音或选择一段音频'],
     [{ path: 'blob:expired', invalid: true }, { usage_dialect_id: 2, original_gloss: '已有大意' }, 'record-required-audio', '请先录音或选择一段音频'],
@@ -30,7 +31,16 @@ describe('first missing recording step', () => {
     const page = pageContext(audio, fields);
     expect(await page.validateForm()).toBe(false);
     expect(page.validationTarget).toBe(target);
-    expect(notify).toHaveBeenLastCalledWith({ title: message, icon: 'none' });
+    expect(Object.values(page.fieldErrors)[0]).toBe(message);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('keeps a generic notice for an unexpected base-form validation failure', async () => {
+    const page = pageContext({ path: 'blob:audio' }, { usage_dialect_id: 2, original_gloss: '大意' });
+    page.$refs.form.validate.mockResolvedValue(false);
+    expect(await page.validateForm()).toBe(false);
+    expect(notify).toHaveBeenCalledWith({ title: '请检查填写内容', icon: 'none' });
+    expect(page.validationTarget).toBe('');
   });
 
   it('repeats navigation to the same missing section on another submit', async () => {

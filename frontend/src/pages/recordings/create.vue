@@ -118,6 +118,7 @@
             <view
               v-if="fieldErrors.audio_url"
               class="field-error"
+              role="alert"
             >
               {{ fieldErrors.audio_url }}
             </view>
@@ -158,6 +159,7 @@
             <view
               v-if="fieldErrors.usage_dialect_id"
               class="field-error"
+              role="alert"
             >
               {{ fieldErrors.usage_dialect_id }}
             </view>
@@ -198,9 +200,15 @@
               required
               :maxlength="300"
               placeholder="例如：表示害怕的意思；看到危险时会说"
-              :error="fieldErrors.original_gloss"
               @change="clearFieldError('original_gloss')"
             />
+            <view
+              v-if="fieldErrors.original_gloss"
+              class="field-error"
+              role="alert"
+            >
+              {{ fieldErrors.original_gloss }}
+            </view>
           </view>
         </view>
 
@@ -697,7 +705,7 @@ export default {
           usage_dialect_id: 'record-required-dialect',
           original_gloss: 'record-required-gloss',
         };
-        notify({ title: errors[firstMissing] || '请检查填写内容', icon: 'none' });
+        if (!targets[firstMissing]) notify({ title: '请检查填写内容', icon: 'none' });
         // Clear first so repeated submissions can revisit the same missing step.
         this.validationTarget = '';
         await this.$nextTick();
