@@ -491,8 +491,13 @@ export default {
         if (!this.audio.path) this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
         if (draft.entryId) await this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
-    } else if (options.entry_id) await this.loadEntry(options.entry_id);
-    else {
+    } else if (options.entry_id) {
+      const matchingDraft = listRecordingDrafts(this.ownerScope)
+        .filter((draft) => String(draft.entryId) === String(options.entry_id))
+        .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0))[0];
+      if (matchingDraft) await this.restoreDraft(matchingDraft.id);
+      else await this.loadEntry(options.entry_id);
+    } else {
       const [latestDraft] = listRecordingDrafts(this.ownerScope)
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
       if (latestDraft) {
@@ -612,7 +617,7 @@ export default {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
         this.draftMessage = error.message;
-        notify({ title: error.message });
+        if (!silent) notify({ title: error.message });
         return { restorable: false, message: this.draftMessage };
       } finally { this.savingDraft = false; }
     },
@@ -986,9 +991,16 @@ export default {
 
 .selected-entry {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 18rpx;
+}
+
+.selected-entry > view {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entry-candidate {
