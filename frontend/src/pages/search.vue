@@ -178,6 +178,16 @@
         <text class="entry-results__summary-copy">
           相同写法的不同意思会各自保留，点开后再看地区、读音和证据。
         </text>
+        <!-- #ifdef H5 -->
+        <BaseButton
+          v-if="submittedKeyword && !loading"
+          class="entry-results__share"
+          size="small"
+          variant="ghost"
+          text="复制关键词链接"
+          @click="copyKeywordLink"
+        />
+        <!-- #endif -->
       </view>
 
       <t-collapse
@@ -396,8 +406,9 @@ import {
 } from '@/services/entrySearchAssist';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord,
+  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
 } from '@/services/navigation';
+import { setClipboard } from '@/utils/clipboard';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
@@ -590,6 +601,14 @@ export default {
   },
   methods: {
     goCollections,
+    copyKeywordLink() {
+      if (!this.submittedKeyword || this.loading) return;
+      // #ifdef H5
+      const mount = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      setClipboard(`${window.location.origin}${mount}${path}`);
+      // #endif
+    },
     clearHistory() { clearSearchHistory(); this.history = []; },
     dialectLabel,
     entryTitle,
@@ -786,6 +805,10 @@ export default {
 
 .entry-results__summary-title {
   font-size: 30rpx;
+}
+
+.entry-results__share {
+  justify-self: start;
 }
 
 .entry-search__bar,
