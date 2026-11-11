@@ -497,6 +497,7 @@ export default {
   order: 5;
 }
 
+.recording-feed__opening :deep(.recording-card__playback-message),
 .recording-feed__list :deep(.recording-card__playback-message) {
   color: var(--on-immersive-color);
 }
