@@ -25,7 +25,16 @@
           {{ entryTitle(entry) }}
         </view>
         <view class="entry-hero__summary">
-          {{ entry.summary || '大意待补充' }}
+          <view>{{ entry.summary || '大意待补充' }}</view>
+          <BaseButton
+            v-if="shareMessage"
+            class="entry-hero__share"
+            size="small"
+            variant="ghost"
+            :open-type="shareType"
+            :text="shareType ? '分享词条' : '复制词条链接'"
+            @click="shareEntry"
+          />
         </view>
         <view
           v-if="entry.senses?.length"
@@ -307,6 +316,9 @@ import { notifySuccess } from '@/services/feedback';
 import { goRecord, openPage, ROUTES } from '@/services/navigation';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
+import {
+  copyContentShareLink, defaultContentShareMessage, entryShareMessage,
+} from '@/services/contentShare';
 
 export default {
   components: {
@@ -331,6 +343,14 @@ export default {
       attestedDialects: new Set(),
     };
   },
+  computed: {
+    shareType() {
+      return typeof window === 'undefined' ? 'share' : '';
+    },
+    shareMessage() {
+      return !this.loading && !this.errorMessage ? entryShareMessage(this.entry) : null;
+    },
+  },
   onLoad(options = {}) {
     this.id = Number(options.id) || null;
     this.anchorCommentId = Number(options.comment) || null;
@@ -340,8 +360,17 @@ export default {
   onShow() {
     if (this.id && this.entry) this.load();
   },
+  onShareAppMessage() {
+    return this.shareMessage || defaultContentShareMessage();
+  },
+  onShareTimeline() {
+    return this.shareMessage || defaultContentShareMessage();
+  },
   methods: {
     entryTitle,
+    shareEntry() {
+      copyContentShareLink(this.shareMessage, '词条链接已复制');
+    },
     openReview() {
       openPage(ROUTES.entryReview, { entry_id: this.id });
     },
@@ -424,8 +453,19 @@ export default {
 .entry-detail,
 .recording-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24rpx;
 }
+
+.entry-detail {
+  overflow-wrap: anywhere;
+}
+
+/* #ifdef H5 */
+.recording-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+}
+/* #endif */
 
 .entry-hero,
 .detail-section,
@@ -480,6 +520,10 @@ export default {
   color: var(--text-secondary-color);
   font-size: 30rpx;
   line-height: 1.65;
+}
+
+.entry-hero__share {
+  margin-top: 16rpx;
 }
 
 .meaning-block,

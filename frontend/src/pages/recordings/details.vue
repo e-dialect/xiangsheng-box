@@ -42,10 +42,10 @@
             @click="toggleLike"
           />
           <BaseButton
-            v-if="recording.visibility"
+            v-if="shareMessage"
             variant="ghost"
             :open-type="shareType"
-            text="分享乡音"
+            :text="shareType ? '分享乡音' : '复制乡音链接'"
             @click="share"
           />
         </view>
@@ -93,10 +93,13 @@ import {
   likeRecording,
 } from '@/services/recordingSocial';
 import {
-  goEntryDetail, goRecord, ROUTES, pageUrl,
+  goEntryDetail, goRecord,
 } from '@/services/navigation';
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
+import {
+  copyContentShareLink, defaultContentShareMessage, recordingShareMessage,
+} from '@/services/contentShare';
 
 export default {
   components: {
@@ -125,6 +128,9 @@ export default {
     shareType() {
       return typeof window === 'undefined' ? 'share' : '';
     },
+    shareMessage() {
+      return !this.loading && !this.error ? recordingShareMessage(this.recording) : null;
+    },
   },
   onLoad(options = {}) {
     this.id = options.id;
@@ -135,10 +141,10 @@ export default {
     this.load();
   },
   onShareAppMessage() {
-    return this.shareMessage();
+    return this.shareMessage || defaultContentShareMessage();
   },
   onShareTimeline() {
-    return this.shareMessage();
+    return this.shareMessage || defaultContentShareMessage();
   },
   methods: {
     entryTitle,
@@ -186,38 +192,8 @@ export default {
         this.busy = false;
       }
     },
-    shareMessage() {
-      if (!this.recording?.visibility) {
-        return {
-          title: '乡声集盒',
-          path: ROUTES.home,
-        };
-      }
-      return {
-        title: `乡声集盒 · ${this.recording.original_gloss}`,
-        path: pageUrl(ROUTES.recordingDetail, {
-          id: this.id,
-        }),
-        query: `id=${this.id}`,
-      };
-    },
     share() {
-      // #ifdef H5
-      if (typeof window === 'undefined') return;
-      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-      const url = `${window.location.origin}${base}${pageUrl(ROUTES.recordingDetail, {
-        id: this.id,
-      })}`;
-      uni.setClipboardData({
-        data: url,
-        success: () => notify({
-          title: '乡音链接已复制',
-        }),
-        fail: () => notify({
-          title: '复制失败，请重试',
-        }),
-      });
-      // #endif
+      copyContentShareLink(this.shareMessage, '乡音链接已复制');
     },
   },
 };
