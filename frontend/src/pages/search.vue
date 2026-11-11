@@ -712,7 +712,10 @@ export default {
 <style scoped>
 .entry-search {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 24rpx;
+  overflow-wrap: anywhere;
 }
 
 .entry-search__prompt,
@@ -767,7 +770,29 @@ export default {
 }
 
 .entry-search__suggestions {
+  min-width: 0;
   margin-top: 6rpx;
+}
+
+.entry-search :deep(.base-button) {
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 44px;
+  padding-block: 8px;
+  box-sizing: border-box;
+  white-space: normal;
+}
+
+.entry-search :deep(.t-button__content) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.entry-search :deep(.t-cell__note) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entry-search__state {
@@ -792,7 +817,31 @@ export default {
 .filter-stack,
 .entry-results {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 18rpx;
+}
+
+/* Keep ranked results in reading order; use available width for search controls. */
+@media (min-width: 600px) {
+  .entry-search__bar {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 160px);
+    align-items: end;
+  }
+
+  .entry-search__bar > :deep(.base-button) {
+    margin-bottom: var(--space-2);
+  }
+}
+
+@media (min-width: 768px) {
+  .filter-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-stack > :not(.base-field) {
+    grid-column: 1 / -1;
+  }
 }
 
 .filter-stack__summary {
@@ -827,6 +876,7 @@ export default {
 }
 
 .entry-result__title {
+  min-width: 0;
   font-size: 36rpx;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -856,6 +906,9 @@ export default {
 }
 
 .entry-result__meta-item {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 6rpx 12rpx;
   border-radius: var(--radius-pill);
   background: var(--surface-subtle-color);
