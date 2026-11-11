@@ -130,6 +130,7 @@ import {
   goUserInformation,
 } from '@/services/navigation';
 import { notify, notifySuccess } from '@/services/feedback';
+import * as themeCenter from '@/services/themeCenter';
 import { bindingWechat, cancelBindingWechat, clearUserInfo, changeUserInfo, getUserInfo } from '@/services/user';
 import request from '@/utils/request';
 import confirmDialog from '@/components/ConfirmDialog';
@@ -240,7 +241,7 @@ describe('account UI tokens', () => {
     expect(mine).toContain('收藏');
     expect(mine).toContain('词条收藏');
     expect(mine).toContain('关注的方言');
-    expect(mine).toContain('个人资料、隐私与安全');
+    expect(mine).toContain('AccountSettingsMenu');
     expect(mine).toContain('申请成为整理员');
     expect(mine).toContain('管理与审核');
     expect(mine).toContain('主题中心');
@@ -526,6 +527,20 @@ describe('mine page logout', () => {
     };
   });
 
+  it('refreshes the current theme summary when returning to the account page', async () => {
+    const wrapper = mountForm(MePage);
+    await flushPromises();
+    const activeTheme = vi.spyOn(themeCenter, 'getActiveTheme').mockReturnValue({ name: '夜色' });
+    try {
+      wrapper.vm.$options.onShow.call(wrapper.vm);
+      await flushPromises();
+      const theme = wrapper.get('.account-settings').findAllComponents({ name: 'TCell' })[0];
+      expect(theme.props('description')).toBe('当前主题：夜色');
+    } finally {
+      activeTheme.mockRestore();
+    }
+  });
+
   it('uses three TDesign cells for the guest destinations', async () => {
     app.globalData.id = null;
     globalThis.uni.getStorageSync = vi.fn(() => '');
@@ -610,7 +625,7 @@ describe('mine page logout', () => {
     await flushPromises();
     expect(wrapper.vm.canUseWechatAuth).toBe(false);
     expect(wrapper.vm.showWechatMenu).toBe(false);
-    expect(wrapper.text()).not.toContain('点此授权');
+    expect(wrapper.get('.account-settings').text()).not.toContain('绑定微信');
     expect(bindingWechat).not.toHaveBeenCalled();
   });
 
@@ -625,6 +640,19 @@ describe('mine page logout', () => {
     }));
     expect(bindingWechat).toHaveBeenCalledWith(7, false);
     expect(goUserInformation).toHaveBeenCalled();
+  });
+
+  it('disables the WeChat action while the binding request is in progress', async () => {
+    const wrapper = mountForm(MePage);
+    await flushPromises();
+    await wrapper.setData({ canUseWechatAuth: true, isBinding: true });
+    const action = wrapper.get('.account-settings').findAllComponents({ name: 'BaseButton' })
+      .find((button) => button.props('text') === '绑定微信');
+
+    expect(action.props()).toMatchObject({ disabled: true, loading: true });
+    await action.trigger('click');
+    expect(bindingWechat).not.toHaveBeenCalled();
+    expect(confirmDialog).not.toHaveBeenCalled();
   });
 
   it('lets H5 unbind an already bound WeChat account', async () => {
