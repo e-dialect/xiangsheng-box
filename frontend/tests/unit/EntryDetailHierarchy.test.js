@@ -51,6 +51,7 @@ const entry = {
     id: 1,
     sense_number: 1,
     gloss: '走路',
+    examples: [{ content: '本义项的原文例句', explain: '本义项的原文解释', type: '例' }],
     concepts: [],
   }],
   writings: [{ id: 2, writing: { text: '行', form_type: 'orthographic' } }],
@@ -108,6 +109,8 @@ describe('entry detail information hierarchy', () => {
   it('keeps identity evidence and contribution actions out of the hero', () => {
     const wrapper = mountPage();
 
+    expect(wrapper.find('[data-detail-section="meaning"]').text()).toContain('本义项的原文例句');
+    expect(wrapper.find('[data-detail-section="meaning"]').text()).toContain('本义项的原文解释');
     expect(wrapper.find('[data-detail-section="meaning"]').text()).not.toContain('辨识说明');
     expect(wrapper.find('[data-detail-section="evidence"]').text()).toContain('辨识说明');
     expect(wrapper.find('[data-detail-section="evidence"]').text()).toContain('已整理');
