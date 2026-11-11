@@ -92,6 +92,7 @@ class RuntimeCleanupTests(unittest.TestCase):
                 self.assertFalse(cleaned)
                 self.assertEqual(failures, [{
                     'service': 'backend', 'stage': stage, 'errorType': 'SmokeFailure',
+                    'reason': 'unexpected-error',
                 }])
                 self.assertNotIn('private-', json.dumps(failures))
 
@@ -116,6 +117,20 @@ class RuntimeCleanupTests(unittest.TestCase):
         cleaned, failures = self.cleanup(docker)
         self.assertFalse(cleaned)
         self.assertEqual(failures[0]['stage'], 'inspect-after-removal')
+        self.assertEqual(failures[0]['reason'], 'container-still-present')
+
+    def test_cleanup_errors_use_only_allowlisted_reasons(self):
+        for message, reason in (
+            ('Container inspection unavailable; absence is not proven', 'inspection-unavailable'),
+            ('Docker operation failed; output withheld', 'docker-operation-failed'),
+            ('Bounded Docker operation timed out', 'docker-timeout'),
+        ):
+            with self.subTest(reason=reason):
+                docker = Mock()
+                docker.inspect.side_effect = [self.container, RUNTIME.SmokeFailure(message)]
+                cleaned, failures = self.cleanup(docker)
+                self.assertFalse(cleaned)
+                self.assertEqual(failures[0]['reason'], reason)
 
     def test_cleanup_continues_with_other_service_after_failure(self):
         docker = Mock()
