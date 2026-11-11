@@ -131,8 +131,7 @@ describe('login page intent', () => {
     expect(wrapper.find('.phone-form').exists()).toBe(false);
   });
 
-  it('does not expose phone login as a mode when its build flag is off', async () => {
-    if (phoneCodeLoginEnabled) return;
+  it.skipIf(phoneCodeLoginEnabled)('does not expose phone login as a mode when its build flag is off', async () => {
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin({ mode: 'phone', loginMode: 'phone' });
 
@@ -149,8 +148,7 @@ describe('login page intent', () => {
     expect(loginWithPhone).not.toHaveBeenCalled();
   });
 
-  it('clears stale password errors before a valid phone login when enabled', async () => {
-    if (!phoneCodeLoginEnabled) return;
+  it.skipIf(!phoneCodeLoginEnabled)('clears stale password errors before a valid phone login when enabled', async () => {
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
 
@@ -167,8 +165,7 @@ describe('login page intent', () => {
     expect(loginWithPhone).toHaveBeenCalledWith('13800000000', '123456');
   });
 
-  it('maps server field errors onto the matching field without a toast', async () => {
-    if (!phoneCodeLoginEnabled) return;
+  it.skipIf(!phoneCodeLoginEnabled)('maps server field errors onto the matching field without a toast', async () => {
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
     wrapper.vm.phone = '13800000000';
@@ -186,8 +183,7 @@ describe('login page intent', () => {
     expect(uni.showToast).not.toHaveBeenCalled();
   });
 
-  it('falls back to a single toast when the server error has no field', async () => {
-    if (!phoneCodeLoginEnabled) return;
+  it.skipIf(!phoneCodeLoginEnabled)('falls back to a single toast when the server error has no field', async () => {
     peekInterceptIntent.mockReturnValue(null);
     const wrapper = mountLogin();
     wrapper.vm.phone = '13800000000';

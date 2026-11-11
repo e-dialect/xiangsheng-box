@@ -98,8 +98,15 @@ jobs:
       - name: Lint frontend
         run: yarn lint
 
-      - name: Run frontend unit tests
+      - name: Run frontend unit tests (phone login disabled)
+        env:
+          VITE_PHONE_CODE_LOGIN_ENABLED: "false"
         run: yarn test:unit
+
+      - name: Run phone login enabled regression tests
+        env:
+          VITE_PHONE_CODE_LOGIN_ENABLED: "true"
+        run: yarn vitest run tests/unit/LoginPage.test.js
 
   frontend-build:
     name: Frontend Build

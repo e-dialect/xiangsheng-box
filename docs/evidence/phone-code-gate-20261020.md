@@ -38,3 +38,32 @@ Vitest emitted a sandbox `EPERM` warning while trying to open its optional WebSo
 - `frontend/tests/unit/LoginPage.test.js`
 - `scripts/create-release-manifest.mjs`
 - `scripts/test_release_scripts.py`
+
+## 2026-11-11 review follow-up: exercise both flag states in CI
+
+The earlier eight-pass LoginPage totals included early-return tests with no assertions in
+one flag state. Those totals are not evidence that all eight behaviors ran. The tests now
+explicitly skip inapplicable cases. The Frontend Unit CI job explicitly runs the full suite
+with the flag `false`, then the login-page regression suite with `true` in a separate process.
+Production build flags remain unchanged.
+
+Actual local checks on the follow-up based on `98e77941961eb54e48919528bc25c7c882c8bb69`:
+
+- Node 22.22.2, Yarn 1.22.22; `yarn install --frozen-lockfile --production=false` passed.
+- `VITE_PHONE_CODE_LOGIN_ENABLED=false yarn test:unit`: 83 files passed, 604 tests passed,
+  3 explicitly skipped (607 total).
+- `VITE_PHONE_CODE_LOGIN_ENABLED=true yarn vitest run tests/unit/LoginPage.test.js`:
+  7 tests passed, 1 explicitly skipped. Phone-login payload, mode switching and both
+  server-error paths executed.
+- CI YAML parsed and the two steps' string-valued false/true environment contracts checked.
+- Independent static review found no blocking issue in the CI/test-only changes.
+
+No application code, production flag, authentication API or release behavior changed.
+No browser E2E, Docker build, real SMS delivery, production deployment, or human journey
+acceptance was performed for this follow-up. Remote CI must be checked against the published
+commit separately; local results do not claim remote CI success.
+
+`yarn lint` (the configured `src` lint scope) passed. An additional direct ESLint run on
+`LoginPage.test.js` reported six pre-existing import-format/order errors; running the same
+command on the unmodified HEAD file produced the same six errors. They are not introduced
+by this follow-up and no claim is made that this extra, non-CI lint scope passed.
