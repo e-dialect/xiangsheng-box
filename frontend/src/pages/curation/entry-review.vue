@@ -1,5 +1,5 @@
 <template>
-  <PageShell title="来源与整理记录">
+  <PageShell :title="authenticated ? '来源与整理记录' : '词条来源'">
     <view class="review-layout">
       <view class="review-card">
         <BaseLoading
@@ -38,6 +38,21 @@
         <view class="muted">
           以下资料关联当前词条。提交来源不等于事实已证实。
         </view>
+        <BaseButton
+          v-if="!disabledReason"
+          variant="ghost"
+          :text="scopeToolsOpen ? '收起整理工具' : '修正地区范围'"
+          :aria-expanded="scopeToolsOpen ? 'true' : 'false'"
+          :disabled="busy"
+          @click="toggleScopeTools"
+          @keydown.enter.space.prevent="toggleScopeTools"
+        />
+        <BaseButton
+          v-else-if="contextRetryable"
+          variant="ghost"
+          text="重试整理权限"
+          @click="loadContext"
+        />
         <BaseLoading
           v-if="evidenceLoading"
           text="正在读取来源…"
@@ -54,6 +69,7 @@
           :source="source"
         >
           <BaseButton
+            v-if="scopeToolsVisible"
             size="small"
             :variant="selectedEvidence.includes(source.id) ? 'primary' : 'ghost'"
             :text="selectedEvidence.includes(source.id) ? '已选为依据' : '选为范围修正依据'"
@@ -64,7 +80,7 @@
         <EmptyState
           v-if="!evidenceLoading && !evidenceError && !evidence.length"
           title="当前没有可见证据"
-          description="需要先补充关联材料，才能提交范围修正。"
+          :description="scopeToolsVisible ? '需要先补充关联材料，才能提交范围修正。' : ''"
         />
         <BaseButton
           v-if="evidenceNext"
@@ -76,7 +92,7 @@
       </view>
 
       <view
-        v-if="entry"
+        v-if="scopeToolsVisible"
         class="review-card"
       >
         <view class="eyebrow">
@@ -88,23 +104,6 @@
         <view class="muted">
           仅缩小到当前地区的严格后代；授权与证据引用由服务器再次检查。
         </view>
-        <BaseLoading
-          v-if="contextLoading"
-          text="正在核对地区与权限…"
-        />
-        <view
-          v-if="disabledReason"
-          class="muted"
-          role="status"
-        >
-          {{ disabledReason }}
-        </view>
-        <BaseButton
-          v-if="contextError"
-          variant="ghost"
-          text="重试地区与权限"
-          @click="loadContext"
-        />
         <BaseForm
           ref="form"
           :data="form"
@@ -114,7 +113,7 @@
           <BaseButton
             variant="ghost"
             :text="targetLabel"
-            :disabled="busy || !!disabledReason"
+            :disabled="busy"
             @click="selectorOpen = true"
           />
           <view class="muted">
@@ -162,7 +161,10 @@
         />
       </view>
 
-      <view class="review-card">
+      <view
+        v-if="authenticated"
+        class="review-card"
+      >
         <view class="review-title">
           整理记录
         </view>
@@ -248,6 +250,7 @@ function initialState() {
     evidenceNext: false,
     evidenceLoading: false,
     evidenceError: '',
+    authenticated: false,
     history: [],
     historyPage: 1,
     historyRetryPage: 1,
@@ -258,6 +261,8 @@ function initialState() {
     dialects: [],
     contextLoading: false,
     contextError: '',
+    contextRetryable: false,
+    scopeToolsOpen: false,
     selectedEvidence: [],
     form: { reason: '', dialectId: null },
     selectorOpen: false,
@@ -265,6 +270,10 @@ function initialState() {
     submitError: '',
     unknownResult: false,
   };
+}
+
+function canRetryContext(result) {
+  return result.status === 'rejected' && ![401, 403, 404].includes(result.reason?.statusCode);
 }
 
 export default {
@@ -301,9 +310,10 @@ export default {
       ] || '待整理';
     },
     canSubmit() {
-      return !this.busy && !this.evidenceLoading && !this.unknownResult && !this.disabledReason
+      return this.scopeToolsVisible && !this.busy && !this.evidenceLoading && !this.unknownResult
         && Boolean(this.target) && this.selectedEvidence.length > 0;
     },
+    scopeToolsVisible() { return this.scopeToolsOpen && !this.disabledReason; },
     descendants() { return strictDescendants(this.dialects, this.entry?.usage_dialect?.id); },
     target() { return this.descendants.find((item) => item.id === this.form.dialectId); },
     targetLabel() {
@@ -332,8 +342,13 @@ export default {
     openEntry() { openPage(ROUTES.entryDetail, { id: this.id }); },
     openAction(id) { openPage(ROUTES.curationActionDetail, { id, entry_id: this.id }); },
     selectDialect({ value }) { if (!this.busy) this.form.dialectId = value; },
+    toggleScopeTools(event) {
+      if (this.disabledReason || this.busy || event?.repeat) return;
+      this.scopeToolsOpen = !this.scopeToolsOpen;
+      if (!this.scopeToolsOpen) this.selectorOpen = false;
+    },
     toggleEvidence(id) {
-      if (this.busy || this.evidenceLoading) return;
+      if (!this.scopeToolsVisible || this.busy || this.evidenceLoading) return;
       this.selectedEvidence = this.selectedEvidence.includes(id)
         ? this.selectedEvidence.filter((value) => value !== id) : [...this.selectedEvidence, id];
     },
@@ -349,14 +364,17 @@ export default {
     },
     async load() {
       this.ownerId = uni.getStorageSync('id') || 'guest';
+      this.authenticated = Boolean(uni.getStorageSync('token'));
       if (!this.id) { this.entryError = '缺少有效词条链接'; return; }
       await Promise.allSettled([
-        this.loadEntry(), this.loadEvidence(1), this.loadHistory(1), this.loadContext(),
+        this.loadEntry(), this.loadEvidence(1),
+        ...(this.authenticated ? [this.loadHistory(1), this.loadContext()] : []),
       ]);
     },
     async loadContext() {
       const valid = this.reviewGuard();
       this.contextLoading = true; this.contextError = ''; this.summary = null;
+      this.contextRetryable = false;
       const results = await Promise.allSettled([
         listAllDialects(), getCurationSummary(), getReviewStaff(),
       ]);
@@ -364,14 +382,19 @@ export default {
       if (results[0].status === 'fulfilled') this.dialects = results[0].value;
       else this.contextError = `地区加载失败：${reviewError(results[0].reason)}`;
       if (results[1].status === 'fulfilled') {
+        this.contextRetryable = canRetryContext(results[0]);
         this.summary = {
           ...results[1].value,
           is_staff: results[2].status === 'fulfilled' && results[2].value === true,
         };
         if (results[2].status === 'rejected' && !this.summary.grants?.length) {
           this.contextError = this.contextError || `无法核对站点审核权限：${reviewError(results[2].reason)}`;
+          this.contextRetryable ||= canRetryContext(results[2]);
         }
-      } else this.contextError = this.contextError || reviewError(results[1].reason);
+      } else {
+        this.contextError = this.contextError || reviewError(results[1].reason);
+        this.contextRetryable = canRetryContext(results[1]);
+      }
       this.contextLoading = false;
     },
     async loadEvidence(page) {
@@ -431,8 +454,7 @@ export default {
       }
     },
     async submit() {
-      if (this.busy || this.evidenceLoading || this.unknownResult || this.disabledReason
-        || !this.target || !this.selectedEvidence.length) return;
+      if (!this.canSubmit) return;
       this.busy = true; this.submitError = '';
       const valid = this.reviewGuard();
       const { reason } = this.form;
