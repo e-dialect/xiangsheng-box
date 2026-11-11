@@ -203,7 +203,15 @@ def cleanup_fixture(docker, names, label, nonce, created):
         except Exception as error:
             # Emit only fixed fixture roles/stages and the exception type.
             # Docker output, container names and exception messages stay private.
-            failures.append({'service': service, 'stage': stage, 'errorType': type(error).__name__})
+            reason = {
+                'Fixture container identity changed; cleanup refused': 'identity-mismatch',
+                'Fixture container remains after removal': 'container-still-present',
+                'Container inspection unavailable; absence is not proven': 'inspection-unavailable',
+                'Docker operation failed; output withheld': 'docker-operation-failed',
+                'Bounded Docker operation timed out': 'docker-timeout',
+            }.get(str(error), 'unexpected-error')
+            failures.append({'service': service, 'stage': stage,
+                             'errorType': type(error).__name__, 'reason': reason})
     return not failures, failures
 
 
