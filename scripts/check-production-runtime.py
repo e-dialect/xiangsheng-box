@@ -184,6 +184,29 @@ def nginx_startup_diagnostics(docker, name, nonce):
         return {'available': False}
 
 
+def cleanup_fixture(docker, names, label, nonce, created):
+    failures = []
+    for service, name in reversed(list(names.items())):
+        stage = 'inspect-before-removal'
+        try:
+            container = docker.inspect(name)
+            if container is not None:
+                stage = 'verify-identity'
+                if (container['Config'].get('Labels', {}).get(label) != nonce
+                        or (created.get(service) and container['Id'] != created[service])):
+                    raise SmokeFailure('Fixture container identity changed; cleanup refused')
+                stage = 'remove'
+                docker.call(['rm', '--force', container['Id']])
+            stage = 'inspect-after-removal'
+            if docker.inspect(name) is not None:
+                raise SmokeFailure('Fixture container remains after removal')
+        except Exception as error:
+            # Emit only fixed fixture roles/stages and the exception type.
+            # Docker output, container names and exception messages stay private.
+            failures.append({'service': service, 'stage': stage, 'errorType': type(error).__name__})
+    return not failures, failures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend-image', default='guantou-backend:latest')
@@ -260,20 +283,9 @@ def main():
         if 'frontend' in receipt['phase']:
             receipt['frontendStartupDiagnostics'] = nginx_startup_diagnostics(docker, names['frontend'], nonce)
     finally:
-        cleaned = True
-        for service, name in reversed(list(names.items())):
-            try:
-                container = docker.inspect(name)
-                if container is not None:
-                    if (container['Config'].get('Labels', {}).get(label) != nonce
-                            or (created.get(service) and container['Id'] != created[service])):
-                        raise SmokeFailure('Fixture container identity changed; cleanup refused')
-                    docker.call(['rm', '--force', container['Id']])
-                if docker.inspect(name) is not None:
-                    cleaned = False
-            except Exception:
-                cleaned = False
+        cleaned, cleanup_failures = cleanup_fixture(docker, names, label, nonce, created)
         receipt['cleanup'] = 'PASS' if cleaned else 'FAIL: exact fixture cleanup required'
+        receipt['cleanupFailures'] = cleanup_failures
     receipt['result'] = 'PASS' if success and cleaned else 'FAIL'
     print(json.dumps(receipt, indent=2))
     return 0 if receipt['result'] == 'PASS' else 1
