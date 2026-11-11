@@ -195,7 +195,7 @@
               v-if="activeFilters"
               class="filter-stack__summary"
             >
-              <text>已启用 {{ activeFilters }} 项条件</text>
+              <text>已选 {{ activeFilters }} 项条件</text>
               <BaseButton
                 size="extra-small"
                 variant="ghost"
@@ -304,6 +304,12 @@
               name="concept"
               label="概念"
               placeholder="例如 WALK；只发现关联词条，不自动合并"
+            />
+            <BaseButton
+              block
+              text="应用筛选"
+              :loading="loading"
+              @click="applyAdvancedFilters"
             />
           </view>
         </t-collapse-panel>
@@ -482,6 +488,7 @@ export default {
   data() {
     return {
       filters: defaultFilters(),
+      appliedFilters: null,
       openSections: [],
       entries: [],
       total: 0,
@@ -603,8 +610,8 @@ export default {
         redirected: '已合并',
       }[status] || '待整理';
     },
-    requestParams(page) {
-      return buildEntrySearchParams({ ...this.filters, page, pageSize: 20 });
+    requestParams(page, filters = this.filters) {
+      return buildEntrySearchParams({ ...filters, page, pageSize: 20 });
     },
     quickSearch(keyword) {
       this.filters.keyword = keyword;
@@ -615,6 +622,10 @@ export default {
       this.filters = { ...defaultFilters(), keyword };
       this.search();
     },
+    applyAdvancedFilters() {
+      this.openSections = [];
+      return this.search();
+    },
     handleErrorAction() {
       if (this.searchUnavailable) {
         goHome(true);
@@ -623,6 +634,10 @@ export default {
       this.search();
     },
     async search() {
+      const filters = { ...this.filters };
+      const requestId = this.searchRequestId + 1;
+      this.searchRequestId = requestId;
+      this.loadingMore = false;
       this.submittedKeyword = String(this.filters.keyword || '').trim();
       rememberSearch(this.filters.keyword);
       this.history = searchHistory();
@@ -632,29 +647,31 @@ export default {
       if (!ensureCapability(CAPABILITIES.ENTRY_SEARCH, 'search')) {
         this.searched = true;
         this.entries = [];
+        this.total = 0;
+        this.next = null;
+        this.loading = false;
         this.searchUnavailable = true;
         this.errorMessage = '词条查询正在维护，请稍后再试';
         return;
       }
       this.searchUnavailable = false;
-      const requestId = this.searchRequestId + 1;
-      this.searchRequestId = requestId;
       this.loading = true;
       this.errorMessage = '';
       this.searched = true;
       try {
-        const response = await listEntries(this.requestParams(1));
+        const response = await listEntries(this.requestParams(1, filters));
         if (requestId !== this.searchRequestId) return;
         this.entries = pageResults(response);
         this.total = Number(response?.count ?? this.entries.length);
         this.next = response?.next || null;
         this.page = 1;
+        this.appliedFilters = filters;
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',
           metadata: {
             result_bucket: resultBucket(this.total),
-            filter_count: activeFilterCount(this.filters),
+            filter_count: activeFilterCount(filters),
           },
         });
       } catch (error) {
@@ -668,7 +685,7 @@ export default {
           result: 'error',
           metadata: {
             result_bucket: '0',
-            filter_count: activeFilterCount(this.filters),
+            filter_count: activeFilterCount(filters),
           },
         });
       } finally {
@@ -676,18 +693,22 @@ export default {
       }
     },
     async loadMore() {
-      if (!this.next || this.loadingMore) return;
+      if (!this.next || this.loading || this.loadingMore || !this.appliedFilters) return;
+      const requestId = this.searchRequestId;
       this.loadingMore = true;
       try {
         const page = this.page + 1;
-        const response = await listEntries(this.requestParams(page));
+        const response = await listEntries(this.requestParams(page, this.appliedFilters));
+        if (requestId !== this.searchRequestId) return;
         this.entries = [...this.entries, ...pageResults(response)];
         this.next = response?.next || null;
         this.page = page;
       } catch (error) {
-        uni.showToast({ title: '暂时无法继续加载', icon: 'none' });
+        if (requestId === this.searchRequestId) {
+          uni.showToast({ title: '暂时无法继续加载', icon: 'none' });
+        }
       } finally {
-        this.loadingMore = false;
+        if (requestId === this.searchRequestId) this.loadingMore = false;
       }
     },
     onDialectChange(context = {}) {
