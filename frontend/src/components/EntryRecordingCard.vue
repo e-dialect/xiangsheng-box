@@ -79,6 +79,7 @@
     </view>
 
     <view
+      class="recording-card__playback-status"
       role="status"
       aria-live="polite"
     >
@@ -336,7 +337,7 @@ export default {
 .recording-card__playback-message {
   display: block;
   margin-top: var(--space-2);
-  color: var(--text-secondary-color);
+  color: var(--text-color);
   font-size: var(--font-size-sm);
 }
 
