@@ -24,6 +24,7 @@
     <PlatformScroll
       v-if="scroll"
       variant="app-shell"
+      :scroll-into-view="scrollIntoView"
       @scrolltolower="$emit('scrolltolower')"
     >
       <view class="app-shell__content">
@@ -59,6 +60,7 @@ export default {
     BaseButton, FeedbackHost, HomeTabBar, PlatformScroll,
   },
   props: {
+    scrollIntoView: { type: String, default: '' },
     title: { type: String, required: true },
     active: { type: String, required: true },
     actionText: { type: String, default: '' },

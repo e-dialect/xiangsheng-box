@@ -2,6 +2,7 @@
   <AppShell
     title="录制乡音"
     active="record"
+    :scroll-into-view="validationTarget"
   >
     <view class="record-page">
       <view class="record-draft-actions">
@@ -78,9 +79,11 @@
         class="record-form"
         :data="form"
         :rules="rules"
+        scroll-to-first-error=""
       >
         <view class="required-flow">
           <view
+            id="record-required-audio"
             class="record-section record-section--audio"
             :class="{ 'record-section--complete': requiredSteps[0].complete }"
           >
@@ -121,6 +124,7 @@
           </view>
 
           <view
+            id="record-required-dialect"
             class="record-section"
             :class="{ 'record-section--complete': requiredSteps[1].complete }"
           >
@@ -163,6 +167,7 @@
           </view>
 
           <view
+            id="record-required-gloss"
             class="record-section"
             :class="{ 'record-section--complete': requiredSteps[2].complete }"
           >
@@ -406,6 +411,7 @@ export default {
       },
       audio: emptyAudio(),
       fieldErrors: {},
+      validationTarget: '',
       optionalSections: [],
       dialects: [],
       dialectPickerVisible: false,
@@ -685,7 +691,17 @@ export default {
       }
       this.fieldErrors = errors;
       if (baseValid !== true || Object.keys(errors).length) {
-        notify({ title: '还差几项必要信息', icon: 'none' });
+        const firstMissing = Object.keys(errors)[0];
+        const targets = {
+          audio_url: 'record-required-audio',
+          usage_dialect_id: 'record-required-dialect',
+          original_gloss: 'record-required-gloss',
+        };
+        notify({ title: errors[firstMissing] || '请检查填写内容', icon: 'none' });
+        // Clear first so repeated submissions can revisit the same missing step.
+        this.validationTarget = '';
+        await this.$nextTick();
+        this.validationTarget = targets[firstMissing] || '';
         return false;
       }
       return true;
