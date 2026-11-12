@@ -512,7 +512,6 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
         filters = {
             "status": "status",
-            "writing_type": "entry_writings__writing__form_type",
             "source_type": "evidence_links__evidence__source_type",
         }
         for parameter, lookup in filters.items():
@@ -520,11 +519,17 @@ class EntryViewSet(viewsets.ModelViewSet):
             if value:
                 queryset = queryset.filter(**{lookup: value})
         writing = self.request.query_params.get("writing")
-        if writing:
-            queryset = queryset.filter(
-                entry_writings__is_current=True,
-                entry_writings__writing__text__iexact=writing.strip(),
-            )
+        writing_type = self.request.query_params.get("writing_type")
+        if writing or writing_type:
+            # Both explicit writing conditions belong to one current relation.
+            writing_filters = {"entry_writings__is_current": True}
+            if writing:
+                writing_filters["entry_writings__writing__text__iexact"] = (
+                    writing.strip()
+                )
+            if writing_type:
+                writing_filters["entry_writings__writing__form_type"] = writing_type
+            queryset = queryset.filter(**writing_filters)
         ids = selected_dialect_ids(self.request)
         ipa = (self.request.query_params.get("ipa") or "").strip()
         romanization = (self.request.query_params.get("romanization") or "").strip()
