@@ -100,7 +100,7 @@ import { notify } from '@/services/feedback';
 import {
   defaultContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
-import { isWechatMiniProgram } from '@/services/platform';
+import { canUseNativeMiniProgramShare } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
@@ -130,7 +130,7 @@ export default {
       return this.recording?.recorder?.nickname || this.recording?.recorder?.username || '乡音贡献者';
     },
     shareType() {
-      return isWechatMiniProgram() ? 'share' : '';
+      return canUseNativeMiniProgramShare() ? 'share' : '';
     },
     canSystemShare: canUseSystemShare,
     shareMessage() {
@@ -152,11 +152,13 @@ export default {
     syncContentShareMenu(this, false);
     this.load();
   },
-  // #ifdef MP-WEIXIN
+  // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
     const { title, path } = this.shareMessage || defaultContentShareMessage();
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
+  // #ifdef MP-WEIXIN
   onShareTimeline() {
     const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };

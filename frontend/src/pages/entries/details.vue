@@ -319,7 +319,7 @@ import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 import {
   defaultContentShareMessage, entryShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
-import { isWechatMiniProgram } from '@/services/platform';
+import { canUseNativeMiniProgramShare } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
@@ -349,7 +349,7 @@ export default {
   },
   computed: {
     shareType() {
-      return isWechatMiniProgram() ? 'share' : '';
+      return canUseNativeMiniProgramShare() ? 'share' : '';
     },
     canSystemShare: canUseSystemShare,
     shareMessage() {
@@ -372,11 +372,13 @@ export default {
     syncContentShareMenu(this, false);
     if (this.id && this.entry) this.load();
   },
-  // #ifdef MP-WEIXIN
+  // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
     const { title, path } = this.shareMessage || defaultContentShareMessage();
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
+  // #ifdef MP-WEIXIN
   onShareTimeline() {
     const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };

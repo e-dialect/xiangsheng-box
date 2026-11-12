@@ -19,6 +19,18 @@ export function isWechatMiniProgram() {
   return canUseWechatMiniProgramAuth();
 }
 
+/** Native share buttons are supported by the configured WeChat and QQ targets. */
+export function canUseNativeMiniProgramShare() {
+  let enabled = false;
+  // #ifdef MP-WEIXIN || MP-QQ
+  enabled = true;
+  // #endif
+  // #ifndef MP-WEIXIN || MP-QQ
+  enabled = false;
+  // #endif
+  return enabled;
+}
+
 /**
  * Runtime H5 detection for code paths shared by every compiled target.
  * Prefer an already available system-info payload so startup code does not
