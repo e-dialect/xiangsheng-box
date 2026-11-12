@@ -24,7 +24,7 @@ viewports.forEach(({ width, height, theme }) => {
     await expect(page.getByRole('button', { name: '微信一键登录' })).toHaveCount(0);
 
     const actions = [
-      page.getByRole('button', { name: '暂不登录，先去查词' }),
+      page.getByRole('button', { name: '暂不登录，返回浏览' }),
       page.getByRole('button', { name: '忘记密码' }),
       page.getByRole('button', { name: '用户注册' }),
     ];
@@ -52,10 +52,10 @@ test('login secondary actions preserve service routing and keyboard activation',
   await installVisualFixture(page, { persona: 'guest', theme: 'light' });
   await openVisualRoute(page, '/pages/login/login');
 
-  const browseFirst = page.getByRole('button', { name: '暂不登录，先去查词' });
+  const browseFirst = page.getByRole('button', { name: '暂不登录，返回浏览' });
   await browseFirst.focus();
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/pages\/search$/);
+  await expect(page).toHaveURL(/(?:\/pages\/index|\/)$/);
 
   await openVisualRoute(page, '/pages/login/login');
   const forgetPassword = page.getByRole('button', { name: '忘记密码' });

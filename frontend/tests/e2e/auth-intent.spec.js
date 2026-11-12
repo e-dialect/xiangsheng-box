@@ -74,3 +74,31 @@ test('guest can cancel an intercepted action and return to search', async ({ pag
   await expect(page.locator('.entry-search__bar input')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('auth_intercept_intent'))).toBeNull();
 });
+
+test('cancelling a guest bookmark returns to the same entry without bookmarking', async ({ page }) => {
+  const runtimeIssues = observeRuntime(page);
+  const bookmarkRequests = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/entries/21/bookmark/') {
+      bookmarkRequests.push(request.method());
+    }
+  });
+  await installVisualFixture(page);
+  const entryUrl = '/pages/entries/details?id=21';
+  await openVisualRoute(page, entryUrl);
+  const bookmark = page.getByRole('button', { name: /^(已收藏|收藏词条)$/ });
+  await bookmark.click();
+  await expect(page).toHaveURL(/\/pages\/login\/login$/);
+  await expect(page.getByText('你刚才想收藏词条，验证身份后会回到原来的位置。')).toBeVisible();
+
+  const browseFirst = page.getByRole('button', { name: '暂不登录，返回浏览' });
+  await browseFirst.scrollIntoViewIfNeeded();
+  await stableScreenshot(page, { path: 'test-results/guest-return-to-entry-390x844.png' });
+  await browseFirst.click();
+
+  await expect(page).toHaveURL(/\/pages\/entries\/details\?id=21$/);
+  await expect(bookmark).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('auth_intercept_intent'))).toBeNull();
+  expect(bookmarkRequests).toEqual([]);
+  expect(runtimeIssues).toEqual([]);
+});

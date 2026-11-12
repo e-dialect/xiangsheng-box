@@ -1,4 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
+
+import { toLoginPage } from '@/routers/login';
+import { clearInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
+import {
+  cancelLogin,
+  openLoginFromMine,
+  resolveAuthDestination,
+} from '@/services/authJourney';
 
 vi.mock('@/routers/login', () => ({
   toLoginPage: vi.fn(),
@@ -9,18 +19,11 @@ vi.mock('@/services/authGuard', () => ({
   saveInterceptIntent: vi.fn(),
 }));
 
-import { toLoginPage } from '@/routers/login';
-import { clearInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
-import {
-  cancelLoginToSearch,
-  openLoginFromMine,
-  resolveAuthDestination,
-} from '@/services/authJourney';
-
 describe('auth journey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    globalThis.uni = { reLaunch: vi.fn() };
+    globalThis.uni = { reLaunch: vi.fn(), navigateBack: vi.fn() };
+    globalThis.getCurrentPages = vi.fn(() => [{ route: 'pages/login/login' }]);
   });
 
   it('records voluntary mine login before opening the shared login page', () => {
@@ -35,10 +38,42 @@ describe('auth journey', () => {
   });
 
   it('clears a cancelled intent and relaunches public search', () => {
-    cancelLoginToSearch();
+    cancelLogin();
 
     expect(clearInterceptIntent).toHaveBeenCalledTimes(1);
     expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/search' });
+  });
+
+  it.each([
+    'pages/index',
+    'pages/entries/details',
+    'pages/recordings/details',
+    'pages/collections/details',
+    'pages/users/me',
+  ])(
+    'returns to the existing guest page %s after clearing the action',
+    (route) => {
+      getCurrentPages.mockReturnValue([{ route }, { route: 'pages/login/login' }]);
+      cancelLogin();
+
+      expect(clearInterceptIntent).toHaveBeenCalledTimes(1);
+      expect(uni.navigateBack).toHaveBeenCalledWith({ delta: 1 });
+      expect(uni.reLaunch).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { route: 'pages/recordings/create' },
+    { route: 'pages/collections/index', options: { mine: 'true' } },
+  ])('falls back to public search from protected route $route', (page) => {
+    getCurrentPages.mockReturnValue([
+      page, { route: 'pages/login/login' },
+    ]);
+    cancelLogin();
+
+    expect(clearInterceptIntent).toHaveBeenCalledTimes(1);
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/search' });
+    expect(uni.navigateBack).not.toHaveBeenCalled();
   });
 
   it('returns a dm intent to the mail send page with the recipient', () => {

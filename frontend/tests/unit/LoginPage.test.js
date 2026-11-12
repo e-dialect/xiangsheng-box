@@ -7,7 +7,8 @@ vi.mock('@/services/authGuard', () => ({
 }));
 
 vi.mock('@/services/authJourney', () => ({
-  cancelLoginToSearch: vi.fn(),
+  cancelLogin: vi.fn(),
+  canReturnToGuestPage: vi.fn(() => false),
 }));
 
 vi.mock('@/services/login', () => ({
@@ -26,7 +27,7 @@ vi.mock('@/routers/login', () => ({
   toWechatRegisterPage: vi.fn(),
 }));
 
-import { cancelLoginToSearch } from '@/services/authJourney';
+import { cancelLogin } from '@/services/authJourney';
 import { peekInterceptIntent } from '@/services/authGuard';
 import { loginWithPhone } from '@/services/phoneAuth';
 import { toForgetPage, toRegisterPage } from '@/routers/login';
@@ -78,7 +79,7 @@ describe('login page intent', () => {
     const browseFirst = wrapper.findAllComponents({ name: 'TDesignStub' })
       .find((component) => component.props('ariaLabel') === '暂不登录，先去查词');
     browseFirst.vm.$emit('click');
-    expect(cancelLoginToSearch).toHaveBeenCalledTimes(1);
+    expect(cancelLogin).toHaveBeenCalledTimes(1);
   });
 
   it('uses TDesign text buttons for every visible secondary action', async () => {

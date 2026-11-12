@@ -370,7 +370,8 @@ export default {
   },
   onShow() {
     syncContentShareMenu(this, false);
-    if (this.id && this.entry) this.load();
+    // 先完成页面激活，再刷新详情，避免提前卸载 Uni H5 的尺寸监听节点。
+    if (this.id && this.entry) this.$nextTick(this.load);
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {

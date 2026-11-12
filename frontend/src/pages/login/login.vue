@@ -158,11 +158,11 @@
             size="medium"
             role="button"
             tabindex="0"
-            aria-label="暂不登录，先去查词"
-            @click="cancelLoginToSearch"
-            @keydown.enter.space.prevent="cancelLoginToSearch"
+            :aria-label="guestReturnLabel"
+            @click="cancelLogin"
+            @keydown.enter.space.prevent="cancelLogin"
           >
-            暂不登录，先去查词
+            {{ guestReturnLabel }}
           </t-button>
           <view
             v-if="showLoginAlternatives"
@@ -226,7 +226,7 @@ import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import { actionLabel, peekInterceptIntent } from '@/services/authGuard';
-import { cancelLoginToSearch } from '@/services/authJourney';
+import { cancelLogin, canReturnToGuestPage } from '@/services/authJourney';
 import { CAPABILITIES, isCapabilityEnabled } from '@/services/capabilities';
 import { mpLogin, normalLogin } from '@/services/login';
 import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
@@ -285,6 +285,9 @@ export default {
       if (this.intentVoluntary) return '验证身份后返回「我的」。';
       return `你刚才想${actionLabel(this.intent.action)}，验证身份后会回到原来的位置。`;
     },
+    guestReturnLabel() {
+      return canReturnToGuestPage() ? '暂不登录，返回浏览' : '暂不登录，先去查词';
+    },
   },
   onLoad() {
     this.intent = peekInterceptIntent();
@@ -296,7 +299,7 @@ export default {
     this.clearCountdown();
   },
   methods: {
-    cancelLoginToSearch,
+    cancelLogin,
     startWechatLogin() {
       this.wechatLoginAvailable = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
       if (!this.wechatLoginAvailable) {
