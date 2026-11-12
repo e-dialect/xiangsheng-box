@@ -178,6 +178,15 @@
         <text class="entry-results__summary-copy">
           相同写法的不同意思会各自保留，点开后再看地区、读音和证据。
         </text>
+        <BaseButton
+          v-if="keywordShare"
+          class="entry-results__share"
+          size="small"
+          variant="ghost"
+          :open-type="shareType"
+          :text="shareType || canSystemShare ? '分享查词结果' : '复制关键词链接'"
+          @click="shareKeyword"
+        />
       </view>
 
       <t-collapse
@@ -402,8 +411,13 @@ import {
 } from '@/services/entrySearchAssist';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord,
+  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
 } from '@/services/navigation';
+import { APP_NAME } from '@/const/branding';
+import { isWechatMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
@@ -527,6 +541,23 @@ export default {
     };
   },
   computed: {
+    shareType() { return isWechatMiniProgram() ? 'share' : ''; },
+    canSystemShare: canUseSystemShare,
+    keywordShare() {
+      if (!hasShareTarget() || this.loading || this.errorMessage
+        || !this.entries.length || !this.submittedKeyword) {
+        return null;
+      }
+      const characters = Array.from(this.submittedKeyword);
+      const keyword = characters.length > 24
+        ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
+      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      return {
+        title: `查词｜${keyword} · ${APP_NAME}`,
+        path,
+        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+      };
+    },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
     },
@@ -583,11 +614,23 @@ export default {
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
   async onLoad(options = {}) {
+    // #ifdef MP-WEIXIN
+    if (isWechatMiniProgram()) showWechatShareMenu();
+    // #endif
     this.history = searchHistory();
     popularEntries()
       .then((items) => { this.popular = pageResults(items); })
       .catch(() => { this.popular = []; });
     this.filters.keyword = options.keywords || options.key || '';
+    // #ifdef MP-WEIXIN
+    if (typeof options.sharedKeyword === 'string') {
+      try {
+        this.filters.keyword = decodeURIComponent(options.sharedKeyword);
+      } catch (error) {
+        this.filters.keyword = '';
+      }
+    }
+    // #endif
     try {
       this.dialects = await listAllDialects();
     } catch (error) {
@@ -595,8 +638,24 @@ export default {
     }
     if (this.filters.keyword) await this.search();
   },
+  // #ifdef MP-WEIXIN
+  onShareAppMessage() {
+    const { title = `查找词条｜${APP_NAME}`, query } = this.keywordShare || {};
+    const path = query ? `${ROUTES.search}?${query}` : ROUTES.search;
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  onShareTimeline() {
+    const { title = `查找词条｜${APP_NAME}`, query = 'sharedKeyword=' } = this.keywordShare || {};
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
   methods: {
     goCollections,
+    shareKeyword() {
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.keywordShare, '关键词链接已复制');
+      // #endif
+    },
     clearHistory() { clearSearchHistory(); this.history = []; },
     dialectLabel,
     entryTitle,
@@ -832,6 +891,10 @@ export default {
 
 .entry-results__summary-title {
   font-size: 30rpx;
+}
+
+.entry-results__share {
+  justify-self: start;
 }
 
 .entry-search__bar,

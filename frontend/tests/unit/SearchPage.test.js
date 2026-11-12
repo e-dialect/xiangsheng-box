@@ -41,6 +41,37 @@ describe('entry-first search page orchestration', () => {
     vi.clearAllMocks();
   });
 
+  it('round-trips the submitted keyword in WeChat without the draft or filters', async () => {
+    const page = pageContext();
+    page.submittedKeyword = '行 & hiŋ+? %2F';
+    page.filters.keyword = '尚未提交';
+    page.filters.dialectId = 12;
+    page.entries = [{ id: 1 }];
+    Object.defineProperty(page, 'keywordShare', {
+      get: () => SearchPage.computed.keywordShare.call(page),
+    });
+
+    const friend = SearchPage.onShareAppMessage.call(page);
+    const timeline = SearchPage.onShareTimeline.call(page);
+    expect(friend.path).toBe('/pages/search?sharedKeyword=%E8%A1%8C%20%26%20hi%C5%8B%2B%3F%20%252F');
+    expect(friend.title).toContain(page.submittedKeyword);
+    expect(timeline).toEqual({
+      title: friend.title,
+      query: friend.path.split('?')[1],
+      imageUrl: '/static/share-cover.png',
+    });
+    request.get.mockResolvedValue({ results: [] });
+    const recipient = pageContext();
+    await SearchPage.onLoad.call(recipient, { sharedKeyword: timeline.query.split('=')[1] });
+    expect(recipient.filters.keyword).toBe(page.submittedKeyword);
+    expect(request.get).toHaveBeenCalledWith('/entries/', expect.objectContaining({
+      search: page.submittedKeyword,
+    }), true, { loading: false });
+    page.loading = true;
+    expect(SearchPage.onShareAppMessage.call(page).path).toBe('/pages/search');
+    expect(SearchPage.onShareTimeline.call(page).query).toBe('sharedKeyword=');
+  });
+
   it('keeps same-writing results as separate entries', async () => {
     const page = pageContext();
     page.filters.keyword = '行';
