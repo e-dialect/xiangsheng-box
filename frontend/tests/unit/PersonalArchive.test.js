@@ -58,7 +58,12 @@ function mountPage(component) {
 describe('personal contribution and bookmark archives', () => {
   it('opens a contributed recording even when it has no linked entry', async () => {
     const wrapper = mountPage(ContributionsPage);
-    wrapper.vm.history = { summary: {}, recent_activity: [{ kind: 'recording', target_id: 55, label: '尚待整理的乡音', created_at: '2026-09-06' }] };
+    wrapper.vm.history = {
+      summary: {},
+      recent_activity: [{
+        kind: 'recording', target_id: 55, label: '尚待整理的乡音', created_at: '2026-09-06',
+      }],
+    };
     wrapper.vm.loading = false;
     await wrapper.vm.$nextTick();
     await wrapper.get('.activity-row button').trigger('click');
@@ -149,5 +154,20 @@ describe('personal contribution and bookmark archives', () => {
     expect(wrapper.vm.entries).toEqual([entry]);
     expect(notify).toHaveBeenCalledWith({ title: '网络中断' });
     expect(wrapper.vm.removingId).toBeNull();
+  });
+
+  it('restarts pagination after removing a bookmark from a partial list', async () => {
+    const remaining = { ...entry, id: 22 };
+    archive.listEntryBookmarks
+      .mockResolvedValueOnce({ count: 2, results: [entry], next: '/entries/bookmarks/?page=2' })
+      .mockResolvedValueOnce({ count: 1, results: [remaining], next: null });
+    const wrapper = mountPage(BookmarksPage);
+    await wrapper.vm.load();
+
+    await wrapper.vm.remove(entry.id);
+
+    expect(archive.listEntryBookmarks.mock.calls).toEqual([[{ page: 1 }], [{ page: 1 }]]);
+    expect(wrapper.vm.entries).toEqual([remaining]);
+    expect(wrapper.vm.total).toBe(1);
   });
 });

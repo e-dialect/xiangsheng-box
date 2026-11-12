@@ -237,8 +237,11 @@ export default {
       this.removingId = id;
       try {
         await unbookmarkEntry(id);
+        this.entries = this.entries.filter((entry) => entry.id !== id);
+        this.total = Math.max(0, this.total - 1);
         notifySuccess('已移出收藏');
-        await this.load();
+        // Removing a row shifts the offset for pages that have not been loaded.
+        if (this.next) await this.load();
       } catch (error) {
         notify({ title: error?.message || '暂时无法移出收藏' });
       } finally {
