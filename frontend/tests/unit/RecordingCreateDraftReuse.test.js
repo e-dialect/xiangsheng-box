@@ -39,6 +39,7 @@ const {
 const { getEntry, createRecording } = await import('@/services/entryRecording');
 const { uploadFile } = await import('@/services/file');
 const { notify } = await import('@/services/feedback');
+const { listAllDialects } = await import('@/services/guantou');
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
 
 function pageContext() {
@@ -215,5 +216,41 @@ describe('pending entry lookup does not block draft persistence', () => {
     await RecordingCreate.onLoad.call(reopened, { draft_id: 'existing' });
     expect(reopened.linkedEntryId).toBeNull();
     expect(reopened.selectedEntry).toBeNull();
+  });
+});
+
+describe('recording page continues initialization after a region load failure', () => {
+  it.each([
+    [{ draft_id: 'saved' }, false],
+    [{ entry_id: '17' }, true],
+  ])('restores the draft and its selected region for %j', async (options, matchingEntry) => {
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    if (matchingEntry) listRecordingDrafts.mockReturnValue([{ id: 'saved', entryId: 17 }]);
+    restoreRecordingDraft.mockResolvedValue({
+      id: 'saved',
+      entryId: 17,
+      form: { usage_dialect_id: 3, original_gloss: '草稿大意' },
+      audio: { path: 'blob:saved' },
+    });
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, options);
+    expect(page.draftReady).toBe(true);
+    expect(page.dialectsError).toContain('请重试');
+    expect(page.audio.path).toBe('blob:saved');
+    expect(page.form.usage_dialect_id).toBe(3);
+    listAllDialects.mockResolvedValueOnce([{ id: 3, name: '城里' }]);
+    await page.loadDialects();
+    expect(page.form.usage_dialect_id).toBe(3);
+    expect(page.form.original_gloss).toBe('草稿大意');
+    expect(page.selectedEntry.id).toBe(17);
+  });
+
+  it('initializes a new contribution even when the region catalog is unavailable', async () => {
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, {});
+    expect(page.draftReady).toBe(true);
+    expect(page.dialectsError).toContain('请重试');
+    expect(page.form.usage_dialect_id).toBe('');
   });
 });

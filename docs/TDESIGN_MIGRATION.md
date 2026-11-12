@@ -250,6 +250,10 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 关联 [#634](https://github.com/e-dialect/xiangsheng-box/issues/634)。词条详情暂时不可读时，录音页保留原关联 ID，并使用 BaseButton 提供重试读取与明确取消选词；显示信息失败不再改变草稿或提交的关联。覆盖恢复、entry_id 入口、保存与提交、重试以及取消/替换后的迟到响应。
 
+### 录音页地区目录失败恢复
+
+关联 [#643](https://github.com/e-dialect/xiangsheng-box/issues/643)。使用既有 BaseLoading 与 BaseButton，在必填地区步骤提供读取状态和原页重试；重试保留录音、文字、词条关联和已选地区，不用档案默认地区覆盖新选择。回归覆盖失败/空目录、重复点击、等待期间选择及草稿恢复路径。
+
 ## 2026-10-24：公开初稿标识
 
 依据 [H5 可见性核查](audits/2026-10-24-h5-recording-visibility.md)，录音卡片（含紧凑模式与详情复用）区分“初稿·待核对”和“未公开初稿”，普通提交成功提示说明已公开。沿用现有组件和样式，没有新增交互控件。回归覆盖见 RecordingDraftVisibility.test.js；本次未创建 PR。

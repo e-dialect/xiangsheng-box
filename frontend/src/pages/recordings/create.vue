@@ -192,6 +192,26 @@
               @keydown.enter="dialectPickerVisible = true"
               @keydown.space.prevent="dialectPickerVisible = true"
             />
+            <BaseLoading
+              v-if="dialectsLoading"
+              text="正在读取地区列表"
+            />
+            <view
+              v-if="dialectsError"
+              role="alert"
+            >
+              <text class="field-error">
+                {{ dialectsError }}
+              </text>
+              <BaseButton
+                size="small"
+                variant="ghost"
+                text="重新加载地区"
+                :loading="dialectsLoading"
+                :disabled="dialectsLoading"
+                @click="loadDialects"
+              />
+            </view>
             <view
               v-if="fieldErrors.usage_dialect_id"
               class="field-error"
@@ -384,6 +404,7 @@ import AudioCapture from '@/components/AudioCapture.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
+import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
@@ -420,6 +441,7 @@ export default {
     BaseButton,
     BaseField,
     BaseForm,
+    BaseLoading,
     DialectSelector,
     TCell,
     TCollapse,
@@ -444,6 +466,8 @@ export default {
       validationTarget: '',
       optionalSections: [],
       dialects: [],
+      dialectsLoading: false,
+      dialectsError: '',
       dialectPickerVisible: false,
       entryKeyword: '',
       entryCandidates: [],
@@ -519,7 +543,7 @@ export default {
     this.capabilityAvailable = ensureCapability(CAPABILITIES.RECORDING, 'record');
     if (!this.capabilityAvailable) return;
     this.ownerScope = draftOwner();
-    await this.loadDialects();
+    await this.loadDialects({ applyDefault: true });
     if (options.draft_id) {
       try {
         const draft = await restoreRecordingDraft(options.draft_id, this.ownerScope);
@@ -666,12 +690,21 @@ export default {
     },
     dialectLabel,
     entryTitle,
-    async loadDialects() {
+    async loadDialects({ applyDefault = false } = {}) {
+      if (this.dialectsLoading) return;
+      this.dialectsLoading = true;
       try {
-        this.dialects = await listAllDialects();
-        if (this.primaryDialect?.id) this.form.usage_dialect_id = this.primaryDialect.id;
+        const dialects = await listAllDialects();
+        if (!dialects.length) throw new Error('地区列表为空');
+        this.dialects = dialects;
+        this.dialectsError = '';
+        if (applyDefault && !this.form.usage_dialect_id && this.primaryDialect?.id) {
+          this.form.usage_dialect_id = this.primaryDialect.id;
+        }
       } catch (error) {
-        this.dialects = [];
+        this.dialectsError = '地区列表暂时无法读取，请重试。已填写的内容会保留。';
+      } finally {
+        this.dialectsLoading = false;
       }
     },
     async loadEntry(id) {
