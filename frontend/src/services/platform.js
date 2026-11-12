@@ -31,6 +31,17 @@ export function canUseNativeMiniProgramShare() {
   return enabled;
 }
 
+export function isQQMiniProgram() {
+  let enabled = false;
+  // #ifdef MP-QQ
+  enabled = true;
+  // #endif
+  // #ifndef MP-QQ
+  enabled = false;
+  // #endif
+  return enabled;
+}
+
 /**
  * Runtime H5 detection for code paths shared by every compiled target.
  * Prefer an already available system-info payload so startup code does not

@@ -98,9 +98,9 @@ import {
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
 import {
-  defaultContentShareMessage, recordingShareMessage, syncContentShareMenu,
+  defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
-import { canUseNativeMiniProgramShare } from '@/services/platform';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
@@ -154,6 +154,7 @@ export default {
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'recording');
     const { title, path } = this.shareMessage || defaultContentShareMessage();
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },

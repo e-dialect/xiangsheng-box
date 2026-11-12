@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { entryShareMessage, recordingShareMessage } from '@/services/contentShare';
+import {
+  afterEach, describe, expect, it, vi,
+} from 'vitest';
+import {
+  entryShareMessage, openQQSharedContent, qqContentShareMessage, recordingShareMessage,
+} from '@/services/contentShare';
 
 const dialect = {
   path_names: ['闽语', '莆仙方言', '仙游'],
@@ -41,5 +45,42 @@ describe('public content share cards', () => {
     expect(entryShareMessage({ id: 1, visibility: true, status: 'redirected' })).toBeNull();
     expect(recordingShareMessage({ id: 2 })).toBeNull();
     expect(recordingShareMessage({ id: 2, visibility: true, status: 'rejected' })).toBeNull();
+  });
+});
+
+describe('QQ mini-program share destination', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('uses a typed QQ query for public content and omits private destinations', () => {
+    const message = entryShareMessage({ id: 12, visibility: true, summary: '走路' });
+    expect(qqContentShareMessage(message, 'entry')).toMatchObject({
+      query: 'box_share=entry&id=12',
+    });
+    expect(qqContentShareMessage(null, 'recording')).not.toHaveProperty('query');
+  });
+
+  it('opens a shared recording when cold and a shared entry when already open', () => {
+    const uni = { reLaunch: vi.fn(), navigateTo: vi.fn() };
+    const getCurrentPages = vi.fn(() => []);
+    vi.stubGlobal('uni', uni);
+    vi.stubGlobal('getCurrentPages', getCurrentPages);
+    openQQSharedContent({ box_share: 'recording', id: '34' });
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/recordings/details?id=34' });
+    getCurrentPages.mockReturnValue([{ route: 'pages/index' }]);
+    openQQSharedContent({ box_share: 'entry', id: '12' });
+    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/entries/details?id=12' });
+  });
+
+  it('ignores invalid routes and IDs and does not reopen the current item', () => {
+    const uni = { reLaunch: vi.fn(), navigateTo: vi.fn() };
+    vi.stubGlobal('uni', uni);
+    vi.stubGlobal('getCurrentPages', () => [{
+      route: 'pages/entries/details', options: { id: 12 },
+    }]);
+    openQQSharedContent({ box_share: '/pages/users/me', id: '12' });
+    openQQSharedContent({ box_share: 'entry', id: '12?private=true' });
+    openQQSharedContent({ box_share: 'entry', id: '12' });
+    expect(uni.reLaunch).not.toHaveBeenCalled();
+    expect(uni.navigateTo).not.toHaveBeenCalled();
   });
 });

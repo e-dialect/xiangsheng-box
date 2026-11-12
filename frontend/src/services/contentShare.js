@@ -1,7 +1,7 @@
 import { APP_NAME } from '@/const/branding';
-import { pageUrl, ROUTES } from '@/services/navigation';
-import { showWechatShareMenu } from '@/services/pageShare';
-import { isWechatMiniProgram } from '@/services/platform';
+import { openPage, pageUrl, ROUTES } from '@/services/navigation';
+import { showWechatShareMenu, WECHAT_SHARE_IMAGE } from '@/services/pageShare';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
 import { naturalDialectName } from '@/utils/dialectTree';
 
 function shareText(value, limit) {
@@ -40,10 +40,31 @@ export function defaultContentShareMessage() {
   return { title: APP_NAME, path: ROUTES.home };
 }
 
+export function qqContentShareMessage(message, kind) {
+  return {
+    title: message?.title || APP_NAME,
+    imageUrl: WECHAT_SHARE_IMAGE,
+    ...(message?.query ? { query: `box_share=${kind}&${message.query}` } : {}),
+  };
+}
+
+export function openQQSharedContent(query) {
+  const routes = { entry: ROUTES.entryDetail, recording: ROUTES.recordingDetail };
+  const kind = query?.box_share;
+  const route = Object.prototype.hasOwnProperty.call(routes, kind) ? routes[kind] : null;
+  const id = String(query?.id ?? '');
+  if (!route || !/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id))) return;
+  const pages = getCurrentPages();
+  const current = pages[pages.length - 1];
+  if (current?.route === route.slice(1) && String(current.options?.id) === id) return;
+  openPage(route, { id }, { reset: !pages.length });
+}
+
 export function syncContentShareMenu(page, shareable) {
-  if (!isWechatMiniProgram()) return;
+  if (!canUseNativeMiniProgramShare()) return;
   const pages = getCurrentPages();
   if (pages[pages.length - 1]?.$vm !== page) return;
-  if (shareable) showWechatShareMenu();
-  else uni.hideShareMenu({ fail() {} });
+  if (!shareable) uni.hideShareMenu({ fail() {} });
+  else if (isQQMiniProgram()) uni.showShareMenu({ fail() {} });
+  else showWechatShareMenu();
 }

@@ -317,9 +317,9 @@ import { goRecord, openPage, ROUTES } from '@/services/navigation';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 import {
-  defaultContentShareMessage, entryShareMessage, syncContentShareMenu,
+  defaultContentShareMessage, entryShareMessage, qqContentShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
-import { canUseNativeMiniProgramShare } from '@/services/platform';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
@@ -374,6 +374,7 @@ export default {
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'entry');
     const { title, path } = this.shareMessage || defaultContentShareMessage();
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
