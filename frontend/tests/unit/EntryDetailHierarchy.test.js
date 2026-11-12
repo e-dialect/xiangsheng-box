@@ -117,4 +117,27 @@ describe('entry detail information hierarchy', () => {
     expect(wrapper.find('[data-detail-section="actions"]').text()).toContain('录下我这边的说法');
     expect(wrapper.find('[data-detail-section="actions"]').text()).toContain('收藏词条');
   });
+
+  it('keeps examples and explanations inside their own sense when senses reorder', async () => {
+    const wrapper = mountPage();
+    const first = entry.senses[0];
+    const second = {
+      id: 2, sense_number: 2, gloss: '另一义项', concepts: [],
+      examples: [{ content: '第二义项例句', explain: '第二义项解释', type: '俗' }],
+    };
+    for (const senses of [[first, second], [second, first]]) {
+      await wrapper.setData({ entry: { ...entry, senses } });
+      const rows = wrapper.findAll('.sense-row');
+      expect(rows).toHaveLength(2);
+      senses.forEach((sense, index) => {
+        const own = sense.examples[0];
+        const other = senses[1 - index].examples[0];
+        expect(rows[index].text()).toContain(own.content);
+        expect(rows[index].text()).toContain(own.explain);
+        expect(rows[index].text()).not.toContain(other.content);
+        expect(rows[index].text()).not.toContain(other.explain);
+      });
+    }
+  });
+
 });
