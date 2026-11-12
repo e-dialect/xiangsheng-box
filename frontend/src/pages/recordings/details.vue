@@ -42,10 +42,10 @@
             @click="toggleLike"
           />
           <BaseButton
-            v-if="recording.visibility"
+            v-if="shareMessage"
             variant="ghost"
             :open-type="shareType"
-            text="分享乡音"
+            :text="shareType || canSystemShare ? '分享乡音' : '复制乡音链接'"
             @click="share"
           />
         </view>
@@ -93,10 +93,17 @@ import {
   likeRecording,
 } from '@/services/recordingSocial';
 import {
-  goEntryDetail, goRecord, ROUTES, pageUrl,
+  goEntryDetail, goRecord,
 } from '@/services/navigation';
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
+import {
+  defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
+} from '@/services/contentShare';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 
 export default {
   components: {
@@ -123,7 +130,17 @@ export default {
       return this.recording?.recorder?.nickname || this.recording?.recorder?.username || '乡音贡献者';
     },
     shareType() {
-      return typeof window === 'undefined' ? 'share' : '';
+      return canUseNativeMiniProgramShare() ? 'share' : '';
+    },
+    canSystemShare: canUseSystemShare,
+    shareMessage() {
+      if (!hasShareTarget() || this.loading || this.error) return null;
+      return recordingShareMessage(this.recording);
+    },
+  },
+  watch: {
+    shareMessage(message) {
+      syncContentShareMenu(this, Boolean(message));
     },
   },
   onLoad(options = {}) {
@@ -132,14 +149,22 @@ export default {
     this.anchorRootId = Number(options.root) || this.anchorCommentId;
   },
   onShow() {
+    syncContentShareMenu(this, false);
     this.load();
   },
+  // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
-    return this.shareMessage();
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'recording');
+    const { title, path } = this.shareMessage || defaultContentShareMessage();
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
+  // #ifdef MP-WEIXIN
   onShareTimeline() {
-    return this.shareMessage();
+    const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
   methods: {
     entryTitle,
     dialectLabel,
@@ -186,37 +211,9 @@ export default {
         this.busy = false;
       }
     },
-    shareMessage() {
-      if (!this.recording?.visibility) {
-        return {
-          title: '乡声集盒',
-          path: ROUTES.home,
-        };
-      }
-      return {
-        title: `乡声集盒 · ${this.recording.original_gloss}`,
-        path: pageUrl(ROUTES.recordingDetail, {
-          id: this.id,
-        }),
-        query: `id=${this.id}`,
-      };
-    },
     share() {
-      // #ifdef H5
-      if (typeof window === 'undefined') return;
-      const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-      const url = `${window.location.origin}${base}${pageUrl(ROUTES.recordingDetail, {
-        id: this.id,
-      })}`;
-      uni.setClipboardData({
-        data: url,
-        success: () => notify({
-          title: '乡音链接已复制',
-        }),
-        fail: () => notify({
-          title: '复制失败，请重试',
-        }),
-      });
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.shareMessage, '乡音链接已复制');
       // #endif
     },
   },

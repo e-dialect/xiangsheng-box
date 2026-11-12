@@ -7,7 +7,7 @@
     <view class="app-shell__header">
       <view class="app-shell__heading">
         <view class="app-shell__brand">
-          乡声集盒 · FIELD ARCHIVE
+          乡声集盒
         </view>
         <view class="app-shell__title">
           {{ title }}

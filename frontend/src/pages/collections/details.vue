@@ -24,6 +24,18 @@
         <text class="box-note">
           {{ box.entry_count }} 个词条 · {{ box.recording_count }} 段乡音
         </text>
+        <view
+          v-if="shareMessage"
+          class="box-actions"
+        >
+          <BaseButton
+            size="small"
+            variant="ghost"
+            :open-type="shareType"
+            :text="shareType || canSystemShare ? '分享集盒' : '复制集盒链接'"
+            @click="shareCollection"
+          />
+        </view>
         <BaseButton
           v-if="box.editable"
           variant="ghost"
@@ -380,6 +392,13 @@ import {
 } from '@/services/entryRecording';
 import { goEntryDetail, goRecord, goCollections } from '@/services/navigation';
 import { confirm, notify } from '@/services/feedback';
+import {
+  collectionShareMessage, defaultContentShareMessage, qqContentShareMessage, syncContentShareMenu,
+} from '@/services/contentShare';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 
 export default {
   components: {
@@ -420,15 +439,47 @@ export default {
     recordingNext: null,
     recordingPage: 1,
   }),
-  onLoad(options) {
+  computed: {
+    shareType() { return canUseNativeMiniProgramShare() ? 'share' : ''; },
+    canSystemShare: canUseSystemShare,
+    shareMessage() {
+      if (!hasShareTarget() || this.loading || this.busy || this.error) return null;
+      return collectionShareMessage(this.box);
+    },
+  },
+  watch: {
+    shareMessage(message) {
+      syncContentShareMenu(this, Boolean(message));
+    },
+  },
+  onLoad(options = {}) {
     this.id = options.id;
   },
   onShow() {
+    syncContentShareMenu(this, false);
     this.load();
   },
+  // #ifdef MP-WEIXIN || MP-QQ
+  onShareAppMessage() {
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'collection');
+    const { title, path } = this.shareMessage || defaultContentShareMessage();
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
+  // #ifdef MP-WEIXIN
+  onShareTimeline() {
+    const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
   methods: {
     entryTitle,
     goEntryDetail,
+    shareCollection() {
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.shareMessage, '集盒链接已复制');
+      // #endif
+    },
     recordFor(id) {
       goRecord({
         entry_id: id,
