@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { installVisualFixture, openVisualRoute, horizontalOverflow } from './helpers/visualReviewFixture';
+import {
+  installVisualFixture, openVisualRoute, horizontalOverflow, observeRuntime,
+} from './helpers/visualReviewFixture';
 import { stableScreenshot } from './helpers/stableScreenshot';
 
 const original = { id: 3, name: '莆仙方言', qualified_code: '闽.莆仙', path_names: ['闽语', '莆仙方言'] };
@@ -63,6 +65,10 @@ async function openReview(page) {
   })));
 }
 
+async function openScopeTools(page) {
+  await page.getByRole('button', { name: '修正地区范围', exact: true }).click();
+}
+
 async function openSessionControlTab(page) {
   const tab = await page.context().newPage();
   // Only drive same-origin storage events. Loading the app here would send
@@ -75,6 +81,44 @@ async function openSessionControlTab(page) {
   await tab.goto(new URL(`${base}__e2e-session-control__`, page.url()).href);
   return tab;
 }
+
+test('guests read distinct original sources without loading or showing curator tools', async ({ page }, testInfo) => {
+  const runtimeIssues = observeRuntime(page);
+  const contextRequests = [];
+  page.on('request', (request) => {
+    const { pathname } = new URL(request.url());
+    if (['/curation/', '/curation/actions/', '/dialects/'].includes(pathname)
+      || /^\/users\/\d+$/.test(pathname)) contextRequests.push(pathname);
+  });
+  await installVisualFixture(page);
+  const secondSource = {
+    id: 93,
+    source_type: 'oral',
+    original_text: '合成口述：另一处记录了不同说法。',
+    original_writing: '另一种写法',
+    original_gloss: '合成大意',
+    citation: '合成口述记录，第 5 段',
+  };
+  await page.route('http://localhost:8000/evidence-records/**', (route) => route.fulfill({
+    json: { results: [source, secondSource], next: null },
+  }));
+
+  await page.goto(`${process.env.E2E_H5_BASE || '/'}pages/curation/entry-review?entry_id=21`);
+  await expect(page.getByText('词条来源', { exact: true })).toBeVisible();
+  const sources = page.locator('.source-card');
+  await expect(sources).toHaveCount(2);
+  await expect(sources.nth(0)).toContainText(source.original_text);
+  await expect(sources.nth(0)).toContainText(source.citation);
+  await expect(sources.nth(1)).toContainText(secondSource.original_text);
+  await expect(sources.nth(1)).toContainText(`原写法：${secondSource.original_writing}`);
+  await expect(sources.nth(1)).toContainText(`原大意：${secondSource.original_gloss}`);
+  await expect(sources.nth(1)).toContainText(secondSource.citation);
+  await expect(page.getByRole('button', { name: /修正地区范围|选为范围修正依据|选择更细地区/ })).toHaveCount(0);
+  await expect(page.getByText('整理记录', { exact: true })).toHaveCount(0);
+  expect(contextRequests).toEqual([]);
+  expect(runtimeIssues).toEqual([]);
+  await stableScreenshot(page, { path: testInfo.outputPath('guest-sources-390x844.png') });
+});
 
 for (const theme of ['light', 'dark']) {
   test(`pronunciation-only evidence and persisted history labels ${theme}`, async ({ page }, testInfo) => {
@@ -101,6 +145,7 @@ for (const theme of ['light', 'dark']) {
     }
     await stableScreenshot(page, { path: testInfo.outputPath('pronunciation-history.png'), fullPage: true });
     await page.getByRole('button', { name: '返回词条来源与历史', exact: true }).click();
+    await openScopeTools(page);
     await page.getByRole('button', { name: '选为范围修正依据', exact: true }).click();
     await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
     await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
@@ -138,6 +183,7 @@ test('retry after an account switch reads and writes only the new selector names
     id: uni.getStorageSync('id'), token: uni.getStorageSync('token'),
   }))).toEqual({ id: '8', token: 'visual-review-b' });
   await page.getByRole('button', { name: '重试', exact: true }).click();
+  await openScopeTools(page);
   await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
   await expect(page.getByRole('button', { name: /^最近 ·/ })).toHaveCount(0);
   await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
@@ -154,7 +200,7 @@ test('retry after an account switch reads and writes only the new selector names
   await secondTab.close();
 });
 
-test('a full page retry clears evidence selected on a later page', async ({ page }) => {
+test('sources stay readable while the entry is unavailable and scope tools wait for retry', async ({ page }) => {
   const state = await setup(page, 'light');
   let entryUnavailable = true;
   await page.route('http://localhost:8000/entries/21/', (route) => (
@@ -170,11 +216,12 @@ test('a full page retry clears evidence selected on a later page', async ({ page
   await openReview(page);
   await expect(page.getByText('词条读取暂时失败', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '加载更多来源', exact: true }).click();
-  await page.locator('.source-card').filter({ hasText: '第二页合成证据' })
-    .getByRole('button', { name: '选为范围修正依据', exact: true }).click();
+  await expect(page.getByText('第二页合成证据', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '修正地区范围', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '选为范围修正依据', exact: true })).toHaveCount(0);
   entryUnavailable = false;
   await page.getByRole('button', { name: '重试', exact: true }).click();
-  await expect(page.getByText('来源已重新加载，请重新选择依据', { exact: true })).toBeVisible();
+  await openScopeTools(page);
   await expect(page.getByText('已选 0 条依据', { exact: false })).toBeVisible();
   await expect(page.getByText('第二页合成证据', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '核对并提交范围修正', exact: true })).toBeDisabled();
@@ -191,9 +238,12 @@ for (const theme of ['light', 'dark']) {
       page.on('pageerror', (error) => runtimeErrors.push(error.message));
       await openReview(page);
       await expect(page.getByText(source.original_text, { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: '选择更细地区', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: '修正地区范围', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: '选择更细地区', exact: true })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '选为范围修正依据', exact: true })).toHaveCount(0);
       await stableScreenshot(page, { path: testInfo.outputPath('entry-review.png'), fullPage: true });
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);
+      await openScopeTools(page);
       await page.getByRole('button', { name: '选为范围修正依据', exact: true }).click();
       await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
       await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
@@ -243,6 +293,7 @@ for (const theme of ['light', 'dark']) {
 test('session changes also remove evidence and draft text from the pending confirmation', async ({ page }) => {
   await setup(page, 'light');
   await openReview(page);
+  await openScopeTools(page);
   await page.getByRole('button', { name: '选为范围修正依据', exact: true }).click();
   await page.getByRole('button', { name: '选择更细地区', exact: true }).click();
   await page.getByRole('button', { name: '莆田，选择这里', exact: true }).click();
@@ -263,6 +314,7 @@ test('staff without any curator grant can submit a scope correction', async ({ p
   const state = await setup(page, 'light');
   state.staff = true;
   await openReview(page);
+  await openScopeTools(page);
   await expect(page.getByRole('button', { name: '选择更细地区', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: '选为范围修正依据', exact: true }).click();
   await page.getByRole('button', { name: '选择更细地区', exact: true }).click();

@@ -102,8 +102,6 @@ export function dialectBreadcrumb(dialect = {}, dialects = dialectCatalog) {
 export function dialectCardLabel(dialect = {}, dialects = dialectCatalog) {
   const path = dialectPathNames(dialect, dialects);
   if (!path.length) return '地区待补充';
-  if (path.length === 1) return path[0];
-  const family = path[1];
-  const locality = path[path.length - 1];
-  return family === locality ? family : `${family} · ${locality}`;
+  // Any ancestor can identify the language or distinguish a locality.
+  return path.join(' · ');
 }

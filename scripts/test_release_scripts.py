@@ -40,9 +40,9 @@ class AuthorizationTests(unittest.TestCase):
     def test_aggregate_gate_accepts_only_the_intentional_main_skip(self):
         step = CI['jobs']['ci-gate']['steps'][0]
         command = step['run'].split("node <<'JS'\n", 1)[1].rsplit('\nJS', 1)[0]
-        for event in ['push', 'workflow_dispatch', 'pull_request']:
+        for event in ['push', 'workflow_dispatch', 'pull_request', 'merge_group']:
             jobs = {name: {'result': 'success'} for name in CI['jobs']['ci-gate']['needs']}
-            if event != 'pull_request':
+            if event in ['push', 'workflow_dispatch']:
                 jobs['commit-messages']['result'] = 'skipped'
             env = {'EVENT_NAME': event, 'NEEDS': json.dumps(jobs)}
             self.assertEqual(node(command, env).returncode, 0)
@@ -52,6 +52,10 @@ class AuthorizationTests(unittest.TestCase):
                 self.assertNotEqual(node(command, {**env, 'NEEDS': json.dumps(changed)}).returncode, 0)
             jobs['backend']['result'] = 'skipped'
             self.assertNotEqual(node(command, {**env, 'NEEDS': json.dumps(jobs)}).returncode, 0)
+
+        jobs['backend']['result'] = 'success'
+        jobs['commit-messages']['result'] = 'skipped'
+        self.assertNotEqual(node(command, {'EVENT_NAME': 'merge_group', 'NEEDS': json.dumps(jobs)}).returncode, 0)
 
     def test_release_build_has_no_private_build_inputs_or_cos_actions(self):
         jobs = RELEASE['jobs']
@@ -63,7 +67,8 @@ class AuthorizationTests(unittest.TestCase):
             self.assertIs(build['with']['push'], False)
             self.assertIs(build['with']['load'], True)
             if service == 'frontend':
-                self.assertEqual(build['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+                self.assertEqual(build['with']['build-args'].strip(),
+                                 'VITE_BACKEND_URL=\nVITE_PHONE_CODE_LOGIN_ENABLED=false')
             else:
                 self.assertNotIn('build-args', build['with'])
             self.assertNotIn('secrets', build['with'])
@@ -71,6 +76,7 @@ class AuthorizationTests(unittest.TestCase):
             ignored = (ROOT / context / '.dockerignore').read_text().splitlines()
             self.assertIn('.env*', ignored)
         self.assertIn('VITE_BACKEND_URL_RUNTIME_REPLACEMENT', (ROOT / 'frontend/Dockerfile').read_text())
+        self.assertIn('ARG VITE_PHONE_CODE_LOGIN_ENABLED=false', (ROOT / 'frontend/Dockerfile').read_text())
         cos_original = subprocess.check_output(['git', 'show', SHA + ':.github/workflows/deploy-cos.yml'], cwd=ROOT)
         self.assertEqual((ROOT / '.github/workflows/deploy-cos.yml').read_bytes(), cos_original)
         self.assertNotIn('TENCENT_CLOUD', (ROOT / '.github/workflows/release.yml').read_text())
@@ -78,7 +84,8 @@ class AuthorizationTests(unittest.TestCase):
     def test_ci_production_runtime_uses_the_same_compiled_frontend_contract(self):
         steps = CI['jobs']['docker']['steps']
         production = next(step for step in steps if step.get('name') == 'Build production frontend image')
-        self.assertEqual(production['with']['build-args'].strip(), 'VITE_BACKEND_URL=')
+        self.assertEqual(production['with']['build-args'].strip(),
+                         'VITE_BACKEND_URL=\nVITE_PHONE_CODE_LOGIN_ENABLED=false')
         self.assertEqual(production['with']['platforms'], 'linux/amd64')
         self.assertNotIn('push', production['with'])
         smoke = next(step for step in steps if step.get('name') == 'Check real production runtime without external services')
@@ -184,7 +191,10 @@ class ManifestTests(unittest.TestCase):
         result = self.create()
         self.assertEqual(result.returncode, 0, result.stderr)
         release = json.loads((self.directory / 'release-manifest.json').read_text())
-        self.assertEqual(release['build']['frontend'], {'VITE_BACKEND_URL': ''})
+        self.assertEqual(release['build']['frontend'], {
+            'VITE_BACKEND_URL': '',
+            'VITE_PHONE_CODE_LOGIN_ENABLED': 'false',
+        })
         self.assertEqual(release['recovery']['compatibility'], 'server-local-attestation-required')
         self.assertFalse(release['recovery']['rollbackSafe'])
         entries = []

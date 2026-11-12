@@ -21,6 +21,7 @@ viewports.forEach(({ width, height, theme }) => {
     await page.setViewportSize({ width, height });
     await installVisualFixture(page, { persona: 'guest', theme });
     await openVisualRoute(page, '/pages/login/login');
+    await expect(page.getByRole('button', { name: '微信一键登录' })).toHaveCount(0);
 
     const actions = [
       page.getByRole('button', { name: '暂不登录，先去查词' }),

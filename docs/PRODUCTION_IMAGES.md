@@ -29,6 +29,15 @@ with a bounded writable `/tmp`. Build the production H5 image with
 `VITE_BACKEND_URL=` for same-origin APIs; the default placeholder build preserves
 development runtime replacement.
 
+Phone-code login is hidden by default through the frontend Dockerfile's
+`VITE_PHONE_CODE_LOGIN_ENABLED=false` build argument. The GHCR release workflow
+passes `false` explicitly and records it in `build.frontend` in the release
+manifest, so changing a container environment variable cannot expose the UI.
+After SMS delivery has been verified, change the release workflow build argument
+and its manifest contract/tests to `true`; for the separate COS H5 workflow, set
+the same value in the `Build H5` step environment. Rebuild and publish the
+frontend artifact before expecting the option to appear.
+
 Object storage can share a bucket only with an explicit isolated prefix. New COS
 uploads and deletions use that prefix; deletion URLs outside it are rejected.
 This does not enforce a provider-side IAM restriction: deploy a dedicated account

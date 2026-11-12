@@ -113,3 +113,24 @@ test('auth step-back actions preserve account drafts and clear reset secrets', a
   await expect(fieldInput(page, '验证码')).toHaveValue('');
   expect(runtimeIssues).toEqual([]);
 });
+
+test('registration shows a disabled send button while the code request is pending', async ({ page }) => {
+  await installVisualFixture(page, { persona: 'guest', theme: 'light' });
+  let releaseResponse;
+  const pendingResponse = new Promise((resolve) => { releaseResponse = resolve; });
+  await page.route('http://localhost:8000/users/email-code', async (route) => {
+    await pendingResponse;
+    await route.fulfill({ status: 200, json: {} });
+  });
+
+  await openRegisterContactStep(page);
+  await fieldInput(page, '邮箱').fill('collector@example.com');
+  await page.getByRole('button', { name: '获取验证码' }).click();
+  try {
+    await expect(page.getByRole('button', { name: '发送中…' })).toBeDisabled();
+  } finally {
+    releaseResponse();
+  }
+  await expect(page.getByText('验证码已发送')).toBeVisible();
+  await expect(page.getByRole('button', { name: /重新获取/ })).toBeDisabled();
+});
