@@ -131,7 +131,9 @@ class CollectionTimestampTests(TestCase):
         CollectionEntry.objects.filter(pk=section.pk).update(sort_order=7)
         CollectionRecording.objects.filter(pk=item.pk).update(sort_order=9)
         before = Collection.objects.get(pk=self.box).updated_at
-        with patch("django.utils.timezone.now", return_value=before + timedelta(days=1)):
+        with patch(
+            "django.utils.timezone.now", return_value=before + timedelta(days=1)
+        ):
             for payload in (
                 {"ids": [section.pk]},
                 {"ids": [item.pk], "section_id": section.pk},
