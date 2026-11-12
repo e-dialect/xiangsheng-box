@@ -30,7 +30,8 @@ beforeEach(() => {
     createInnerAudioContext: () => {
       const callbacks = {};
       const context = {
-        play: vi.fn(), destroy: vi.fn(),
+        play: vi.fn(),
+        destroy: vi.fn(),
         onTimeUpdate: (callback) => { callbacks.timeupdate = callback; },
         onEnded: (callback) => { callbacks.ended = callback; },
         onError: (callback) => { callbacks.error = callback; },
@@ -40,9 +41,12 @@ beforeEach(() => {
       return context;
     },
   });
-  listRecordings.mockResolvedValue({ results: [{
-    id: 1, original_gloss: '乡音', audio_url: '/sample.mp3',
-  }], next: null });
+  listRecordings.mockResolvedValue({
+    results: [{
+      id: 1, original_gloss: '乡音', audio_url: '/sample.mp3',
+    }],
+    next: null,
+  });
 });
 afterEach(() => {
   wrapper?.unmount();
@@ -112,6 +116,10 @@ it('does not leave an old card playing after account/profile replacement', async
   accountId = '10';
   await wrapper.setData({ id: '10', loading: true });
   expect(contexts[0].destroy).toHaveBeenCalledTimes(1);
-  await wrapper.setData({ loading: false, userInfo: { user: { id: 10 }, contribution: { recordings: 0 } }, recordings: [] });
+  await wrapper.setData({
+    loading: false,
+    userInfo: { user: { id: 10 }, contribution: { recordings: 0 } },
+    recordings: [],
+  });
   expect(wrapper.findComponent(EntryRecordingCard).exists()).toBe(false);
 });
