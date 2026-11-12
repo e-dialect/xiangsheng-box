@@ -79,6 +79,36 @@
         :data="form"
         :rules="rules"
       >
+        <view
+          v-if="selectedEntry"
+          class="record-entry-context"
+        >
+          <view class="record-entry-context__label">
+            这次录这个词
+          </view>
+          <view
+            class="selected-entry"
+          >
+            <view>
+              <view class="selected-entry__title">
+                {{ entryTitle(selectedEntry) }}
+              </view>
+              <view class="selected-entry__summary">
+                {{ selectedEntry.summary }}
+              </view>
+            </view>
+            <BaseButton
+              size="small"
+              variant="ghost"
+              text="取消选词"
+              @click="clearEntry"
+            />
+          </view>
+          <text class="record-section__help">
+            照你平常的说法读出来就好，不必填写写法或音标。
+          </text>
+        </view>
+
         <view class="required-flow">
           <view
             class="record-section record-section--audio"
@@ -225,63 +255,45 @@
                 placeholder="IPA、罗马字或自己的记法都可以"
               />
 
-              <view class="entry-linker">
+              <view
+                v-if="!selectedEntry"
+                class="entry-linker"
+              >
                 <view class="entry-linker__heading">
                   关联已有词条
                 </view>
+                <BaseField
+                  v-model="entryKeyword"
+                  name="entry_keyword"
+                  label="查找词条"
+                  placeholder="按写法或大意搜索"
+                  @confirm="searchEntries"
+                />
+                <BaseButton
+                  size="small"
+                  variant="ghost"
+                  :loading="entrySearching"
+                  text="查找可关联词条"
+                  @click="searchEntries"
+                />
                 <view
-                  v-if="selectedEntry"
-                  class="selected-entry"
+                  v-for="entry in entryCandidates"
+                  :key="entry.id"
+                  class="entry-candidate"
+                  role="button"
+                  :aria-label="`关联词条：${entryTitle(entry)}`"
+                  @tap="selectEntry(entry)"
                 >
-                  <view>
-                    <view class="selected-entry__title">
-                      {{ entryTitle(selectedEntry) }}
-                    </view>
-                    <view class="selected-entry__summary">
-                      {{ selectedEntry.summary }}
-                    </view>
+                  <view class="entry-candidate__title">
+                    {{ entryTitle(entry) }}
                   </view>
-                  <BaseButton
-                    size="small"
-                    variant="ghost"
-                    text="取消关联"
-                    @click="clearEntry"
-                  />
+                  <view class="entry-candidate__summary">
+                    {{ entry.summary || '大意待补充' }}
+                  </view>
+                  <view class="entry-candidate__meta">
+                    {{ dialectLabel(entry.usage_dialect) }} · {{ entry.recording_count }} 段录音
+                  </view>
                 </view>
-                <template v-else>
-                  <BaseField
-                    v-model="entryKeyword"
-                    name="entry_keyword"
-                    label="查找词条"
-                    placeholder="按写法或大意搜索"
-                    @confirm="searchEntries"
-                  />
-                  <BaseButton
-                    size="small"
-                    variant="ghost"
-                    :loading="entrySearching"
-                    text="查找可关联词条"
-                    @click="searchEntries"
-                  />
-                  <view
-                    v-for="entry in entryCandidates"
-                    :key="entry.id"
-                    class="entry-candidate"
-                    role="button"
-                    :aria-label="`关联词条：${entryTitle(entry)}`"
-                    @tap="selectEntry(entry)"
-                  >
-                    <view class="entry-candidate__title">
-                      {{ entryTitle(entry) }}
-                    </view>
-                    <view class="entry-candidate__summary">
-                      {{ entry.summary || '大意待补充' }}
-                    </view>
-                    <view class="entry-candidate__meta">
-                      {{ dialectLabel(entry.usage_dialect) }} · {{ entry.recording_count }} 段录音
-                    </view>
-                  </view>
-                </template>
               </view>
 
               <BaseField
@@ -634,7 +646,6 @@ export default {
     async loadEntry(id) {
       try {
         this.selectedEntry = await getEntry(id);
-        this.optionalSections = ['optional'];
       } catch (error) {
         notify({ title: '原词条暂时无法读取', icon: 'none' });
       }
@@ -756,6 +767,32 @@ export default {
 </script>
 
 <style scoped>
+/* Keep the recording task visible without expanding professional fields. */
+.record-entry-context {
+  display: grid;
+  gap: 12rpx;
+  min-width: 0;
+  padding: 20rpx;
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle-color);
+}
+
+.record-entry-context__label {
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.record-entry-context .selected-entry {
+  flex-wrap: wrap;
+}
+
+.record-entry-context .selected-entry > view {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .record-page,
 .record-form,
 .optional-fields {
