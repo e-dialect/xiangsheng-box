@@ -1,25 +1,33 @@
 <template>
   <PageShell title="词条收藏">
-    <view class="bookmark-intro">
-      <view class="eyebrow">
-        私人书签
-      </view>
-      <view class="intro-title">
-        把想继续听、继续查的词条放在一起
-      </view>
-      <view class="intro-copy">
-        收藏只帮助你稍后找回词条，不会影响公开排序，也不会给词条或贡献者加分。
-      </view>
-      <view
-        v-if="!loading && !error"
-        class="collection-summary"
-      >
-        {{ collectionSummary }}
+    <view
+      v-if="total || appliedSearch"
+      class="bookmark-search"
+    >
+      <view class="bookmark-search__controls">
+        <BaseField
+          v-model="keyword"
+          name="bookmarkKeyword"
+          label="查我的收藏"
+          placeholder="输入写法或意思"
+          aria-role="searchbox"
+          aria-label="查我的收藏"
+          clearable
+          :disabled="loading || removingId !== null"
+          @blur="captureSearchInput"
+          @confirm="confirmSearch"
+        />
+        <BaseButton
+          class="bookmark-search__submit"
+          text="查找"
+          :disabled="loading || removingId !== null"
+          @click="submitSearch"
+        />
       </view>
     </view>
 
     <BaseLoading
-      v-if="loading"
+      v-if="loading && !entries.length"
       text="正在读取你的词条收藏…"
     />
     <EmptyState
@@ -27,12 +35,18 @@
       title="收藏暂时没有加载出来"
       :description="error"
       action-text="重新加载"
-      @action="load"
+      @action="load()"
+    />
+    <EmptyState
+      v-else-if="!entries.length && appliedSearch"
+      title="收藏里没有找到匹配词条"
+      action-text="查看全部收藏"
+      @action="resetSearch"
     />
     <EmptyState
       v-else-if="!entries.length"
       title="还没有收藏词条"
-      description="查词时收藏想继续听、继续考据的词条，会集中显示在这里。"
+      description="查词时点「收藏词条」，就能在这里找回来。只有你能看到这些收藏。"
       action-text="去查词条"
       @action="goSearch"
     />
@@ -41,17 +55,17 @@
       class="bookmark-archive"
     >
       <view class="section-heading">
-        <view>
-          <view class="section-kicker">
-            已收藏
-          </view>
-          <view class="section-title">
-            按词条继续浏览
-          </view>
-        </view>
-        <view class="section-count">
-          {{ entries.length }} 个
-        </view>
+        <text aria-live="polite">
+          {{ appliedSearch ? `找到 ${total} 个收藏词条` : `已收藏 ${total} 个词条` }}
+        </text>
+        <BaseButton
+          v-if="appliedSearch"
+          size="small"
+          variant="ghost"
+          text="查看全部收藏"
+          :disabled="loading || removingId !== null"
+          @click="resetSearch"
+        />
       </view>
 
       <view class="bookmark-list">
@@ -61,9 +75,6 @@
           class="bookmark-card"
         >
           <view class="bookmark-card__head">
-            <view class="entry-kind">
-              词条
-            </view>
             <view :class="['status-badge', entry.status]">
               {{ statusLabel(entry.status) }}
             </view>
@@ -100,7 +111,7 @@
               size="small"
               variant="ghost"
               :loading="removingId === entry.id"
-              :disabled="removingId !== null"
+              :disabled="loading || removingId !== null"
               :aria-label="`移出收藏：${entryTitle(entry)}`"
               text="移出收藏"
               @click="remove(entry.id)"
@@ -108,12 +119,31 @@
           </view>
         </view>
       </view>
+      <view
+        v-if="next"
+        class="bookmark-pagination"
+      >
+        <text
+          v-if="paginationError"
+          role="status"
+        >
+          更多收藏暂时没加载出来，已显示的词条仍可查看。
+        </text>
+        <BaseButton
+          variant="ghost"
+          :text="paginationError ? '重试加载更多收藏' : '查看更多收藏'"
+          :loading="loading"
+          :disabled="removingId !== null"
+          @click="load(true)"
+        />
+      </view>
     </view>
   </PageShell>
 </template>
 
 <script>
 import BaseButton from '@/components/BaseButton.vue';
+import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import PageShell from '@/components/PageShell.vue';
@@ -129,22 +159,21 @@ import { goEntryDetail, goSearch } from '@/services/navigation';
 
 export default {
   components: {
-    BaseButton, BaseLoading, EmptyState, PageShell,
+    BaseButton, BaseField, BaseLoading, EmptyState, PageShell,
   },
   data() {
     return {
       entries: [],
-      loading: true,
+      loading: false,
       error: '',
+      paginationError: false,
       removingId: null,
+      keyword: '',
+      appliedSearch: '',
+      page: 1,
+      total: 0,
+      next: false,
     };
-  },
-  computed: {
-    collectionSummary() {
-      return this.entries.length
-        ? `${this.entries.length} 个词条，等你回来继续看`
-        : '从一次查词开始，留下第一枚书签';
-    },
   },
   onLoad() { this.load(); },
   methods: {
@@ -157,25 +186,59 @@ export default {
         published: '已公开', disputed: '有争议', draft: '待整理', rejected: '已退回',
       })[status] || '整理中';
     },
-    async load() {
+    captureSearchInput(event) {
+      const value = typeof event === 'string' ? event : event?.value;
+      if (typeof value === 'string') this.keyword = value;
+    },
+    confirmSearch(event) {
+      this.captureSearchInput(event);
+      return this.submitSearch();
+    },
+    async submitSearch() {
+      await this.$nextTick();
+      if (this.loading || this.removingId !== null) return;
+      this.appliedSearch = this.keyword.trim();
+      await this.load();
+    },
+    resetSearch() {
+      this.keyword = '';
+      this.submitSearch();
+    },
+    async load(more = false) {
+      if (this.loading || (more && !this.next)) return;
+      const page = more ? this.page + 1 : 1;
       this.loading = true;
       this.error = '';
-      this.entries = [];
+      this.paginationError = false;
+      if (!more) {
+        this.entries = [];
+        this.next = false;
+      }
       try {
-        this.entries = pageResults(await listEntryBookmarks({ page_size: 100 }));
+        const response = await listEntryBookmarks({
+          page,
+          ...(this.appliedSearch ? { search: this.appliedSearch } : {}),
+        });
+        const results = pageResults(response);
+        const loadedIds = new Set(this.entries.map((entry) => entry.id));
+        this.entries = [...this.entries, ...results.filter((entry) => !loadedIds.has(entry.id))];
+        this.page = page;
+        this.total = response.count ?? this.entries.length;
+        this.next = Boolean(response.next);
       } catch (error) {
-        this.error = error?.message || '请检查网络或登录状态后重试';
+        if (more) this.paginationError = true;
+        else this.error = error?.message || '请检查网络或登录状态后重试';
       } finally {
         this.loading = false;
       }
     },
     async remove(id) {
-      if (this.removingId !== null) return;
+      if (this.loading || this.removingId !== null) return;
       this.removingId = id;
       try {
         await unbookmarkEntry(id);
-        this.entries = this.entries.filter((entry) => entry.id !== id);
         notifySuccess('已移出收藏');
+        await this.load();
       } catch (error) {
         notify({ title: error?.message || '暂时无法移出收藏' });
       } finally {
@@ -187,55 +250,23 @@ export default {
 </script>
 
 <style scoped>
-.bookmark-intro {
-  padding: var(--space-4);
-  border: 1px solid var(--accent-color);
+.bookmark-search {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background: var(--accent-subtle-color);
-}
-
-.eyebrow,
-.section-kicker,
-.entry-kind {
-  color: var(--accent-color);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  letter-spacing: 0.1em;
-}
-
-.intro-title {
-  margin-top: var(--space-1);
-  color: var(--text-color);
-  font-family: STSong, SimSun, serif;
-  font-size: var(--font-size-xl);
-  font-weight: 900;
-  line-height: 1.35;
-}
-
-.intro-copy,
-.bookmark-card__summary {
-  color: var(--text-secondary-color);
-  font-size: var(--font-size-sm);
-  line-height: 1.65;
-}
-
-.intro-copy {
-  margin-top: var(--space-1);
-}
-
-.collection-summary {
-  display: inline-flex;
-  margin-top: var(--space-3);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-pill);
   background: var(--surface-color);
-  color: var(--accent-color);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
 }
 
-.bookmark-archive {
-  margin-top: var(--space-4);
+.bookmark-search__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+.bookmark-search__submit {
+  margin-bottom: var(--space-2);
 }
 
 .section-heading,
@@ -249,19 +280,8 @@ export default {
 
 .section-heading {
   margin-bottom: var(--space-2);
-}
-
-.section-title {
-  margin-top: var(--space-1);
-  color: var(--text-color);
-  font-size: var(--font-size-lg);
-  font-weight: 800;
-}
-
-.section-count {
-  flex: 0 0 auto;
-  color: var(--muted-color);
-  font-size: var(--font-size-xs);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
 }
 
 .bookmark-list {
@@ -275,10 +295,6 @@ export default {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--surface-color);
-}
-
-.entry-kind {
-  letter-spacing: 0;
 }
 
 .status-badge {
@@ -313,6 +329,10 @@ export default {
 
 .bookmark-card__summary {
   margin-top: var(--space-1);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
 }
 
 .bookmark-card__meta {
@@ -332,8 +352,24 @@ export default {
 
 .bookmark-card__actions {
   justify-content: flex-end;
+  flex-wrap: wrap;
   margin-top: var(--space-3);
   padding-top: var(--space-3);
   border-top: 1px solid var(--border-color);
+}
+
+.bookmark-pagination {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+}
+
+@media (min-width: 720px) {
+  .bookmark-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>
