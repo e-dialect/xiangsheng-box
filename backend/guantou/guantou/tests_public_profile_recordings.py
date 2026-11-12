@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Dialect, Recording
+from .models import Dialect, Entry, Recording, RecordingEntryLink
 
 
 class PublicProfileRecordingTests(TestCase):
@@ -62,3 +62,33 @@ class PublicProfileRecordingTests(TestCase):
             with self.subTest(value=value):
                 response = self.client.get("/recordings/", {"recorder_id": value})
                 self.assertEqual(response.status_code, 400)
+
+    def test_public_recording_does_not_expose_a_private_link_to_other_viewers(self):
+        private_entry = Entry.objects.create(
+            created_by=self.author,
+            visibility=False,
+            status=Entry.Status.REVIEWED,
+            summary="私人词条",
+        )
+        RecordingEntryLink.objects.create(
+            recording=self.newer,
+            entry=private_entry,
+            status=RecordingEntryLink.Status.ACCEPTED,
+            created_by=self.author,
+        )
+        for viewer in (None, self.other, self.author, self.staff):
+            with self.subTest(viewer=viewer):
+                client = APIClient()
+                client.force_authenticate(viewer)
+                response = client.get("/recordings/", {"recorder_id": self.author.id})
+                self.assertEqual(response.status_code, 200)
+                recording = next(
+                    item
+                    for item in response.data["results"]
+                    if item["id"] == self.newer.id
+                )
+                if viewer in (self.author, self.staff):
+                    self.assertEqual(len(recording["entry_links"]), 1)
+                else:
+                    self.assertEqual(recording["entry_links"], [])
+                    self.assertNotIn("私人词条", str(response.data))
