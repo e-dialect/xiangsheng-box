@@ -36,6 +36,16 @@ export function recordingShareMessage(recording) {
   return contentShareMessage(recording, ROUTES.recordingDetail, `乡音｜${title}`);
 }
 
+export function collectionShareMessage(collection) {
+  if (collection?.is_public !== true || !collection.id) return null;
+  const title = shareText(collection.title, 24) || '公开集盒';
+  return {
+    title: `集盒｜${title}`,
+    path: pageUrl(ROUTES.collectionDetail, { id: collection.id }),
+    query: `id=${encodeURIComponent(collection.id)}`,
+  };
+}
+
 export function defaultContentShareMessage() {
   return { title: APP_NAME, path: ROUTES.home };
 }
@@ -49,7 +59,11 @@ export function qqContentShareMessage(message, kind) {
 }
 
 export function openQQSharedContent(query) {
-  const routes = { entry: ROUTES.entryDetail, recording: ROUTES.recordingDetail };
+  const routes = {
+    entry: ROUTES.entryDetail,
+    recording: ROUTES.recordingDetail,
+    collection: ROUTES.collectionDetail,
+  };
   const kind = query?.box_share;
   const route = Object.prototype.hasOwnProperty.call(routes, kind) ? routes[kind] : null;
   const id = String(query?.id ?? '');

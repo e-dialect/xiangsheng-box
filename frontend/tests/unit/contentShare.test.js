@@ -2,7 +2,8 @@ import {
   afterEach, describe, expect, it, vi,
 } from 'vitest';
 import {
-  entryShareMessage, openQQSharedContent, qqContentShareMessage, recordingShareMessage,
+  collectionShareMessage, entryShareMessage, openQQSharedContent,
+  qqContentShareMessage, recordingShareMessage,
 } from '@/services/contentShare';
 
 const dialect = {
@@ -46,6 +47,17 @@ describe('public content share cards', () => {
     expect(recordingShareMessage({ id: 2 })).toBeNull();
     expect(recordingShareMessage({ id: 2, visibility: true, status: 'rejected' })).toBeNull();
   });
+
+  it('shares a public collection with its saved title and excludes private collections', () => {
+    expect(collectionShareMessage({
+      id: 7, is_public: true, title: '  春节\n 问候  ', description: '盒签简介',
+    })).toEqual({
+      title: '集盒｜春节 问候',
+      path: '/pages/collections/details?id=7',
+      query: 'id=7',
+    });
+    expect(collectionShareMessage({ id: 7, is_public: false, title: '私人' })).toBeNull();
+  });
 });
 
 describe('QQ mini-program share destination', () => {
@@ -69,6 +81,13 @@ describe('QQ mini-program share destination', () => {
     getCurrentPages.mockReturnValue([{ route: 'pages/index' }]);
     openQQSharedContent({ box_share: 'entry', id: '12' });
     expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/entries/details?id=12' });
+  });
+
+  it('opens a shared public collection from its QQ launch query', () => {
+    vi.stubGlobal('uni', { reLaunch: vi.fn(), navigateTo: vi.fn() });
+    vi.stubGlobal('getCurrentPages', () => []);
+    openQQSharedContent({ box_share: 'collection', id: '19' });
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/collections/details?id=19' });
   });
 
   it('ignores invalid routes and IDs and does not reopen the current item', () => {
