@@ -354,11 +354,12 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if len(ids) != len(set(ids)) or set(ids) != expected:
             raise ValidationError("排序必须包含该目录全部可见条目且不能重复")
         ordered = list(rows)
+        original_ids = [row.id for row in ordered]
         by_id = {row.id: row for row in ordered}
         positions = [index for index, row in enumerate(ordered) if row.id in expected]
         for position, item_id in zip(positions, ids):
             ordered[position] = by_id[item_id]
-        changed = any(row.sort_order != index for index, row in enumerate(ordered))
+        changed = [row.id for row in ordered] != original_ids
         if changed:
             for index, row in enumerate(ordered):
                 row.sort_order = index

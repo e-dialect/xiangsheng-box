@@ -121,6 +121,25 @@ class CollectionTimestampTests(TestCase):
             Collection.objects.get(pk=self.box).updated_at, later + timedelta(days=1)
         )
 
+    def test_sort_order_gaps_do_not_refresh_timestamps(self):
+        self.client.post(
+            self.url + "recordings/",
+            {"recording_id": self.recording.pk, "entry_id": self.entry.pk},
+        )
+        section = CollectionEntry.objects.get(collection_id=self.box)
+        item = CollectionRecording.objects.get(collection_id=self.box)
+        CollectionEntry.objects.filter(pk=section.pk).update(sort_order=7)
+        CollectionRecording.objects.filter(pk=item.pk).update(sort_order=9)
+        before = Collection.objects.get(pk=self.box).updated_at
+        with patch("django.utils.timezone.now", return_value=before + timedelta(days=1)):
+            for payload in (
+                {"ids": [section.pk]},
+                {"ids": [item.pk], "section_id": section.pk},
+            ):
+                response = self.client.post(self.url + "order/", payload, format="json")
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(Collection.objects.get(pk=self.box).updated_at, before)
+
     def test_unknown_historical_timestamps_remain_null_in_api(self):
         self.link.delete()
         self.client.post(self.url + "recordings/", {"recording_id": self.recording.pk})
