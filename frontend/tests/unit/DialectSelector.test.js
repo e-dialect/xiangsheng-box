@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
 import { mount } from '@vue/test-utils';
 import DialectLabel from '@/components/DialectLabel.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
@@ -9,7 +11,9 @@ import {
 } from '@/utils/dialectTree';
 
 const dialects = [
-  { id: 1, name: '闽语', code: '闽', qualified_code: '闽', sort_order: 1 },
+  {
+    id: 1, name: '闽语', code: '闽', qualified_code: '闽', sort_order: 1,
+  },
   {
     id: 2,
     name: '莆仙片（兴化方言）',
@@ -17,7 +21,9 @@ const dialects = [
     qualified_code: '闽.莆仙',
     sort_order: 1,
   },
-  { id: 3, name: '莆田', code: '莆田', qualified_code: '闽.莆仙.莆田', sort_order: 1 },
+  {
+    id: 3, name: '莆田', code: '莆田', qualified_code: '闽.莆仙.莆田', sort_order: 1,
+  },
   {
     id: 4,
     name: '城里',
@@ -38,13 +44,30 @@ describe('hierarchical dialect selection and labels', () => {
   });
 
   it('uses natural card and detail labels without exposing qualified codes', () => {
-    expect(dialectCardLabel(dialects[1], dialects)).toBe('莆仙方言');
-    expect(dialectCardLabel(dialects[3], dialects)).toBe('莆仙方言 · 城里');
+    expect(dialectCardLabel(dialects[1], dialects)).toBe('闽语 · 莆仙方言');
+    expect(dialectCardLabel(dialects[3], dialects)).toBe('闽语 · 莆仙方言 · 莆田 · 城里');
     expect(dialectBreadcrumb(dialects[3], dialects)).toBe('闽语 › 莆仙方言 › 莆田 › 城里');
 
     const card = mount(DialectLabel, { props: { dialect: dialects[3], dialects } });
-    expect(card.text()).toBe('莆仙方言 · 城里');
+    expect(card.text()).toBe('闽语 · 莆仙方言 · 莆田 · 城里');
     expect(card.text()).not.toContain('闽.莆仙');
+  });
+
+  it('preserves parent scope and intermediate regions from API names or fallback codes', () => {
+    expect(dialectCardLabel(dialects[0], dialects)).toBe('闽语');
+    expect(dialectCardLabel(dialects[2], dialects)).toBe('闽语 · 莆仙方言 · 莆田');
+    expect(dialectCardLabel({
+      name: '福州', path_names: ['闽语', '闽东片', '侯官片', '福州'],
+    })).toBe('闽语 · 闽东方言 · 侯官方言 · 福州');
+    expect(dialectCardLabel({
+      name: '厦门', qualified_code: '闽.闽南.泉漳.厦门',
+    }, [])).toBe('闽语 · 闽南 · 泉漳 · 厦门');
+    expect(dialectCardLabel({
+      name: '同名镇', path_names: ['某语言', '某方言', '甲地区', '乙地区', '同名镇'],
+    })).toBe('某语言 · 某方言 · 甲地区 · 乙地区 · 同名镇');
+    expect(dialectCardLabel({ path_names: ['蒙古语', '某地'] }, [])).toBe('蒙古语 · 某地');
+    expect(dialectCardLabel({ name: '独立名称' }, [])).toBe('独立名称');
+    expect(dialectCardLabel(null, [])).toBe('地区待补充');
   });
 
   it('lets a contributor stop at a parent node or continue to a locality', async () => {
@@ -87,6 +110,6 @@ describe('hierarchical dialect selection and labels', () => {
     app.globalData.userInfo = { primary_dialect: dialects[3] };
     await wrapper.setProps({ visible: true });
 
-    expect(wrapper.text()).toContain('默认 · 莆仙方言 · 城里');
+    expect(wrapper.text()).toContain('默认 · 闽语 · 莆仙方言 · 莆田 · 城里');
   });
 });
