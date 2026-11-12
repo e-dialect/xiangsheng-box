@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { stableScreenshot } from './helpers/stableScreenshot';
+import { installVisualFixture, observeRuntime, openVisualRoute } from './helpers/visualReviewFixture';
 
 test('cancelling direct login returns to its public collection without submitting', async ({ page }) => {
   await installVisualFixture(page);
