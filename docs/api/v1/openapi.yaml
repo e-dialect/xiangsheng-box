@@ -54,6 +54,11 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: search
+          in: query
+          description: 在公开集盒名称和简介中查找关键词。浏览自己的集盒时忽略。
+          schema:
+            type: string
         - name: page
           in: query
           schema:

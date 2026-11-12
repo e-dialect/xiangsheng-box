@@ -105,6 +105,11 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 else Collection.objects.none()
             )
         if self.action == "list":
+            keyword = self.request.query_params.get("search", "").strip()
+            if keyword:
+                public = public.filter(
+                    Q(title__icontains=keyword) | Q(description__icontains=keyword)
+                )
             return public
         return (
             Collection.objects.filter(Q(is_public=True) | Q(owner=self.request.user))

@@ -12,6 +12,7 @@ from user.models import UserFollow
 from .models import (
     Dialect,
     Entry,
+    Collection,
     Recording,
     RecordingEntryLink,
     CollectionRecording,
@@ -50,6 +51,28 @@ class RestorationTests(TestCase):
         self.assertEqual(response.status_code, 201, response.data)
         self.box = response.data["id"]
         self.url = f"/collections/{self.box}/"
+
+    def test_public_collection_search_excludes_private_results(self):
+        title_match = Collection.objects.create(
+            owner=self.other, title="拜年乡音", is_public=True
+        )
+        description_match = Collection.objects.create(
+            owner=self.other, title="年节", description="拜年时的问候", is_public=True
+        )
+        Collection.objects.create(owner=self.other, title="路上", is_public=True)
+        Collection.objects.create(
+            owner=self.other, title="私人拜年录音", is_public=False
+        )
+
+        visitor = APIClient()
+        response = visitor.get("/collections/", {"search": " 拜年 "})
+        self.assertEqual(response.status_code, 200)
+        self.assertSetEqual(
+            {item["id"] for item in response.data["results"]},
+            {title_match.id, description_match.id},
+        )
+        mine = self.client.get("/collections/", {"mine": "true", "search": "拜年"})
+        self.assertEqual([item["id"] for item in mine.data["results"]], [self.box])
 
     def test_directory_dedup_sort_and_no_domain_mutations(self):
         RecordingEntryLink.objects.create(
