@@ -542,3 +542,80 @@ class EntryFirstApiTests(TestCase):
         self.assertEqual(response.json()["code"], 400)
         self.assertEqual(boolean.status_code, 400)
         self.assertEqual(boolean.json()["code"], 400)
+
+    def test_writing_type_uses_current_relationships_only(self):
+        current, _ = self.make_entry("当前罗马字", "行")
+        retired, _ = self.make_entry("历史罗马字", "走")
+        form = WritingForm.objects.create(text="hing", form_type="romanization")
+        for entry, is_current in ((current, True), (retired, False)):
+            EntryWriting.objects.create(
+                entry=entry, writing=form, is_current=is_current, status="reviewed"
+            )
+        for params in (
+            {"writing_type": "romanization"},
+            {"writing_type": "romanization", "search": "罗马字"},
+            {"writing_type": "romanization", "writing": "hing"},
+        ):
+            with self.subTest(params=params):
+                response = self.client.get("/entries/", params)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    [item["id"] for item in response.data["results"]], [current.id]
+                )
+
+    def test_exact_writing_and_type_match_same_current_relationship(self):
+        entry, _ = self.make_entry("移动含义", "行")
+        for text in ("hing", "HING"):
+            EntryWriting.objects.create(
+                entry=entry,
+                writing=WritingForm.objects.create(text=text, form_type="romanization"),
+            )
+        cases = (
+            ({"writing": "行", "writing_type": "romanization"}, []),
+            ({"writing": "行", "writing_type": "orthographic"}, [entry.id]),
+            ({"writing": " hing ", "writing_type": "romanization"}, [entry.id]),
+            ({"writing": " hing "}, [entry.id]),
+            ({"writing": "missing"}, []),
+            ({"writing_type": "romanization"}, [entry.id]),
+            # Keyword search spans meanings and other writings, not just the type.
+            ({"search": "行", "writing_type": "romanization"}, [entry.id]),
+        )
+        for params, expected in cases:
+            with self.subTest(params=params):
+                response = self.client.get("/entries/", params)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    [item["id"] for item in response.data["results"]], expected
+                )
+
+    def test_writing_filters_preserve_status_and_visibility_rules(self):
+        entries = []
+        for state in EntryWriting.Status.values:
+            entry, _ = self.make_entry(f"状态 {state}", state)
+            EntryWriting.objects.create(
+                entry=entry,
+                writing=WritingForm.objects.create(
+                    text="hing", form_type="romanization"
+                ),
+                status=state,
+            )
+            entries.append(entry)
+        private, _ = self.make_entry("私有", "私")
+        private.visibility = False
+        private.save(update_fields=["visibility"])
+        EntryWriting.objects.create(
+            entry=private,
+            writing=WritingForm.objects.create(text="hing", form_type="romanization"),
+        )
+        self.client.force_authenticate(user=None)
+        for params in (
+            {"writing_type": "romanization"},
+            {"writing": "hing", "writing_type": "romanization"},
+        ):
+            with self.subTest(params=params):
+                response = self.client.get("/entries/", params)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    {item["id"] for item in response.data["results"]},
+                    {entry.id for entry in entries},
+                )
