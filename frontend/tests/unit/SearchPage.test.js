@@ -147,4 +147,44 @@ describe('entry-first search page orchestration', () => {
     });
     expect(page.search).toHaveBeenCalledOnce();
   });
+
+  it('keeps later pages on the applied filters until the user applies new choices', async () => {
+    const page = pageContext();
+    page.filters.keyword = '行';
+    request.get.mockResolvedValueOnce({ results: [{ id: 1 }], next: '/entries/?page=2' });
+    await page.search();
+
+    page.openSections = ['advanced'];
+    page.filters.hasRecording = true;
+    request.get.mockResolvedValueOnce({ results: [{ id: 2 }], next: null });
+    await page.loadMore();
+    expect(request.get.mock.calls[1][1]).toMatchObject({ search: '行', page: 2 });
+    expect(request.get.mock.calls[1][1]).not.toHaveProperty('has_recording');
+    expect(page.entries.map((entry) => entry.id)).toEqual([1, 2]);
+
+    request.get.mockResolvedValueOnce({ results: [{ id: 3 }], next: null });
+    await page.applyAdvancedFilters();
+    expect(page.openSections).toEqual([]);
+    expect(request.get.mock.calls[2][1]).toMatchObject({ page: 1, has_recording: true });
+    expect(page.entries.map((entry) => entry.id)).toEqual([3]);
+  });
+
+  it('discards an old next page after a new search starts', async () => {
+    const page = pageContext();
+    const oldNext = deferred();
+    request.get.mockResolvedValueOnce({ results: [{ id: 1 }], next: '/entries/?page=2' });
+    await page.search();
+    request.get.mockReturnValueOnce(oldNext.promise);
+    const oldLoad = page.loadMore();
+
+    page.filters.hasRecording = false;
+    request.get.mockResolvedValueOnce({ results: [{ id: 3 }], next: null });
+    await page.applyAdvancedFilters();
+    oldNext.resolve({ results: [{ id: 2 }], next: '/entries/?page=3' });
+    await oldLoad;
+
+    expect(page.entries.map((entry) => entry.id)).toEqual([3]);
+    expect(page.next).toBeNull();
+    expect(page.loadingMore).toBe(false);
+  });
 });
