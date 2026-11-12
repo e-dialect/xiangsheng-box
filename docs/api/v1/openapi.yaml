@@ -752,6 +752,7 @@ paths:
       tags: [Entries]
       operationId: listEntries
       summary: 按词条优先查询
+      description: IPA 与罗马字筛选需由同一条地区读音同时满足；若带 dialect_id，则该读音须位于指定 exact/subtree 范围。仅按地区查询时仍按词条、读音、录音和使用证明发现相关词条。
       security: []
       parameters:
         - { name: search, in: query, schema: { type: string } }

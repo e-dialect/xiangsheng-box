@@ -151,6 +151,112 @@ class EntryFirstApiTests(TestCase):
                     {item["id"] for item in filtered.data["results"]}, expected
                 )
 
+    def test_blank_pronunciation_filters_do_not_require_a_variant(self):
+        entry, _ = self.make_entry("尚未标注读音", "行", dialect=self.city)
+        response = self.client.get(
+            "/entries/",
+            {
+                "ipa": "   ",
+                "romanization": "   ",
+                "dialect_id": self.city.id,
+                "dialect_scope": "exact",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([item["id"] for item in response.data["results"]], [entry.id])
+
+    def test_pronunciation_filters_match_one_variant_not_two_readings(self):
+        split, _ = self.make_entry("不同读法不能拼接", "甲")
+        matching, _ = self.make_entry("同一读法同时符合", "乙")
+        for entry, ipa, base, surface in (
+            (split, "hiŋ2", "other", ""),
+            (split, "other", "hing2", ""),
+            (matching, "hiŋ2", "", "hing2"),
+        ):
+            PronunciationVariant.objects.create(
+                entry=entry,
+                dialect=self.city,
+                ipa=ipa,
+                base_romanization=base,
+                surface_romanization=surface,
+                created_by=self.owner,
+            )
+        response = self.client.get("/entries/", {"ipa": "hiŋ", "romanization": "hing"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in response.data["results"]], [matching.id]
+        )
+        for params in ({"ipa": "hiŋ"}, {"romanization": "hing"}):
+            with self.subTest(params=params):
+                response = self.client.get("/entries/", params)
+                self.assertEqual(
+                    {item["id"] for item in response.data["results"]},
+                    {split.id, matching.id},
+                )
+
+    def test_pronunciation_filter_stays_in_selected_dialect_scope(self):
+        entry, _ = self.make_entry("有多个地区读音", "行", dialect=self.city)
+        elsewhere = Dialect.objects.create(name="另一区", code="另区", parent=self.root)
+        PronunciationVariant.objects.create(
+            entry=entry,
+            dialect=elsewhere,
+            ipa="hiŋ2",
+            base_romanization="hing2",
+            created_by=self.owner,
+        )
+        for params in (
+            {"ipa": "hiŋ"},
+            {"romanization": "hing"},
+            {"ipa": "hiŋ", "romanization": "hing"},
+        ):
+            with self.subTest(params=params):
+                for scope in ("exact", "subtree"):
+                    response = self.client.get(
+                        "/entries/",
+                        {
+                            **params,
+                            "dialect_id": self.city.id,
+                            "dialect_scope": scope,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.data["count"], 0)
+                response = self.client.get(
+                    "/entries/",
+                    {
+                        **params,
+                        "dialect_id": elsewhere.id,
+                        "dialect_scope": "exact",
+                    },
+                )
+                self.assertEqual(
+                    [item["id"] for item in response.data["results"]], [entry.id]
+                )
+        # A region-only search must keep its broader entry/recording/attestation semantics.
+        response = self.client.get(
+            "/entries/", {"dialect_id": self.city.id, "dialect_scope": "exact"}
+        )
+        self.assertEqual([item["id"] for item in response.data["results"]], [entry.id])
+
+    def test_pronunciation_scope_includes_descendants_and_deduplicates(self):
+        entry, _ = self.make_entry("下级地区的多种读法", "行")
+        for base, surface in (("hing2", ""), ("", "hing3")):
+            PronunciationVariant.objects.create(
+                entry=entry,
+                dialect=self.city,
+                ipa="hiŋ2",
+                base_romanization=base,
+                surface_romanization=surface,
+                created_by=self.owner,
+            )
+        params = {"dialect_id": self.group.id, "ipa": " hiŋ ", "romanization": " hing "}
+        response = self.client.get("/entries/", {**params, "dialect_scope": "subtree"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual([item["id"] for item in response.data["results"]], [entry.id])
+        response = self.client.get("/entries/", {**params, "dialect_scope": "exact"})
+        self.assertEqual(response.data["count"], 0)
+
     def test_concepts_find_related_entries_without_merging_them(self):
         walking, walking_sense = self.make_entry("步行", "行")
         running, running_sense = self.make_entry("奔跑", "走")

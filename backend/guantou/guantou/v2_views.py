@@ -525,21 +525,23 @@ class EntryViewSet(viewsets.ModelViewSet):
                 entry_writings__is_current=True,
                 entry_writings__writing__text__iexact=writing.strip(),
             )
-        ipa = self.request.query_params.get("ipa")
-        if ipa:
-            queryset = queryset.filter(
-                pronunciation_variants__ipa__icontains=ipa.strip()
-            )
-        romanization = self.request.query_params.get("romanization")
-        if romanization:
-            queryset = queryset.filter(
-                Q(
-                    pronunciation_variants__base_romanization__icontains=romanization.strip()
+        ids = selected_dialect_ids(self.request)
+        ipa = (self.request.query_params.get("ipa") or "").strip()
+        romanization = (self.request.query_params.get("romanization") or "").strip()
+        if ipa or romanization:
+            # All explicit reading conditions must describe one actual variant,
+            # rather than borrowing each field from another reading or region.
+            variants = PronunciationVariant.objects.filter(entry_id=OuterRef("pk"))
+            if ipa:
+                variants = variants.filter(ipa__icontains=ipa)
+            if romanization:
+                variants = variants.filter(
+                    Q(base_romanization__icontains=romanization)
+                    | Q(surface_romanization__icontains=romanization)
                 )
-                | Q(
-                    pronunciation_variants__surface_romanization__icontains=romanization.strip()
-                )
-            )
+            if ids is not None:
+                variants = variants.filter(dialect_id__in=ids)
+            queryset = queryset.filter(Exists(variants))
         source = self.request.query_params.get("source")
         if source:
             queryset = queryset.filter(
@@ -553,8 +555,7 @@ class EntryViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(
                     senses__concept_links__concept__code__iexact=concept
                 )
-        ids = selected_dialect_ids(self.request)
-        if ids is not None:
+        if ids is not None and not (ipa or romanization):
             queryset = queryset.filter(
                 Q(usage_dialect_id__in=ids)
                 | Q(pronunciation_variants__dialect_id__in=ids)
