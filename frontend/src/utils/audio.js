@@ -64,11 +64,13 @@ export function releasePreloadAudio() {
 function stopCurrentAudio() {
   disposeManagedHandle();
   if (!currentAudioContext) return;
-  currentAudioContext.stop();
-  if (typeof currentAudioContext.destroy === 'function') {
-    currentAudioContext.destroy();
-  }
+  const context = currentAudioContext;
+  // 先解除归属，防止 stop/destroy 触发的旧回调影响后续播放或重入清理。
   currentAudioContext = null;
+  context.stop();
+  if (typeof context.destroy === 'function') {
+    context.destroy();
+  }
 }
 
 export function playAudio(src, warn = true) {
@@ -142,6 +144,7 @@ export function playAudio(src, warn = true) {
   const innerAudioContext = uni.createInnerAudioContext();
   currentAudioContext = innerAudioContext;
   innerAudioContext.onError(() => {
+    if (currentAudioContext !== innerAudioContext) return;
     uni.showToast({
       title: '播放失败',
       icon: 'none',
@@ -151,6 +154,7 @@ export function playAudio(src, warn = true) {
   innerAudioContext.onEnded(() => {
     if (currentAudioContext === innerAudioContext) {
       currentAudioContext = null;
+      innerAudioContext.destroy();
     }
   });
 
@@ -195,11 +199,13 @@ function createWebManaged(src, { onEnded, onTimeUpdate, onError }) {
   const handleEnded = () => {
     if (managedHandle !== handle) return;
     managedHandle = null;
+    handle.destroy();
     if (onEnded) onEnded();
   };
   const handleError = () => {
     if (managedHandle !== handle) return;
     managedHandle = null;
+    handle.destroy();
     if (onError) onError(new Error('playback failed'));
   };
   audioElement.addEventListener('timeupdate', handleTimeUpdate);
@@ -245,11 +251,13 @@ function createNativeManaged(src, { onEnded, onTimeUpdate, onError }) {
   innerAudioContext.onEnded(() => {
     if (managedHandle !== handle) return;
     managedHandle = null;
+    handle.destroy();
     if (onEnded) onEnded();
   });
   innerAudioContext.onError(() => {
     if (managedHandle !== handle) return;
     managedHandle = null;
+    handle.destroy();
     if (onError) onError(new Error('playback failed'));
   });
   handle = {
