@@ -545,7 +545,11 @@ export default {
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
       const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
-      return { title: `查词｜${keyword} · ${APP_NAME}`, path, query: path.split('?')[1] };
+      return {
+        title: `查词｜${keyword} · ${APP_NAME}`,
+        path,
+        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+      };
     },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
@@ -604,13 +608,22 @@ export default {
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
   async onLoad(options = {}) {
     // #ifdef MP-WEIXIN
-    showWechatShareMenu();
+    if (isWechatMiniProgram()) showWechatShareMenu();
     // #endif
     this.history = searchHistory();
     popularEntries()
       .then((items) => { this.popular = pageResults(items); })
       .catch(() => { this.popular = []; });
     this.filters.keyword = options.keywords || options.key || '';
+    // #ifdef MP-WEIXIN
+    if (typeof options.sharedKeyword === 'string') {
+      try {
+        this.filters.keyword = decodeURIComponent(options.sharedKeyword);
+      } catch (error) {
+        this.filters.keyword = '';
+      }
+    }
+    // #endif
     try {
       this.dialects = await listAllDialects();
     } catch (error) {
@@ -620,11 +633,12 @@ export default {
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
-    const { title, path } = this.keywordShare || { title: `查找词条｜${APP_NAME}`, path: ROUTES.search };
+    const { title = `查找词条｜${APP_NAME}`, query } = this.keywordShare || {};
+    const path = query ? `${ROUTES.search}?${query}` : ROUTES.search;
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
   onShareTimeline() {
-    const { title, query } = this.keywordShare || { title: `查找词条｜${APP_NAME}`, query: 'key=' };
+    const { title = `查找词条｜${APP_NAME}`, query = 'sharedKeyword=' } = this.keywordShare || {};
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
   // #endif
