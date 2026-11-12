@@ -162,4 +162,48 @@ describe('hierarchical dialect selection and labels', () => {
     expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
     expect(wrapper.emitted('change')).toBeUndefined();
   });
+
+  it('refreshes the profile default when the account changes while the sheet stays open', async () => {
+    const app = { globalData: { userInfo: { primary_dialect: dialects[3] } } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: { visible: true, dialects, ownerScope: 7 },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+
+    app.globalData.userInfo = { primary_dialect: dialects[1] };
+    await wrapper.setProps({ ownerScope: 8 });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(2);
+
+    app.globalData.userInfo = null;
+    await wrapper.setProps({ ownerScope: 'guest' });
+    expect(wrapper.vm.resolvedDefaultDialect).toBeNull();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('picks up a late global profile when the async dialect catalog arrives', async () => {
+    const app = { globalData: { userInfo: null } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: { visible: true, dialects: [], ownerScope: 7 },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect).toBeNull();
+    app.globalData.userInfo = { primary_dialect: dialects[3] };
+    await wrapper.setProps({ dialects });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+  });
+
+  it('refreshes the global fallback after an explicit default is removed', async () => {
+    const app = { globalData: { userInfo: { primary_dialect: dialects[1] } } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: {
+        visible: true, dialects, ownerScope: 7, defaultDialect: dialects[3],
+      },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+    app.globalData.userInfo = { primary_dialect: dialects[2] };
+    await wrapper.setProps({ defaultDialect: null });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(3);
+  });
 });
