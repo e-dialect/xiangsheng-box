@@ -68,4 +68,55 @@ describe('dialect circle pagination', () => {
     expect(wrapper.vm.recordings).toEqual([first, older]);
     expect(wrapper.vm.hasMoreRecordings).toBe(false);
   });
+
+  it('recovers an initial directory failure and stops requesting after the last page', async () => {
+    listCircles.mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ results: [{ id: 1 }], count: 1, next: null });
+    const wrapper = shallowMount(CircleDirectory);
+    await wrapper.vm.refresh('莆田');
+    expect(wrapper.vm.error).toBe('offline');
+    expect(wrapper.vm.loading).toBe(false);
+    await wrapper.vm.refresh();
+    expect(wrapper.vm.error).toBe('');
+    expect(wrapper.vm.circles.map((item) => item.id)).toEqual([1]);
+    await wrapper.vm.loadMore();
+    expect(listCircles).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not start duplicate directory page requests', async () => {
+    let resolve;
+    listCircles.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const wrapper = shallowMount(CircleDirectory);
+    await wrapper.setData({ circles: [{ id: 1 }], next: true, page: 1 });
+    const pending = wrapper.vm.loadMore();
+    await wrapper.vm.loadMore();
+    expect(listCircles).toHaveBeenCalledTimes(1);
+    resolve({ results: [{ id: 2 }], count: 2, next: null });
+    await pending;
+    expect(wrapper.vm.circles.map((item) => item.id)).toEqual([1, 2]);
+    expect(wrapper.vm.page).toBe(2);
+  });
+
+  it('recovers an initial recordings failure and serializes the final page', async () => {
+    listCircleRecordings.mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ results: [{ id: 1 }], next: 'page2' });
+    const wrapper = shallowMount(CircleDetails);
+    await wrapper.setData({ circleId: 4 });
+    await wrapper.vm.loadRecordings();
+    expect(wrapper.vm.recordingsError).toBe('offline');
+    await wrapper.vm.loadRecordings();
+    expect(wrapper.vm.recordingsError).toBe('');
+    let resolve;
+    listCircleRecordings.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const pending = wrapper.vm.loadRecordings(true);
+    await wrapper.vm.loadRecordings(true);
+    expect(listCircleRecordings).toHaveBeenCalledTimes(3);
+    resolve({ results: [{ id: 2 }], next: null });
+    await pending;
+    await wrapper.vm.loadRecordings(true);
+    expect(listCircleRecordings).toHaveBeenCalledTimes(3);
+    expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([1, 2]);
+    expect(wrapper.vm.hasMoreRecordings).toBe(false);
+  });
+
 });
