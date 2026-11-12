@@ -40,9 +40,9 @@ class AuthorizationTests(unittest.TestCase):
     def test_aggregate_gate_accepts_only_the_intentional_main_skip(self):
         step = CI['jobs']['ci-gate']['steps'][0]
         command = step['run'].split("node <<'JS'\n", 1)[1].rsplit('\nJS', 1)[0]
-        for event in ['push', 'workflow_dispatch', 'pull_request']:
+        for event in ['push', 'workflow_dispatch', 'pull_request', 'merge_group']:
             jobs = {name: {'result': 'success'} for name in CI['jobs']['ci-gate']['needs']}
-            if event != 'pull_request':
+            if event in ['push', 'workflow_dispatch']:
                 jobs['commit-messages']['result'] = 'skipped'
             env = {'EVENT_NAME': event, 'NEEDS': json.dumps(jobs)}
             self.assertEqual(node(command, env).returncode, 0)
@@ -52,6 +52,10 @@ class AuthorizationTests(unittest.TestCase):
                 self.assertNotEqual(node(command, {**env, 'NEEDS': json.dumps(changed)}).returncode, 0)
             jobs['backend']['result'] = 'skipped'
             self.assertNotEqual(node(command, {**env, 'NEEDS': json.dumps(jobs)}).returncode, 0)
+
+        jobs['backend']['result'] = 'success'
+        jobs['commit-messages']['result'] = 'skipped'
+        self.assertNotEqual(node(command, {'EVENT_NAME': 'merge_group', 'NEEDS': json.dumps(jobs)}).returncode, 0)
 
     def test_release_build_has_no_private_build_inputs_or_cos_actions(self):
         jobs = RELEASE['jobs']
