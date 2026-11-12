@@ -48,6 +48,7 @@
             :text="shareType || canSystemShare ? '分享乡音' : '复制乡音链接'"
             @click="share"
           />
+          <RecordingContributorButton :recording="recording" />
         </view>
         <CollectionPicker :recording="recording" />
       </view>
@@ -85,6 +86,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
+import RecordingContributorButton from '@/components/RecordingContributorButton.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
 import {
   getRecording, entryTitle, dialectLabel,
@@ -113,6 +115,7 @@ export default {
     BaseLoading,
     EmptyState,
     EntryRecordingCard,
+    RecordingContributorButton,
     CollectionPicker,
   },
   data: () => ({

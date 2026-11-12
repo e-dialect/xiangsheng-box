@@ -200,7 +200,10 @@
           <view class="works-empty-title">
             {{ worksPanelTitle }}
           </view>
-          <view class="works-empty-copy">
+          <view
+            v-if="isSelf || !showPublicRecordings"
+            class="works-empty-copy"
+          >
             {{ worksPanelCopy }}
           </view>
           <BaseButton
@@ -221,7 +224,7 @@
             查看贡献履历
           </BaseButton>
           <BaseButton
-            v-else
+            v-else-if="!showPublicRecordings"
             class="works-empty-action"
             variant="ghost"
             block
@@ -229,6 +232,45 @@
           >
             先去听乡音
           </BaseButton>
+        </view>
+        <view
+          v-if="showPublicRecordings"
+          class="profile-recordings"
+        >
+          <BaseLoading
+            v-if="recordingsLoading && !recordings.length"
+            text="正在读取公开录音…"
+          />
+          <EmptyState
+            v-else-if="recordingsError"
+            title="暂时无法读取公开录音"
+            action-text="重新加载录音"
+            @action="loadPublicRecordings()"
+          />
+          <EmptyState
+            v-else-if="!recordings.length"
+            title="暂时没有可听的公开录音"
+          />
+          <EntryRecordingCard
+            v-for="recording in recordings"
+            :key="recording.id"
+            :recording="recording"
+            :community="false"
+            @open-entry="goEntryDetail"
+          />
+          <text
+            v-if="recordingsMoreError"
+            role="status"
+          >
+            更多乡音暂时没加载出来，已显示的录音仍可听。
+          </text>
+          <BaseButton
+            v-if="hasMoreRecordings"
+            variant="ghost"
+            :loading="recordingsLoading"
+            :text="recordingsMoreError ? '重试加载更多乡音' : '听更多乡音'"
+            @click="loadPublicRecordings(true)"
+          />
         </view>
       </view>
     </template>
@@ -239,12 +281,15 @@
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
 import { APP_NAME } from '@/const/branding';
 import { requireAuth } from '@/services/authGuard';
+import { listRecordings, pageResults } from '@/services/entryRecording';
 import { followUser, unfollowUser } from '@/services/following';
 import {
   goContributionHistory,
+  goEntryDetail,
   goHome,
   goMailSend,
   goMails,
@@ -258,7 +303,7 @@ import { dialectCardLabel } from '@/utils/dialectTree';
 
 export default {
   components: {
-    BaseButton, BaseLoading, EmptyState, PageShell,
+    BaseButton, BaseLoading, EmptyState, EntryRecordingCard, PageShell,
   },
   data() {
     return {
@@ -284,6 +329,12 @@ export default {
       },
       followingBusy: false,
       worksTab: 'recordings',
+      recordings: [],
+      recordingsLoading: false,
+      recordingsError: false,
+      recordingsMoreError: false,
+      recordingPage: 1,
+      hasMoreRecordings: false,
     };
   },
   computed: {
@@ -321,6 +372,9 @@ export default {
     },
     worksCount() {
       return this.contributionCount(this.worksTab);
+    },
+    showPublicRecordings() {
+      return this.worksTab === 'recordings' && this.userInfo.contribution?.recordings > 0;
     },
     worksPanelTitle() {
       if (this.worksCount > 0) {
@@ -373,6 +427,7 @@ export default {
     goRecord,
     goMails,
     goHome,
+    goEntryDetail,
     goContributionHistory,
     handleLoadError() {
       if (this.id) {
@@ -383,6 +438,9 @@ export default {
     },
     selectWorksTab(tab) {
       this.worksTab = tab;
+      if (this.showPublicRecordings && !this.recordings.length && !this.recordingsError) {
+        this.loadPublicRecordings();
+      }
     },
     openMail() {
       if (!requireAuth('dm', { page: 'user_detail', userId: this.id })) return;
@@ -409,6 +467,29 @@ export default {
         this.loadError = error?.message || '用户档案加载失败，请检查网络后重试';
       } finally {
         this.loading = false;
+      }
+      if (!this.loadError && this.showPublicRecordings) await this.loadPublicRecordings();
+    },
+    async loadPublicRecordings(more = false) {
+      if (this.recordingsLoading || (more && !this.hasMoreRecordings)) return;
+      const page = more ? this.recordingPage + 1 : 1;
+      this.recordingsLoading = true;
+      this.recordingsError = false;
+      this.recordingsMoreError = false;
+      try {
+        const response = await listRecordings({ recorder_id: this.id, page });
+        const existing = more ? this.recordings : [];
+        const loadedIds = new Set(existing.map((recording) => recording.id));
+        this.recordings = [
+          ...existing, ...pageResults(response).filter((recording) => !loadedIds.has(recording.id)),
+        ];
+        this.recordingPage = page;
+        this.hasMoreRecordings = Boolean(response.next);
+      } catch {
+        if (more) this.recordingsMoreError = true;
+        else this.recordingsError = true;
+      } finally {
+        this.recordingsLoading = false;
       }
     },
     async toggleFollow() {
@@ -438,6 +519,12 @@ export default {
 </script>
 
 <style scoped>
+.profile-recordings {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
 .profile-overview {
   padding: var(--space-4);
   border-radius: var(--radius-lg);

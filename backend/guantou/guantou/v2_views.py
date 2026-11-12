@@ -778,6 +778,15 @@ class RecordingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = self.response_queryset()
+        recorder_id = self.request.query_params.get("recorder_id")
+        if self.action == "list" and recorder_id is not None:
+            try:
+                recorder_id = int(recorder_id)
+            except ValueError as error:
+                raise BadRequestException("recorder_id 必须是有效的用户编号") from error
+            if not 0 < recorder_id <= 2**63 - 1:
+                raise BadRequestException("recorder_id 必须是有效的用户编号")
+            queryset = queryset.filter(recorder_id=recorder_id, visibility=True)
         if parse_boolean(self.request.query_params.get("following"), "following"):
             from user.models import UserFollow
 

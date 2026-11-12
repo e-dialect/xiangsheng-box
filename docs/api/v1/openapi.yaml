@@ -906,8 +906,14 @@ paths:
       operationId: listRecordings
       summary: 浏览录音流
       security: []
+      parameters:
+        - name: recorder_id
+          in: query
+          description: 仅返回指定贡献者的公开录音
+          schema: { type: integer, minimum: 1 }
       responses:
         "200": { description: 录音列表, content: { application/json: { schema: { $ref: "#/components/schemas/RecordingPage" } } } }
+        "400": { description: 用户编号格式错误 }
     post:
       tags: [Recordings]
       operationId: createRecording
