@@ -33,6 +33,8 @@ vi.mock('@/services/productAnalytics', () => ({
   trackProductEvent: vi.fn(),
 }));
 
+const { getEntry, listRecordings } = await import('@/services/entryRecording');
+
 const EntryDetails = (await import('@/pages/entries/details.vue')).default;
 
 const entry = {
@@ -113,5 +115,63 @@ describe('entry detail information hierarchy', () => {
     expect(wrapper.find('[data-detail-section="evidence"]').text()).toContain('已整理');
     expect(wrapper.find('[data-detail-section="actions"]').text()).toContain('录下我这边的说法');
     expect(wrapper.find('[data-detail-section="actions"]').text()).toContain('收藏词条');
+  });
+});
+
+
+describe('entry recordings pagination', () => {
+  it('keeps additional regional recordings accessible after the first page', async () => {
+    getEntry.mockResolvedValue(entry);
+    listRecordings.mockResolvedValueOnce({ results: [{ id: 11 }], next: '/recordings/?page=2' });
+    const wrapper = mountPage();
+    await wrapper.setData({ id: 21 });
+    await wrapper.vm.load();
+    const recordingSection = wrapper.find('[data-detail-section="recordings"]');
+    expect(recordingSection.find('[data-testid="load-more-recordings"]').exists()).toBe(true);
+    listRecordings.mockResolvedValueOnce({ results: [{ id: 11 }, { id: 12 }, { id: 12 }], next: null });
+    await wrapper.vm.loadMoreRecordings();
+    expect(listRecordings).toHaveBeenLastCalledWith({ entry_id: 21, page: 2, page_size: 50 });
+    expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([11, 12]);
+    expect(recordingSection.find('[data-testid="load-more-recordings"]').exists()).toBe(false);
+  });
+
+  it('preserves playable recordings and retries the same failed page', async () => {
+    const wrapper = mountPage();
+    await wrapper.setData({ id: 21, hasMoreRecordings: true });
+    listRecordings.mockRejectedValueOnce(new Error('network'));
+    await wrapper.vm.loadMoreRecordings();
+    expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([11]);
+    expect(wrapper.vm.recordingPage).toBe(1);
+    expect(wrapper.text()).toContain('已显示的录音仍可播放');
+    listRecordings.mockResolvedValueOnce({ results: [{ id: 12 }], next: null });
+    await wrapper.vm.loadMoreRecordings();
+    expect(listRecordings).toHaveBeenLastCalledWith({ entry_id: 21, page: 2, page_size: 50 });
+    expect(wrapper.vm.recordingsError).toBe('');
+  });
+
+  it('does not start duplicate loads or append a stale page after refresh', async () => {
+    const wrapper = mountPage();
+    await wrapper.setData({ id: 21, hasMoreRecordings: true });
+    let resolvePage;
+    listRecordings.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve; }));
+    const pending = wrapper.vm.loadMoreRecordings();
+    await wrapper.vm.loadMoreRecordings();
+    expect(listRecordings).toHaveBeenCalledTimes(1);
+    getEntry.mockResolvedValue(entry);
+    listRecordings.mockResolvedValueOnce({ results: [{ id: 15 }], next: null });
+    await wrapper.vm.load();
+    resolvePage({ results: [{ id: 12 }], next: null });
+    await pending;
+    expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([15]);
+    expect(wrapper.vm.recordingsLoading).toBe(false);
+  });
+
+  it('handles an unpaginated response without inventing another page', async () => {
+    const wrapper = mountPage();
+    await wrapper.setData({ id: 21 });
+    getEntry.mockResolvedValue(entry);
+    listRecordings.mockResolvedValueOnce([{ id: 11 }]);
+    await wrapper.vm.load();
+    expect(wrapper.vm.hasMoreRecordings).toBe(false);
   });
 });

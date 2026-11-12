@@ -186,6 +186,22 @@
             @continue="continueChain"
           />
         </view>
+        <view
+          v-if="recordingsError"
+          class="detail-section__pending"
+          role="status"
+        >
+          {{ recordingsError }}
+        </view>
+        <BaseButton
+          v-if="hasMoreRecordings"
+          data-testid="load-more-recordings"
+          :text="recordingsError ? '重试加载更多乡音' : '听更多乡音'"
+          :loading="recordingsLoading"
+          :disabled="recordingsLoading"
+          variant="ghost"
+          @click="loadMoreRecordings"
+        />
       </view>
 
       <view
@@ -342,6 +358,11 @@ export default {
       anchorRootId: null,
       entry: null,
       recordings: [],
+      recordingPage: 1,
+      hasMoreRecordings: false,
+      recordingsLoading: false,
+      recordingsError: '',
+      loadVersion: 0,
       loading: true,
       errorMessage: '',
       attestedDialects: new Set(),
@@ -371,6 +392,9 @@ export default {
   onShow() {
     syncContentShareMenu(this, false);
     if (this.id && this.entry) this.load();
+  },
+  onUnload() {
+    this.loadVersion += 1;
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
@@ -419,19 +443,54 @@ export default {
         this.errorMessage = '缺少词条编号';
         return;
       }
+      this.loadVersion += 1;
+      const version = this.loadVersion;
       this.loading = true;
       this.errorMessage = '';
+      this.recordingsLoading = false;
+      this.recordingsError = '';
+      this.hasMoreRecordings = false;
       try {
         const [entry, recordings] = await Promise.all([
           getEntry(this.id),
-          listRecordings({ entry_id: this.id, page_size: 50 }),
+          listRecordings({ entry_id: this.id, page: 1, page_size: 50 }),
         ]);
+        if (version !== this.loadVersion) return;
         this.entry = entry;
         this.recordings = pageResults(recordings);
+        this.recordingPage = 1;
+        this.hasMoreRecordings = Boolean(recordings?.next);
       } catch (error) {
-        this.errorMessage = '词条暂时无法读取';
+        if (version === this.loadVersion) this.errorMessage = '词条暂时无法读取';
       } finally {
-        this.loading = false;
+        if (version === this.loadVersion) this.loading = false;
+      }
+    },
+    async loadMoreRecordings() {
+      if (this.loading || this.recordingsLoading || !this.hasMoreRecordings) return;
+      const version = this.loadVersion;
+      const entryId = this.id;
+      const page = this.recordingPage + 1;
+      this.recordingsLoading = true;
+      this.recordingsError = '';
+      try {
+        const response = await listRecordings({ entry_id: entryId, page, page_size: 50 });
+        if (version !== this.loadVersion || entryId !== this.id) return;
+        const seen = new Set(this.recordings.map((item) => item.id));
+        const additions = pageResults(response).filter((item) => {
+          if (seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+        this.recordings = [...this.recordings, ...additions];
+        this.recordingPage = page;
+        this.hasMoreRecordings = Boolean(response?.next);
+      } catch (error) {
+        if (version === this.loadVersion && entryId === this.id) {
+          this.recordingsError = '更多乡音暂时没加载出来，已显示的录音仍可播放。请重试。';
+        }
+      } finally {
+        if (version === this.loadVersion && entryId === this.id) this.recordingsLoading = false;
       }
     },
     continueChain() {
