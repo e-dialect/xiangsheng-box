@@ -22,9 +22,30 @@
         </view>
       </template>
 
+      <!-- #ifdef MP-WEIXIN -->
+      <view
+        v-if="wechatLoginAvailable"
+        class="login-choice"
+      >
+        <BaseButton
+          v-if="!accountLoginSelected"
+          block
+          text="微信一键登录"
+          @click="startWechatLogin"
+        />
+        <BaseButton
+          block
+          variant="ghost"
+          :text="accountLoginSelected ? '返回微信登录' : '使用账号密码'"
+          @click="toggleAccountLogin"
+        />
+      </view>
+      <!-- #endif -->
+
       <t-tabs
         :value="loginMode"
         class="login-tabs"
+        :class="{ 'login-alternative--hidden': !showLoginAlternatives }"
         @change="changeMode"
       >
         <t-tab-panel
@@ -40,6 +61,7 @@
       <view
         v-if="loginMode === 'phone'"
         class="login-form phone-form"
+        :class="{ 'login-alternative--hidden': !showLoginAlternatives }"
       >
         <BaseField
           v-model="phone"
@@ -97,6 +119,7 @@
       <view
         v-else
         class="login-form password-form"
+        :class="{ 'login-alternative--hidden': !showLoginAlternatives }"
       >
         <BaseField
           v-model="username"
@@ -126,17 +149,6 @@
         </BaseButton>
       </view>
 
-      <!-- #ifdef MP-WEIXIN -->
-      <BaseButton
-        class="wechat-login"
-        block
-        variant="ghost"
-        @click="mpLogin()"
-      >
-        微信一键登录 / 注册
-      </BaseButton>
-      <!-- #endif -->
-
       <template #footer>
         <view class="auth-secondary">
           <t-button
@@ -152,7 +164,10 @@
           >
             暂不登录，先去查词
           </t-button>
-          <view class="login-links">
+          <view
+            v-if="showLoginAlternatives"
+            class="login-links"
+          >
             <t-button
               class="login-link"
               theme="default"
@@ -166,7 +181,6 @@
             >
               忘记密码
             </t-button>
-            <!-- #ifndef MP-WEIXIN -->
             <t-button
               class="login-link"
               theme="default"
@@ -174,15 +188,15 @@
               size="medium"
               role="button"
               tabindex="0"
-              aria-label="用户注册"
+              :aria-label="registrationLabel"
               @click="toRegisterPage()"
               @keydown.enter.space.prevent="toRegisterPage()"
             >
-              用户注册
+              {{ registrationLabel }}
             </t-button>
-            <!-- #endif -->
             <!-- #ifdef MP-WEIXIN -->
             <t-button
+              v-show="wechatLoginAvailable"
               class="login-link"
               theme="default"
               variant="text"
@@ -213,6 +227,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import { actionLabel, peekInterceptIntent } from '@/services/authGuard';
 import { cancelLoginToSearch } from '@/services/authJourney';
+import { CAPABILITIES, isCapabilityEnabled } from '@/services/capabilities';
 import { mpLogin, normalLogin } from '@/services/login';
 import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
 import { toForgetPage, toRegisterPage, toWechatRegisterPage } from '@/routers/login';
@@ -231,6 +246,8 @@ export default {
   },
   data() {
     return {
+      wechatLoginAvailable: isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH),
+      accountLoginSelected: false,
       toForgetPage,
       toRegisterPage,
       toWechatRegisterPage,
@@ -254,6 +271,12 @@ export default {
     };
   },
   computed: {
+    showLoginAlternatives() {
+      return !this.wechatLoginAvailable || this.accountLoginSelected;
+    },
+    registrationLabel() {
+      return this.wechatLoginAvailable ? '邮箱注册' : '用户注册';
+    },
     intentVoluntary() {
       return Boolean(this.intent?.voluntary);
     },
@@ -266,12 +289,33 @@ export default {
   onLoad() {
     this.intent = peekInterceptIntent();
   },
+  onShow() {
+    this.wechatLoginAvailable = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
+  },
   onUnload() {
     this.clearCountdown();
   },
   methods: {
-    mpLogin,
     cancelLoginToSearch,
+    startWechatLogin() {
+      this.wechatLoginAvailable = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
+      if (!this.wechatLoginAvailable) {
+        this.openAccountLogin();
+        return;
+      }
+      mpLogin(this.openAccountLogin);
+    },
+    openAccountLogin() {
+      this.changeMode('password');
+      this.accountLoginSelected = true;
+    },
+    toggleAccountLogin() {
+      if (this.accountLoginSelected) {
+        this.accountLoginSelected = false;
+      } else {
+        this.openAccountLogin();
+      }
+    },
     changeMode(event) {
       const value = event?.detail?.value ?? event?.value ?? event?.detail ?? event;
       const nextMode = value ?? 'phone';
@@ -384,6 +428,11 @@ export default {
   margin-top: 24rpx;
 }
 
+.login-tabs.login-alternative--hidden,
+.login-form.login-alternative--hidden {
+  display: none;
+}
+
 .demo-code {
   padding: 14rpx 18rpx;
   background: var(--surface-subtle-color);
@@ -396,9 +445,11 @@ export default {
   letter-spacing: 4rpx;
 }
 
-.wechat-login {
-  display: block;
-  margin-top: 18rpx;
+.login-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .browse-first {

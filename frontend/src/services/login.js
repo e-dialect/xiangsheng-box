@@ -125,9 +125,9 @@ async function registerWithWechatCode(code) {
     });
 }
 
-export async function mpLogin() {
+export async function mpLogin(onFallback = toLoginPage) {
   // #ifdef H5
-  toLoginPage();
+  onFallback();
   // #endif
 
   // #ifndef H5
@@ -136,7 +136,7 @@ export async function mpLogin() {
     success: (res) => {
       // 如果没有获取到微信的 code 直接使用普通登录
       if (!res.code) {
-        toLoginPage();
+        onFallback();
         return;
       }
       // 尝试进行微信登录
@@ -174,7 +174,7 @@ export async function mpLogin() {
                     });
                   } else {
                     // 跳转到普通登录页面
-                    toLoginPage();
+                    onFallback();
                   }
                 },
               });
@@ -189,7 +189,7 @@ export async function mpLogin() {
     // 尝试调用登录接口失败
     fail() {
       // 跳转到账号密码登录页面
-      toLoginPage();
+      onFallback();
     },
   });
   // #endif
