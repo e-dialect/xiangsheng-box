@@ -5357,9 +5357,9 @@ minipass@^7.1.2, minipass@^7.1.3:
   integrity sha512-tEBHqDnIoM/1rXME1zgka9g6Q2lcoCkxHLuc7ODJ5BxbP5d4c2Z5cGgtXAku59200Cx7diuHTOYfSBD8n6mm8A==
 
 miniprogram-api-typings@*:
-  version "5.2.3"
-  resolved "https://registry.yarnpkg.com/miniprogram-api-typings/-/miniprogram-api-typings-5.2.3.tgz#df5b8ceadd8863a8cefdea2e02b40420f8126072"
-  integrity sha512-KVcNSfR2VmRtz35rxkjLxE92HlsBnbT6NsKyTcDX3ebbTKAsAiTOFO1mRM82Xbe848dnEYqNGzaD48LMEvGytw==
+  version "5.3.1"
+  resolved "https://registry.yarnpkg.com/miniprogram-api-typings/-/miniprogram-api-typings-5.3.1.tgz#077ab884d2fc0b526afccdf7ae666cfe69e3370a"
+  integrity sha512-2CirO+C1z5RmKXDqTUSNbuyouHf5d0/KJTt+Qqi1EsiQYs8jlYhq7yWjp6EdTcJpvZzjuefZQCcDixYbrgIqow==
 
 mkdirp@^0.5.1:
   version "0.5.6"
