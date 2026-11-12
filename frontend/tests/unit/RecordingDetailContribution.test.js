@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { requireAuth } from '@/services/authGuard';
+import { goRecord } from '@/services/navigation';
+
+vi.mock('@/services/authGuard', () => ({ requireAuth: vi.fn() }));
+vi.mock('@/services/navigation', async (importOriginal) => ({
+  ...await importOriginal(), goRecord: vi.fn(),
+}));
 import RecordingDetail from '@/pages/recordings/details.vue';
+import CollectionDetail from '@/pages/collections/details.vue';
 
 const primary = { is_current: true, role: 'primary', status: 'accepted', entry: { id: 8 } };
 const target = (entryLinks, extra = {}) => RecordingDetail.computed.recordingTarget.call({
@@ -32,5 +40,23 @@ describe('the recording detail contribution target', () => {
     expect(target([{ ...primary, is_current: false }])).toBeNull();
     expect(target([primary, { ...primary, role: 'competing', entry: { id: 9 } }])).toBeNull();
     expect(target([primary, { ...primary, entry: { id: 9 } }])).toBeNull();
+  });
+});
+
+
+describe.each([['recording', RecordingDetail], ['collection', CollectionDetail]])('%s contribution navigation', (name, Page) => {
+  it('preserves the entry for authentication without opening recording', () => {
+    vi.clearAllMocks();
+    requireAuth.mockReturnValue(false);
+    Page.methods.recordFor(8);
+    expect(requireAuth).toHaveBeenCalledWith('record_recording', { entryId: 8 });
+    expect(goRecord).not.toHaveBeenCalled();
+  });
+
+  it('passes only the entry, without copying another speaker metadata', () => {
+    vi.clearAllMocks();
+    requireAuth.mockReturnValue(true);
+    Page.methods.recordFor(8);
+    expect(goRecord).toHaveBeenCalledWith({ entry_id: 8 });
   });
 });
