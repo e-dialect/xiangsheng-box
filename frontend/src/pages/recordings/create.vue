@@ -5,7 +5,10 @@
     :scroll-into-view="validationTarget"
   >
     <view class="record-page">
-      <view class="record-tools">
+      <view
+        class="record-tools"
+        data-scroll-offset
+      >
         <view class="record-draft-actions">
           <BaseButton
             variant="ghost"
