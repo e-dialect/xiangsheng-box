@@ -1,3 +1,5 @@
+import { markRaw } from 'vue';
+
 let currentAudioContext = null;
 let managedHandle = null;
 let preloadContext = null;
@@ -289,7 +291,8 @@ export function playManaged(src, callbacks = {}) {
   // #ifndef H5
   handle = createNativeManaged(src, callbacks);
   // #endif
-  managedHandle = handle;
+  // 组件把句柄放入响应式 data 后仍需按同一身份识别外部停止广播。
+  managedHandle = markRaw(handle);
   return handle;
 }
 

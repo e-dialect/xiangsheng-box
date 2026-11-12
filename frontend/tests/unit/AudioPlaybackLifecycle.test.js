@@ -1,4 +1,5 @@
 import { runInNewContext } from 'node:vm';
+import { markRaw, reactive } from 'vue';
 import {
   describe, expect, it, vi,
 } from 'vitest';
@@ -42,9 +43,10 @@ function setup(platform) {
     if (line.includes('// #ifndef H5')) { active = platform !== 'H5'; return false; }
     if (line.includes('// #endif')) { active = true; return false; }
     return active;
-  }).join('\n').replaceAll('export function ', 'function ');
+  }).join('\n').replace("import { markRaw } from 'vue';", '')
+    .replaceAll('export function ', 'function ');
   const api = runInNewContext(`${compiled}\n({ playAudio, playManaged, stopAudio, onExternalStop });`, {
-    uni, Audio, URL, window: { location: { href: 'https://example.test/', origin: 'https://example.test' } },
+    uni, Audio, URL, markRaw, window: { location: { href: 'https://example.test/', origin: 'https://example.test' } },
   });
   return { api, contexts, uni };
 }
@@ -113,6 +115,18 @@ describe('native legacy playback ownership', () => {
 });
 
 describe.each(['H5', 'APP'])('%s managed playback cleanup', (platform) => {
+  it('preserves handle identity when a Vue component stores it in reactive state', () => {
+    const { api } = setup(platform);
+    const state = reactive({ handle: null });
+    api.onExternalStop((handle) => {
+      if (handle === state.handle) state.handle = null;
+    });
+    state.handle = api.playManaged('/old.mp3');
+    api.playManaged('/new.mp3');
+    expect(state.handle).toBeNull();
+    api.stopAudio();
+  });
+
   it('preserves external-stop notification when another recording replaces it', () => {
     const { api, contexts } = setup(platform);
     const onEnded = vi.fn();
