@@ -237,3 +237,7 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 ### 二次补缺：词条讨论与草稿生命周期
 
 关联 #405、#407。新增共享 DiscussionThread，词条与录音详情共用 BaseForm/BaseField/BaseButton、加载与错误反馈；词条讨论为独立内容区。草稿箱用 BaseLoading 展示实际音频状态检查，录音页沿用原表单和保存反馈，增加编辑与离页保存。
+
+### 录音草稿词条关联恢复
+
+关联 [#634](https://github.com/e-dialect/xiangsheng-box/issues/634)。词条详情暂时不可读时，录音页保留原关联 ID，并使用 BaseButton 提供重试读取与明确取消选词；显示信息失败不再改变草稿或提交的关联。覆盖恢复、entry_id 入口、保存与提交、重试以及取消/替换后的迟到响应。
