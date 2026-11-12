@@ -2,7 +2,8 @@ import {
   afterEach, describe, expect, it, vi,
 } from 'vitest';
 import {
-  entryShareMessage, openQQSharedContent, qqContentShareMessage, recordingShareMessage,
+  collectionShareMessage, entryShareMessage, openQQSharedContent,
+  qqContentShareMessage, recordingShareMessage,
 } from '@/services/contentShare';
 
 const dialect = {
@@ -45,6 +46,17 @@ describe('public content share cards', () => {
     expect(entryShareMessage({ id: 1, visibility: true, status: 'redirected' })).toBeNull();
     expect(recordingShareMessage({ id: 2 })).toBeNull();
     expect(recordingShareMessage({ id: 2, visibility: true, status: 'rejected' })).toBeNull();
+  });
+
+  it('shares a public collection with its saved title and excludes private collections', () => {
+    expect(collectionShareMessage({
+      id: 7, is_public: true, title: '  春节\n 问候  ', description: '盒签简介',
+    })).toEqual({
+      title: '集盒｜春节 问候',
+      path: '/pages/collections/details?id=7',
+      query: 'id=7',
+    });
+    expect(collectionShareMessage({ id: 7, is_public: false, title: '私人' })).toBeNull();
   });
 });
 
