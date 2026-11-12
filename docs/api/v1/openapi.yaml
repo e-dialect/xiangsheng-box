@@ -1214,6 +1214,12 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 最近一次盒签或成员变更时间；迁移前未知时为 null
     CollectionCreate:
       allOf:
         - $ref: "#/components/schemas/CollectionWrite"
@@ -1234,6 +1240,12 @@ components:
     CollectedRecording:
       type: object
       properties:
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 加入该层级的时间；迁移前未知时为 null
         id:
           type: integer
           minimum: 1
@@ -1244,6 +1256,12 @@ components:
     CollectionSection:
       type: object
       properties:
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
+          description: 加入该层级的时间；迁移前未知时为 null
         id:
           type: integer
           minimum: 1
