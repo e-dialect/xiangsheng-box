@@ -263,6 +263,9 @@ export default {
     },
   },
   watch: {
+    ownerScope() {
+      if (this.visible) this.loadRecent();
+    },
     value(next) {
       if (!this.visible) return;
       const path = findDialectPath(this.tree, next);
@@ -296,7 +299,11 @@ export default {
         Number(id),
         ...this.recentIds.filter((item) => String(item) !== String(id)),
       ].slice(0, MAX_RECENT);
-      uni.setStorageSync(this.storageKey(), JSON.stringify(this.recentIds));
+      try {
+        uni.setStorageSync(this.storageKey(), JSON.stringify(this.recentIds));
+      } catch (error) {
+        // Recent shortcuts are optional; unavailable storage must not block selection.
+      }
     },
     breadcrumbFor(dialect) {
       return dialectBreadcrumb(dialect, this.dialects);
