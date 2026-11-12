@@ -51,7 +51,7 @@
         :icon="playing ? 'stop-circle' : 'play-circle'"
         :text="playing ? '停止播放' : '听录音'"
         :disabled="!hasAudio"
-        @click="toggleAudio"
+        @click="toggleAudio()"
       />
       <text
         v-if="recording.duration_ms"
@@ -67,7 +67,6 @@
         @click="$emit('open-entry', entry.id)"
       />
     </view>
-
     <view
       class="recording-card__playback-status"
       role="status"

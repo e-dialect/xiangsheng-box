@@ -486,6 +486,7 @@ export default {
   color: var(--immersive-accent-color);
 }
 
+.recording-feed__opening :deep(.recording-card__playback-message),
 .recording-feed__list :deep(.recording-card__playback-message) {
   color: var(--on-immersive-color);
 }

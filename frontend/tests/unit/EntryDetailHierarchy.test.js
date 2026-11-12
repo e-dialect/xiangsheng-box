@@ -169,7 +169,10 @@ describe('entry recordings pagination', () => {
     await wrapper.vm.loadMoreRecordings();
     expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([11]);
     expect(wrapper.vm.recordingPage).toBe(1);
-    expect(wrapper.text()).toContain('已显示的录音仍可播放');
+    const recordings = wrapper.get('[data-detail-section="recordings"]');
+    expect(recordings.text()).toContain('已显示的录音仍可播放');
+    expect(recordings.find('[data-testid="load-more-recordings"]').exists()).toBe(true);
+    expect(wrapper.get('[data-detail-section="pronunciation"]').text()).not.toContain('重试加载更多乡音');
     listRecordings.mockResolvedValueOnce({ results: [{ id: 12 }], next: null });
     await wrapper.vm.loadMoreRecordings();
     expect(listRecordings).toHaveBeenLastCalledWith({ entry_id: 21, page: 2, page_size: 50 });

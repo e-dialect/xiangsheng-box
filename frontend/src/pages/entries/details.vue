@@ -88,6 +88,22 @@
             @continue="continueChain"
           />
         </view>
+        <view
+          v-if="recordingsError"
+          class="detail-section__pending"
+          role="status"
+        >
+          {{ recordingsError }}
+        </view>
+        <BaseButton
+          v-if="hasMoreRecordings"
+          data-testid="load-more-recordings"
+          :text="recordingsError ? '重试加载更多乡音' : '听更多乡音'"
+          :loading="recordingsLoading"
+          :disabled="recordingsLoading"
+          variant="ghost"
+          @click="loadMoreRecordings"
+        />
       </view>
 
       <view
@@ -198,22 +214,6 @@
         >
           这个地区的读音还没整理出来，可以先听上面的乡音。
         </view>
-        <view
-          v-if="recordingsError"
-          class="detail-section__pending"
-          role="status"
-        >
-          {{ recordingsError }}
-        </view>
-        <BaseButton
-          v-if="hasMoreRecordings"
-          data-testid="load-more-recordings"
-          :text="recordingsError ? '重试加载更多乡音' : '听更多乡音'"
-          :loading="recordingsLoading"
-          :disabled="recordingsLoading"
-          variant="ghost"
-          @click="loadMoreRecordings"
-        />
       </view>
 
       <view

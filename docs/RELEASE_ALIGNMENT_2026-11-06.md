@@ -69,3 +69,15 @@ Not manually verified：当前线上容器版本、真实 A/B/C 账号的新提�
 - `restoration.spec.js` 不再依赖静默自动保存的常驻成功文字。在点击草稿箱前轮询浏览器存储，要求已经存在本次大意，再验证草稿箱与恢复表单。这样能区分定时自动保存和离页补存，保留持久化行为门禁。
 
 本轮仅修改这两份浏览器测试与本记录，不改产品源码、接口、依赖或构建规则。实际运行 `playwright test tests/e2e/listening-states.spec.js tests/e2e/restoration.spec.js --workers=1`：本机 Edge 12/12 通过；`git diff --check` 通过。日志为 `tmp/p0-resume-e2e.log`。最终远端结果以 [PR #560 Checks](https://github.com/e-dialect/xiangsheng-box/pull/560/checks) 为准；R2 人工验收及发布边界继续有效。
+
+## 2026-11-12 isolated integration check
+
+This local integration preserves the original #560 commits and merges main `2e3eff06e7d075e08bc68fababb7249935239650` and #585 `886317a160b77713054fd71685e2b008d121e53e`. It retains the larger play control, duration, and author-row detail link, while keeping missing-audio disabling and inline playback failure/retry feedback from main. Recording pagination and its retry message now stay inside the recordings section when #560 moves that section ahead of pronunciation. The pre-fix pagination placement test failed and passes after this correction.
+
+Validation on the isolated iMac worktree:
+- Frontend: 95 files, 716 tests passed, 3 skipped; ESLint passed.
+- H5 and WeChat checked builds passed without tracked notices, using Node 24.22.1 and the unchanged main lockfile dependency installation.
+- Backend: 34 API, model, and governance tests passed against a temporary test database, including public submitted draft, explicit/historical private, and returned-record isolation.
+- Real Chrome: 33 local synthetic-API tests passed across UI phase one, member feedback, and search/detail pagination. Coverage includes light/dark layouts, 390/768/844/1440 widths, real fixture audio playback, private local draft save, and pagination failure/retry. Screenshots were inspected. No production API or data was used.
+
+This is technical integration evidence, not product approval of default-public recording submission, CLA approval, an independent approving review, or a deployment. #560 remains a draft pending its R2 product decision; #585 still has a pending CLA check. No branch protection or contributor attribution was changed.

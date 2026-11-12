@@ -52,3 +52,17 @@ it('explains missing audio and does not offer a working playback action', () => 
   expect(playManaged).not.toHaveBeenCalled();
   card.unmount();
 });
+
+it('preserves the primary play control and the single author-row detail link', () => {
+  const card = shallowMount(EntryRecordingCard, {
+    props: { recording: { id: 1, audio_url: '/sample.mp3', duration_ms: 2500 } },
+  });
+  const play = card.get('.recording-card__actions').getComponent(BaseButton);
+  expect(play.props()).toMatchObject({ size: 'medium', icon: 'play-circle', disabled: false });
+  expect(card.get('.recording-card__duration').text()).toBe('3 秒');
+  expect(card.findAllComponents(BaseButton).filter((button) => button.props('text') === '录音详情')).toHaveLength(1);
+  expect(card.get('.recording-card__author').getComponent(BaseButton).props('text')).toBe('录音详情');
+  const actions = card.get('.recording-card__actions').element;
+  expect(actions.nextElementSibling.getAttribute('role')).toBe('status');
+  card.unmount();
+});
