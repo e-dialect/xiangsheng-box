@@ -300,6 +300,7 @@ import {
 import { defaultMessage } from '@/services/shareMessages';
 import { getUserInfo } from '@/services/user';
 import { dialectCardLabel } from '@/utils/dialectTree';
+import { stopAudio } from '@/utils/audio';
 
 export default {
   components: {
@@ -414,6 +415,12 @@ export default {
   async onLoad(options) {
     this.id = options.id;
     await this.getInfo();
+  },
+  onHide() {
+    stopAudio();
+  },
+  onUnload() {
+    stopAudio();
   },
   onShareAppMessage() {
     return {
