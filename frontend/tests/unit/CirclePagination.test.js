@@ -34,9 +34,9 @@ describe('dialect circle pagination', () => {
     await wrapper.vm.loadMore();
 
     expect(listCircles.mock.calls).toEqual([
-      [{ page: 1, search: '莆田' }],
-      [{ page: 2, search: '莆田' }],
-      [{ page: 2, search: '莆田' }],
+      [{ page: 1, search: '莆田' }, true],
+      [{ page: 2, search: '莆田' }, true],
+      [{ page: 2, search: '莆田' }, true],
     ]);
     expect(wrapper.vm.circles).toEqual([first, second]);
     expect(wrapper.vm.next).toBe(false);

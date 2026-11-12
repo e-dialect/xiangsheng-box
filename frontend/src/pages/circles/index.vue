@@ -193,7 +193,7 @@ export default {
       this.error = '';
       this.moreError = false;
       try {
-        const response = await listCircles({ page, search: this.appliedSearch });
+        const response = await listCircles({ page, search: this.appliedSearch }, true);
         const loadedIds = new Set(this.circles.map((circle) => circle.id));
         this.circles = [
           ...this.circles, ...pageResults(response).filter((circle) => !loadedIds.has(circle.id)),

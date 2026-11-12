@@ -35,8 +35,8 @@ export function resolveDialect(qualifiedCode) {
   );
 }
 
-export function listCircles(params = {}) {
-  return request.get('/circles/', params, false, PAGE_LOAD_OPTIONS);
+export function listCircles(params = {}, silent = false) {
+  return request.get('/circles/', params, silent, PAGE_LOAD_OPTIONS);
 }
 
 export function getCircle(id) {
