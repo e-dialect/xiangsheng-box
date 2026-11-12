@@ -5,6 +5,7 @@ import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platfo
 import { ROUTES } from '@/services/navigation';
 import EntryDetails from '@/pages/entries/details.vue';
 import RecordingDetails from '@/pages/recordings/details.vue';
+import CollectionDetails from '@/pages/collections/details.vue';
 
 vi.mock('@/services/platform', async (importOriginal) => ({
   ...await importOriginal(),
@@ -15,6 +16,7 @@ vi.mock('@/services/platform', async (importOriginal) => ({
 const cases = [
   ['entry', EntryDetails, 'entry', ROUTES.entryDetail],
   ['recording', RecordingDetails, 'recording', ROUTES.recordingDetail],
+  ['collection', CollectionDetails, 'box', ROUTES.collectionDetail],
 ];
 
 describe.each(cases)('%s native sharing', (name, page, field, route) => {
@@ -33,7 +35,7 @@ describe.each(cases)('%s native sharing', (name, page, field, route) => {
   it('returns the public detail destination from the native share callback', () => {
     const shareMessage = page.computed.shareMessage.call({
       [field]: {
-        id: 42, visibility: true, summary: '走路', original_gloss: '走路',
+        id: 42, visibility: true, is_public: true, summary: '走路', original_gloss: '走路',
       },
       loading: false,
     });
@@ -44,7 +46,7 @@ describe.each(cases)('%s native sharing', (name, page, field, route) => {
 
   it('keeps private content out of native share payloads', () => {
     const shareMessage = page.computed.shareMessage.call({
-      [field]: { id: 42, visibility: false },
+      [field]: { id: 42, visibility: false, is_public: false },
       loading: false,
     });
     expect(shareMessage).toBeNull();
@@ -55,7 +57,7 @@ describe.each(cases)('%s native sharing', (name, page, field, route) => {
     isQQMiniProgram.mockReturnValue(true);
     const shareMessage = page.computed.shareMessage.call({
       [field]: {
-        id: 42, visibility: true, summary: '走路', original_gloss: '走路',
+        id: 42, visibility: true, is_public: true, summary: '走路', original_gloss: '走路',
       },
       loading: false,
     });
