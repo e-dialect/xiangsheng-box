@@ -2,6 +2,7 @@
   <AppShell
     title="录制乡音"
     active="record"
+    :scroll-into-view="validationTarget"
   >
     <view class="record-page">
       <view class="record-draft-actions">
@@ -78,9 +79,41 @@
         class="record-form"
         :data="form"
         :rules="rules"
+        scroll-to-first-error=""
       >
+        <view
+          v-if="selectedEntry"
+          class="record-entry-context"
+        >
+          <view class="record-entry-context__label">
+            这次录这个词
+          </view>
+          <view
+            class="selected-entry"
+          >
+            <view>
+              <view class="selected-entry__title">
+                {{ entryTitle(selectedEntry) }}
+              </view>
+              <view class="selected-entry__summary">
+                {{ selectedEntry.summary }}
+              </view>
+            </view>
+            <BaseButton
+              size="small"
+              variant="ghost"
+              text="取消选词"
+              @click="clearEntry"
+            />
+          </view>
+          <text class="record-section__help">
+            照你平常的说法读出来就好，不必填写写法或音标。
+          </text>
+        </view>
+
         <view class="required-flow">
           <view
+            id="record-required-audio"
             class="record-section record-section--audio"
             :class="{ 'record-section--complete': requiredSteps[0].complete }"
           >
@@ -115,12 +148,14 @@
             <view
               v-if="fieldErrors.audio_url"
               class="field-error"
+              role="alert"
             >
               {{ fieldErrors.audio_url }}
             </view>
           </view>
 
           <view
+            id="record-required-dialect"
             class="record-section"
             :class="{ 'record-section--complete': requiredSteps[1].complete }"
           >
@@ -154,6 +189,7 @@
             <view
               v-if="fieldErrors.usage_dialect_id"
               class="field-error"
+              role="alert"
             >
               {{ fieldErrors.usage_dialect_id }}
             </view>
@@ -163,6 +199,7 @@
           </view>
 
           <view
+            id="record-required-gloss"
             class="record-section"
             :class="{ 'record-section--complete': requiredSteps[2].complete }"
           >
@@ -193,9 +230,15 @@
               required
               :maxlength="300"
               placeholder="例如：表示害怕的意思；看到危险时会说"
-              :error="fieldErrors.original_gloss"
               @change="clearFieldError('original_gloss')"
             />
+            <view
+              v-if="fieldErrors.original_gloss"
+              class="field-error"
+              role="alert"
+            >
+              {{ fieldErrors.original_gloss }}
+            </view>
           </view>
         </view>
 
@@ -225,63 +268,45 @@
                 placeholder="IPA、罗马字或自己的记法都可以"
               />
 
-              <view class="entry-linker">
+              <view
+                v-if="!selectedEntry"
+                class="entry-linker"
+              >
                 <view class="entry-linker__heading">
                   关联已有词条
                 </view>
+                <BaseField
+                  v-model="entryKeyword"
+                  name="entry_keyword"
+                  label="查找词条"
+                  placeholder="按写法或大意搜索"
+                  @confirm="searchEntries"
+                />
+                <BaseButton
+                  size="small"
+                  variant="ghost"
+                  :loading="entrySearching"
+                  text="查找可关联词条"
+                  @click="searchEntries"
+                />
                 <view
-                  v-if="selectedEntry"
-                  class="selected-entry"
+                  v-for="entry in entryCandidates"
+                  :key="entry.id"
+                  class="entry-candidate"
+                  role="button"
+                  :aria-label="`关联词条：${entryTitle(entry)}`"
+                  @tap="selectEntry(entry)"
                 >
-                  <view>
-                    <view class="selected-entry__title">
-                      {{ entryTitle(selectedEntry) }}
-                    </view>
-                    <view class="selected-entry__summary">
-                      {{ selectedEntry.summary }}
-                    </view>
+                  <view class="entry-candidate__title">
+                    {{ entryTitle(entry) }}
                   </view>
-                  <BaseButton
-                    size="small"
-                    variant="ghost"
-                    text="取消关联"
-                    @click="clearEntry"
-                  />
+                  <view class="entry-candidate__summary">
+                    {{ entry.summary || '大意待补充' }}
+                  </view>
+                  <view class="entry-candidate__meta">
+                    {{ dialectLabel(entry.usage_dialect) }} · {{ entry.recording_count }} 段录音
+                  </view>
                 </view>
-                <template v-else>
-                  <BaseField
-                    v-model="entryKeyword"
-                    name="entry_keyword"
-                    label="查找词条"
-                    placeholder="按写法或大意搜索"
-                    @confirm="searchEntries"
-                  />
-                  <BaseButton
-                    size="small"
-                    variant="ghost"
-                    :loading="entrySearching"
-                    text="查找可关联词条"
-                    @click="searchEntries"
-                  />
-                  <view
-                    v-for="entry in entryCandidates"
-                    :key="entry.id"
-                    class="entry-candidate"
-                    role="button"
-                    :aria-label="`关联词条：${entryTitle(entry)}`"
-                    @tap="selectEntry(entry)"
-                  >
-                    <view class="entry-candidate__title">
-                      {{ entryTitle(entry) }}
-                    </view>
-                    <view class="entry-candidate__summary">
-                      {{ entry.summary || '大意待补充' }}
-                    </view>
-                    <view class="entry-candidate__meta">
-                      {{ dialectLabel(entry.usage_dialect) }} · {{ entry.recording_count }} 段录音
-                    </view>
-                  </view>
-                </template>
               </view>
 
               <BaseField
@@ -406,6 +431,7 @@ export default {
       },
       audio: emptyAudio(),
       fieldErrors: {},
+      validationTarget: '',
       optionalSections: [],
       dialects: [],
       dialectPickerVisible: false,
@@ -491,8 +517,13 @@ export default {
         if (!this.audio.path) this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
         if (draft.entryId) await this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
-    } else if (options.entry_id) await this.loadEntry(options.entry_id);
-    else {
+    } else if (options.entry_id) {
+      const matchingDraft = listRecordingDrafts(this.ownerScope)
+        .filter((draft) => String(draft.entryId) === String(options.entry_id))
+        .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0))[0];
+      if (matchingDraft) await this.restoreDraft(matchingDraft.id);
+      else await this.loadEntry(options.entry_id);
+    } else {
       const [latestDraft] = listRecordingDrafts(this.ownerScope)
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
       if (latestDraft) {
@@ -612,7 +643,7 @@ export default {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
         this.draftMessage = error.message;
-        notify({ title: error.message });
+        if (!silent) notify({ title: error.message });
         return { restorable: false, message: this.draftMessage };
       } finally { this.savingDraft = false; }
     },
@@ -629,7 +660,6 @@ export default {
     async loadEntry(id) {
       try {
         this.selectedEntry = await getEntry(id);
-        this.optionalSections = ['optional'];
       } catch (error) {
         notify({ title: '原词条暂时无法读取', icon: 'none' });
       }
@@ -685,7 +715,17 @@ export default {
       }
       this.fieldErrors = errors;
       if (baseValid !== true || Object.keys(errors).length) {
-        notify({ title: '还差几项必要信息', icon: 'none' });
+        const firstMissing = Object.keys(errors)[0];
+        const targets = {
+          audio_url: 'record-required-audio',
+          usage_dialect_id: 'record-required-dialect',
+          original_gloss: 'record-required-gloss',
+        };
+        if (!targets[firstMissing]) notify({ title: '请检查填写内容', icon: 'none' });
+        // Clear first so repeated submissions can revisit the same missing step.
+        this.validationTarget = '';
+        await this.$nextTick();
+        this.validationTarget = targets[firstMissing] || '';
         return false;
       }
       return true;
@@ -751,6 +791,32 @@ export default {
 </script>
 
 <style scoped>
+/* Keep the recording task visible without expanding professional fields. */
+.record-entry-context {
+  display: grid;
+  gap: 12rpx;
+  min-width: 0;
+  padding: 20rpx;
+  border: 1rpx solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--accent-subtle-color);
+}
+
+.record-entry-context__label {
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.record-entry-context .selected-entry {
+  flex-wrap: wrap;
+}
+
+.record-entry-context .selected-entry > view {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .record-page,
 .record-form,
 .optional-fields {
@@ -986,9 +1052,16 @@ export default {
 
 .selected-entry {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 18rpx;
+}
+
+.selected-entry > view {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entry-candidate {

@@ -43,6 +43,7 @@
       <!-- #endif -->
 
       <t-tabs
+        v-if="phoneCodeLoginEnabled"
         :value="loginMode"
         class="login-tabs"
         :class="{ 'login-alternative--hidden': !showLoginAlternatives }"
@@ -59,7 +60,7 @@
       </t-tabs>
 
       <view
-        v-if="loginMode === 'phone'"
+        v-if="phoneCodeLoginEnabled && loginMode === 'phone'"
         class="login-form phone-form"
         :class="{ 'login-alternative--hidden': !showLoginAlternatives }"
       >
@@ -233,6 +234,8 @@ import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
 import { toForgetPage, toRegisterPage, toWechatRegisterPage } from '@/routers/login';
 import { applyFieldErrors, readableErrorMessage } from '@/utils/apiError';
 
+const PHONE_CODE_LOGIN_ENABLED = import.meta.env.VITE_PHONE_CODE_LOGIN_ENABLED === 'true';
+
 export default {
   name: 'LoginPage',
   components: {
@@ -251,8 +254,9 @@ export default {
       toForgetPage,
       toRegisterPage,
       toWechatRegisterPage,
+      phoneCodeLoginEnabled: PHONE_CODE_LOGIN_ENABLED,
       intent: null,
-      loginMode: 'phone',
+      loginMode: PHONE_CODE_LOGIN_ENABLED ? 'phone' : 'password',
       phone: '',
       code: '',
       username: '',
@@ -322,8 +326,11 @@ export default {
     changeMode(event) {
       const value = event?.detail?.value ?? event?.value ?? event?.detail ?? event;
       const nextMode = value ?? 'phone';
-      if (nextMode === this.loginMode) return;
-      this.loginMode = nextMode;
+      const resolvedMode = nextMode === 'phone' && !this.phoneCodeLoginEnabled
+        ? 'password'
+        : nextMode;
+      if (resolvedMode === this.loginMode) return;
+      this.loginMode = resolvedMode;
       // 两种模式字段互斥，切走时清空错误，避免隐藏字段的旧错误阻塞提交。
       this.errors = {
         phone: '',
@@ -348,6 +355,7 @@ export default {
       }, 1000);
     },
     async sendPhoneCode() {
+      if (!this.phoneCodeLoginEnabled) return;
       if (this.countdown > 0 || this.sendingCode) return;
       const phone = String(this.phone || '').trim();
       this.errors.phone = phone ? '' : '请输入手机号';
@@ -365,6 +373,7 @@ export default {
       }
     },
     async phoneLogin() {
+      if (!this.phoneCodeLoginEnabled) return;
       const phone = String(this.phone || '').trim();
       const code = String(this.code || '').trim();
       this.errors.phone = phone ? '' : '请输入手机号';

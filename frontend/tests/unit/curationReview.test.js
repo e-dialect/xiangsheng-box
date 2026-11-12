@@ -37,6 +37,7 @@ function readyEntry() {
   return context(EntryReview, {
     id: 7, entry: { id: 7, status: 'reviewed', usage_dialect: dialects[0] },
     dialects, summary: { grants: [grant] }, evidence: [{ id: 9, citation: '资料第 2 页' }],
+    scopeToolsOpen: true,
     selectedEvidence: [9], form: { dialectId: 2, reason: '依据地方材料修正' },
     $refs: { form: { validate: vi.fn(async () => true) } },
   });
@@ -344,7 +345,60 @@ describe('stage two curation loop', () => {
     expect(ctx.history).toEqual([{ id: 80 }]);
     expect(ctx.evidence).toEqual([{ id: 80 }]);
     expect(ctx.contextError).toContain('不允许');
+    expect(ctx.contextRetryable).toBe(false);
     expect(ctx.entryError).toBe('');
+  });
+
+  it('lets an eligible curator recover from a temporary dialect-context error', async () => {
+    const ctx = readyEntry();
+    listAllDialects.mockRejectedValueOnce({ statusCode: 503 });
+
+    await ctx.loadContext();
+    expect(ctx.contextRetryable).toBe(true);
+    expect(ctx.scopeToolsVisible).toBe(false);
+
+    await ctx.loadContext();
+    expect(ctx.contextRetryable).toBe(false);
+    expect(ctx.scopeToolsVisible).toBe(true);
+  });
+
+  it('loads public entry and sources for guests without history or editor context requests', async () => {
+    session = {};
+    const ctx = context(EntryReview, { id: 7 });
+
+    await ctx.load();
+
+    expect(request.get.mock.calls.map(([url]) => url)).toEqual([
+      '/entries/7/', '/evidence-records/',
+    ]);
+    expect(listAllDialects).not.toHaveBeenCalled();
+    expect(ctx.scopeToolsVisible).toBe(false);
+  });
+
+  it('keeps the tools collapsed until an eligible curator opens them', () => {
+    const ctx = readyEntry();
+    ctx.scopeToolsOpen = false;
+    expect(ctx.scopeToolsVisible).toBe(false);
+    expect(ctx.canSubmit).toBe(false);
+
+    ctx.toggleScopeTools();
+    expect(ctx.scopeToolsVisible).toBe(true);
+    expect(ctx.canSubmit).toBe(true);
+
+    ctx.summary = { grants: [] };
+    expect(ctx.scopeToolsVisible).toBe(false);
+    expect(ctx.canSubmit).toBe(false);
+  });
+
+  it('clears later-page selections on a full source reload', async () => {
+    const ctx = readyEntry();
+    ctx.evidencePage = 2;
+    ctx.selectedEvidence = [10];
+
+    await ctx.loadEvidence(1);
+
+    expect(ctx.selectedEvidence).toEqual([]);
+    expect(ctx.submitError).toBe('来源已重新加载，请重新选择依据');
   });
 
   it('retains the failed next page number for retry and clears records after access denial', async () => {

@@ -178,6 +178,15 @@
         <text class="entry-results__summary-copy">
           相同写法的不同意思会各自保留，点开后再看地区、读音和证据。
         </text>
+        <BaseButton
+          v-if="keywordShare"
+          class="entry-results__share"
+          size="small"
+          variant="ghost"
+          :open-type="shareType"
+          :text="shareType || canSystemShare ? '分享查词结果' : '复制关键词链接'"
+          @click="shareKeyword"
+        />
       </view>
 
       <t-collapse
@@ -195,7 +204,7 @@
               v-if="activeFilters"
               class="filter-stack__summary"
             >
-              <text>已启用 {{ activeFilters }} 项条件</text>
+              <text>已选 {{ activeFilters }} 项条件</text>
               <BaseButton
                 size="extra-small"
                 variant="ghost"
@@ -305,6 +314,12 @@
               label="概念"
               placeholder="例如 WALK；只发现关联词条，不自动合并"
             />
+            <BaseButton
+              block
+              text="应用筛选"
+              :loading="loading"
+              @click="applyAdvancedFilters"
+            />
           </view>
         </t-collapse-panel>
       </t-collapse>
@@ -396,8 +411,13 @@ import {
 } from '@/services/entrySearchAssist';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord,
+  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
 } from '@/services/navigation';
+import { APP_NAME } from '@/const/branding';
+import { isWechatMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
@@ -482,6 +502,7 @@ export default {
   data() {
     return {
       filters: defaultFilters(),
+      appliedFilters: null,
       openSections: [],
       entries: [],
       total: 0,
@@ -520,6 +541,23 @@ export default {
     };
   },
   computed: {
+    shareType() { return isWechatMiniProgram() ? 'share' : ''; },
+    canSystemShare: canUseSystemShare,
+    keywordShare() {
+      if (!hasShareTarget() || this.loading || this.errorMessage
+        || !this.entries.length || !this.submittedKeyword) {
+        return null;
+      }
+      const characters = Array.from(this.submittedKeyword);
+      const keyword = characters.length > 24
+        ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
+      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      return {
+        title: `查词｜${keyword} · ${APP_NAME}`,
+        path,
+        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+      };
+    },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
     },
@@ -576,11 +614,23 @@ export default {
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
   async onLoad(options = {}) {
+    // #ifdef MP-WEIXIN
+    if (isWechatMiniProgram()) showWechatShareMenu();
+    // #endif
     this.history = searchHistory();
     popularEntries()
       .then((items) => { this.popular = pageResults(items); })
       .catch(() => { this.popular = []; });
     this.filters.keyword = options.keywords || options.key || '';
+    // #ifdef MP-WEIXIN
+    if (typeof options.sharedKeyword === 'string') {
+      try {
+        this.filters.keyword = decodeURIComponent(options.sharedKeyword);
+      } catch (error) {
+        this.filters.keyword = '';
+      }
+    }
+    // #endif
     try {
       this.dialects = await listAllDialects();
     } catch (error) {
@@ -588,8 +638,24 @@ export default {
     }
     if (this.filters.keyword) await this.search();
   },
+  // #ifdef MP-WEIXIN
+  onShareAppMessage() {
+    const { title = `查找词条｜${APP_NAME}`, query } = this.keywordShare || {};
+    const path = query ? `${ROUTES.search}?${query}` : ROUTES.search;
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  onShareTimeline() {
+    const { title = `查找词条｜${APP_NAME}`, query = 'sharedKeyword=' } = this.keywordShare || {};
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
   methods: {
     goCollections,
+    shareKeyword() {
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.keywordShare, '关键词链接已复制');
+      // #endif
+    },
     clearHistory() { clearSearchHistory(); this.history = []; },
     dialectLabel,
     entryTitle,
@@ -603,8 +669,8 @@ export default {
         redirected: '已合并',
       }[status] || '待整理';
     },
-    requestParams(page) {
-      return buildEntrySearchParams({ ...this.filters, page, pageSize: 20 });
+    requestParams(page, filters = this.filters) {
+      return buildEntrySearchParams({ ...filters, page, pageSize: 20 });
     },
     quickSearch(keyword) {
       this.filters.keyword = keyword;
@@ -615,6 +681,10 @@ export default {
       this.filters = { ...defaultFilters(), keyword };
       this.search();
     },
+    applyAdvancedFilters() {
+      this.openSections = [];
+      return this.search();
+    },
     handleErrorAction() {
       if (this.searchUnavailable) {
         goHome(true);
@@ -623,6 +693,10 @@ export default {
       this.search();
     },
     async search() {
+      const filters = { ...this.filters };
+      const requestId = this.searchRequestId + 1;
+      this.searchRequestId = requestId;
+      this.loadingMore = false;
       this.submittedKeyword = String(this.filters.keyword || '').trim();
       rememberSearch(this.filters.keyword);
       this.history = searchHistory();
@@ -632,29 +706,31 @@ export default {
       if (!ensureCapability(CAPABILITIES.ENTRY_SEARCH, 'search')) {
         this.searched = true;
         this.entries = [];
+        this.total = 0;
+        this.next = null;
+        this.loading = false;
         this.searchUnavailable = true;
         this.errorMessage = '词条查询正在维护，请稍后再试';
         return;
       }
       this.searchUnavailable = false;
-      const requestId = this.searchRequestId + 1;
-      this.searchRequestId = requestId;
       this.loading = true;
       this.errorMessage = '';
       this.searched = true;
       try {
-        const response = await listEntries(this.requestParams(1));
+        const response = await listEntries(this.requestParams(1, filters));
         if (requestId !== this.searchRequestId) return;
         this.entries = pageResults(response);
         this.total = Number(response?.count ?? this.entries.length);
         this.next = response?.next || null;
         this.page = 1;
+        this.appliedFilters = filters;
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',
           metadata: {
             result_bucket: resultBucket(this.total),
-            filter_count: activeFilterCount(this.filters),
+            filter_count: activeFilterCount(filters),
           },
         });
       } catch (error) {
@@ -668,7 +744,7 @@ export default {
           result: 'error',
           metadata: {
             result_bucket: '0',
-            filter_count: activeFilterCount(this.filters),
+            filter_count: activeFilterCount(filters),
           },
         });
       } finally {
@@ -676,18 +752,22 @@ export default {
       }
     },
     async loadMore() {
-      if (!this.next || this.loadingMore) return;
+      if (!this.next || this.loading || this.loadingMore || !this.appliedFilters) return;
+      const requestId = this.searchRequestId;
       this.loadingMore = true;
       try {
         const page = this.page + 1;
-        const response = await listEntries(this.requestParams(page));
+        const response = await listEntries(this.requestParams(page, this.appliedFilters));
+        if (requestId !== this.searchRequestId) return;
         this.entries = [...this.entries, ...pageResults(response)];
         this.next = response?.next || null;
         this.page = page;
       } catch (error) {
-        uni.showToast({ title: '暂时无法继续加载', icon: 'none' });
+        if (requestId === this.searchRequestId) {
+          uni.showToast({ title: '暂时无法继续加载', icon: 'none' });
+        }
       } finally {
-        this.loadingMore = false;
+        if (requestId === this.searchRequestId) this.loadingMore = false;
       }
     },
     onDialectChange(context = {}) {
@@ -712,7 +792,10 @@ export default {
 <style scoped>
 .entry-search {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 24rpx;
+  overflow-wrap: anywhere;
 }
 
 .entry-search__prompt,
@@ -767,7 +850,29 @@ export default {
 }
 
 .entry-search__suggestions {
+  min-width: 0;
   margin-top: 6rpx;
+}
+
+.entry-search :deep(.base-button) {
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 44px;
+  padding-block: 8px;
+  box-sizing: border-box;
+  white-space: normal;
+}
+
+.entry-search :deep(.t-button__content) {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.entry-search :deep(.t-cell__note) {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entry-search__state {
@@ -788,11 +893,39 @@ export default {
   font-size: 30rpx;
 }
 
+.entry-results__share {
+  justify-self: start;
+}
+
 .entry-search__bar,
 .filter-stack,
 .entry-results {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 18rpx;
+}
+
+/* Keep ranked results in reading order; use available width for search controls. */
+@media (min-width: 600px) {
+  .entry-search__bar {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 160px);
+    align-items: end;
+  }
+
+  .entry-search__bar > :deep(.base-button) {
+    margin-bottom: var(--space-2);
+  }
+}
+
+@media (min-width: 768px) {
+  .filter-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-stack > :not(.base-field) {
+    grid-column: 1 / -1;
+  }
 }
 
 .filter-stack__summary {
@@ -827,6 +960,7 @@ export default {
 }
 
 .entry-result__title {
+  min-width: 0;
   font-size: 36rpx;
   font-weight: 800;
   overflow-wrap: anywhere;
@@ -856,6 +990,9 @@ export default {
 }
 
 .entry-result__meta-item {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 6rpx 12rpx;
   border-radius: var(--radius-pill);
   background: var(--surface-subtle-color);

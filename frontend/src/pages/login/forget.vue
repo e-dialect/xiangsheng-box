@@ -89,7 +89,7 @@
             class="code-button"
             variant="ghost"
             size="medium"
-            :disabled="isSending"
+            :disabled="Boolean(codeRequest)"
             @click="getCode"
           >
             {{ sendCodeMsg }}
@@ -131,6 +131,7 @@ import {
   requestPasswordResetCode,
   resetPassword,
 } from '@/services/user';
+import { notify, notifySuccess } from '@/services/feedback';
 import { applyFieldErrors, readableErrorMessage } from '@/utils/apiError';
 import getCodeMixin from './mixin/getCodeMixin';
 
@@ -162,6 +163,9 @@ export default {
     this.username = String(query?.username || '').trim();
   },
   computed: {
+    codeDestination() {
+      return this.steps === 1 ? this.username.trim() : '';
+    },
     journeyTitle() {
       return this.steps === 0 ? '先确认你的账号' : '换一把新的钥匙';
     },
@@ -173,6 +177,7 @@ export default {
   methods: {
     returnToAccountStep() {
       this.steps = 0;
+      this.emailMasked = '';
       this.password = '';
       this.repeatedPassword = '';
       this.code = '';
@@ -184,6 +189,7 @@ export default {
       this.errors[field] = '';
     },
     async next() {
+      if (this.checking) return;
       const username = String(this.username || '').trim();
       this.errors.username = username ? '' : '请输入用户名';
       if (this.errors.username) return;
@@ -191,9 +197,12 @@ export default {
       this.checking = true;
       try {
         const res = await getEmailByUsername(username);
+        if (this.username.trim() !== username) return;
+        this.username = username;
         this.emailMasked = res.email_masked;
         this.steps = 1;
       } catch (error) {
+        if (this.username.trim() !== username) return;
         if (!applyFieldErrors(this.errors, error, ['username'])) {
           const title = readableErrorMessage(error, {
             404: '没有找到该账号',
@@ -205,19 +214,19 @@ export default {
       }
     },
     async getCode() {
-      try {
-        const res = await requestPasswordResetCode(this.username);
-        this.emailMasked = res.email_masked;
-        uni.showToast({ title: '验证码已发送', icon: 'success' });
-        this.isSending = true;
-      } catch (error) {
-        if (!applyFieldErrors(this.errors, error, ['username', 'code'])) {
-          uni.showToast({
-            title: readableErrorMessage(error) || '验证码发送失败',
-            icon: 'none',
-          });
-        }
-      }
+      const username = this.codeDestination;
+      await this.sendVerificationCode(
+        () => requestPasswordResetCode(username),
+        (response) => {
+          this.emailMasked = response.email_masked;
+          notifySuccess('验证码已发送');
+        },
+        (error) => {
+          if (!applyFieldErrors(this.errors, error, ['username', 'code'])) {
+            notify({ title: readableErrorMessage(error) || '验证码发送失败' });
+          }
+        },
+      );
     },
     async reset() {
       const password = String(this.password || '');

@@ -66,7 +66,8 @@
       <BaseButton
         size="small"
         :text="playing ? '停止' : '听录音'"
-        @click="toggleAudio"
+        :disabled="!hasAudio"
+        @click="toggleAudio()"
       />
       <BaseButton
         v-if="entry && !compact"
@@ -75,6 +76,19 @@
         text="看词条"
         @click="$emit('open-entry', entry.id)"
       />
+    </view>
+
+    <view
+      class="recording-card__playback-status"
+      role="status"
+      aria-live="polite"
+    >
+      <text
+        v-if="playbackMessage"
+        class="recording-card__playback-message"
+      >
+        {{ playbackMessage }}
+      </text>
     </view>
 
     <view
@@ -131,6 +145,7 @@ export default {
     return {
       playing: false,
       playbackHandle: null,
+      playbackFailed: false,
     };
   },
   computed: {
@@ -158,12 +173,27 @@ export default {
       const variant = this.entry?.pronunciation_variants?.[0];
       return variant?.surface_romanization || variant?.base_romanization || variant?.ipa || '';
     },
+    audioSource() {
+      return String(this.recording.audio_url || '').trim();
+    },
+    hasAudio() {
+      return Boolean(this.audioSource && this.audioSource !== 'null');
+    },
+    playbackMessage() {
+      if (!this.hasAudio) return '这段录音暂无可播放的音频。';
+      return this.playbackFailed ? '这段录音暂时播不了，可以再点「听录音」重试。' : '';
+    },
+  },
+  watch: {
+    audioSource() {
+      if (this.playbackHandle) stopAudio();
+      this.playbackFailed = false;
+    },
   },
   mounted() {
     this.unsubscribeAudio = onExternalStop((handle) => {
       if (handle !== this.playbackHandle) return;
-      this.playing = false;
-      this.playbackHandle = null;
+      this.resetPlayback();
     });
   },
   beforeUnmount() {
@@ -172,26 +202,31 @@ export default {
   },
   methods: {
     goRecordingDetail,
+    resetPlayback() {
+      this.playing = false;
+      this.playbackHandle = null;
+    },
+    failPlayback() {
+      this.resetPlayback();
+      this.playbackFailed = true;
+    },
     toggleAudio() {
       if (this.playing) {
         stopAudio();
-        this.playing = false;
-        this.playbackHandle = null;
+        this.resetPlayback();
         return;
       }
-      this.playing = true;
-      this.playbackHandle = playManaged(this.recording.audio_url, {
-        onEnded: () => {
-          this.playing = false;
-          this.playbackHandle = null;
-        },
-        onError: () => {
-          this.playing = false;
-          this.playbackHandle = null;
-          uni.showToast({ title: '录音播放失败', icon: 'none' });
-        },
-      });
-      if (!this.playbackHandle) this.playing = false;
+      if (!this.hasAudio) return;
+      this.playbackFailed = false;
+      try {
+        this.playbackHandle = playManaged(this.audioSource, {
+          onEnded: this.resetPlayback,
+          onError: this.failPlayback,
+        });
+        this.playing = Boolean(this.playbackHandle);
+      } catch (error) {
+        this.failPlayback();
+      }
     },
   },
 };
@@ -297,6 +332,13 @@ export default {
 
 .recording-card__actions {
   margin-top: 24rpx;
+}
+
+.recording-card__playback-message {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--text-color);
+  font-size: var(--font-size-sm);
 }
 
 .recording-card__community {

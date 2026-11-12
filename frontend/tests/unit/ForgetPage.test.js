@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getEmailByUsername: vi.fn(),
   requestPasswordResetCode: vi.fn(),
   resetPassword: vi.fn(),
-  sendEmailCode: vi.fn(),
 }));
 
 vi.mock('@/services/user', () => ({
@@ -15,7 +14,6 @@ vi.mock('@/services/user', () => ({
   requestPasswordResetCode: mocks.requestPasswordResetCode,
   resetPassword: mocks.resetPassword,
 }));
-vi.mock('@/services/verification', () => ({ sendEmailCode: mocks.sendEmailCode }));
 
 const { default: ForgetPage } = await import('@/pages/login/forget.vue');
 
@@ -30,9 +28,11 @@ function mountPage() {
 }
 
 function fillResetForm(wrapper) {
-  wrapper.vm.password = 'password123';
-  wrapper.vm.repeatedPassword = 'password123';
-  wrapper.vm.code = '654321';
+  Object.assign(wrapper.vm, {
+    password: 'password123',
+    repeatedPassword: 'password123',
+    code: '654321',
+  });
 }
 
 describe('forget password page', () => {
@@ -64,6 +64,18 @@ describe('forget password page', () => {
 
     expect(wrapper.vm.steps).toBe(1);
     expect(wrapper.vm.emailMasked).toBe('c***@example.com');
+  });
+
+  it('requires confirmation of the current username if it changes during lookup', async () => {
+    const wrapper = mountPage();
+    wrapper.vm.username = 'collector';
+    const checking = wrapper.vm.next();
+    wrapper.vm.username = 'another';
+    await checking;
+
+    expect(wrapper.vm.steps).toBe(0);
+    expect(wrapper.vm.emailMasked).toBe('');
+    expect(wrapper.vm.checking).toBe(false);
   });
 
   it('returns to username editing and clears sensitive reset drafts', async () => {
@@ -114,11 +126,46 @@ describe('forget password page', () => {
     expect(mocks.requestPasswordResetCode).toHaveBeenCalledWith('collector');
     expect(wrapper.vm.emailMasked).toBe('c***@example.com');
     expect(wrapper.text()).not.toContain('123456');
-    expect(wrapper.vm.isSending).toBe(true);
+    expect(wrapper.vm.sendCodeMsg).toBe('重新获取(30)');
+    wrapper.unmount();
+  });
+
+  it('keeps a late code response and its cooldown with the original account', async () => {
+    const wrapper = mountPage();
+    wrapper.vm.username = 'collector';
+    await wrapper.vm.next();
+    let resolveSend;
+    mocks.requestPasswordResetCode.mockReturnValueOnce(new Promise((resolve) => {
+      resolveSend = resolve;
+    }));
+
+    const sending = wrapper.vm.getCode();
+    await wrapper.vm.getCode();
+    expect(wrapper.vm.sendCodeMsg).toBe('发送中…');
+    expect(mocks.requestPasswordResetCode).toHaveBeenCalledTimes(1);
+    expect(mocks.requestPasswordResetCode).toHaveBeenCalledWith('collector');
+
+    wrapper.vm.returnToAccountStep();
+    wrapper.vm.username = 'another';
+    mocks.getEmailByUsername.mockResolvedValueOnce({ email_masked: 'a***@example.com' });
+    await wrapper.vm.next();
+    resolveSend({ email_masked: 'c***@example.com' });
+    await sending;
+
+    expect(wrapper.vm.emailMasked).toBe('a***@example.com');
+    expect(wrapper.vm.sendCodeMsg).toBe('获取验证码');
+    expect(uni.showToast).not.toHaveBeenCalled();
+    wrapper.vm.returnToAccountStep();
+    wrapper.vm.username = 'collector';
+    await wrapper.vm.next();
+    expect(wrapper.vm.sendCodeMsg).toBe('重新获取(30)');
+    wrapper.unmount();
   });
 
   it('maps reset-code field errors without duplicating a toast', async () => {
     const wrapper = mountPage();
+    wrapper.vm.username = 'collector';
+    wrapper.vm.steps = 1;
     mocks.requestPasswordResetCode.mockRejectedValue({
       statusCode: 400,
       data: { username: '账号不可用' },
@@ -127,6 +174,7 @@ describe('forget password page', () => {
     await wrapper.vm.getCode();
 
     expect(wrapper.vm.errors.username).toBe('账号不可用');
+    expect(wrapper.vm.sendCodeMsg).toBe('获取验证码');
     expect(uni.showToast).not.toHaveBeenCalled();
   });
 

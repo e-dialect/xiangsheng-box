@@ -1,5 +1,7 @@
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach, beforeEach, describe, expect, it, vi,
+} from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   registerUser: vi.fn(),
@@ -24,21 +26,29 @@ function mountPage() {
 }
 
 function fillValidForm(wrapper) {
-  wrapper.vm.username = 'collector';
-  wrapper.vm.password = 'password123';
-  wrapper.vm.passwordConfirmed = 'password123';
-  wrapper.vm.email = 'collector@example.com';
-  wrapper.vm.code = '123456';
+  Object.assign(wrapper.vm, {
+    username: 'collector',
+    password: 'password123',
+    passwordConfirmed: 'password123',
+    email: 'collector@example.com',
+    code: '123456',
+  });
 }
 
 describe('register page', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     globalThis.uni = {
       showToast: vi.fn(),
     };
     mocks.registerUser.mockResolvedValue({ id: 9 });
     mocks.normalLogin.mockResolvedValue({ id: 9 });
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('registers then logs in with the new account by email', async () => {
@@ -104,18 +114,33 @@ describe('register page', () => {
     expect(wrapper.vm.code).toBe('123456');
   });
 
-  it('sends email code when contact is an email', async () => {
+  it('blocks repeat requests while sending and only cools down the destination email', async () => {
     const wrapper = mountPage();
+    wrapper.vm.formStep = 2;
     wrapper.vm.email = 'collector@example.com';
-    mocks.sendEmailCode.mockResolvedValue({});
+    let resolveSend;
+    mocks.sendEmailCode.mockReturnValue(new Promise((resolve) => { resolveSend = resolve; }));
 
+    const sending = wrapper.vm.getCode();
     await wrapper.vm.getCode();
+    expect(wrapper.text()).toContain('发送中…');
+    expect(mocks.sendEmailCode).toHaveBeenCalledTimes(1);
+    expect(mocks.sendEmailCode).toHaveBeenCalledWith('collector@example.com', 'register', true);
 
-    expect(mocks.sendEmailCode).toHaveBeenCalledWith('collector@example.com', 'register');
-    expect(uni.showToast).toHaveBeenCalledWith({
+    resolveSend({});
+    await sending;
+    expect(uni.showToast).toHaveBeenCalledWith(expect.objectContaining({
       title: '验证码已发送',
       icon: 'success',
-    });
+    }));
+    expect(wrapper.vm.sendCodeMsg).toBe('重新获取(30)');
+    wrapper.vm.email = 'other@example.com';
+    expect(wrapper.vm.sendCodeMsg).toBe('获取验证码');
+    wrapper.vm.email = 'Collector@example.com';
+    expect(wrapper.vm.sendCodeMsg).toBe('重新获取(30)');
+    vi.advanceTimersByTime(30_000);
+    expect(wrapper.vm.sendCodeMsg).toBe('获取验证码');
+    wrapper.unmount();
   });
 
   it('maps server field errors onto the matching field without a toast', async () => {

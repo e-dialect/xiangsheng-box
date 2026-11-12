@@ -3,6 +3,7 @@
   <!-- H5 使用原生滚动容器，避免 uni-app scroll-view 在页面激活时访问已卸载节点。 -->
   <!-- #ifdef H5 -->
   <view
+    ref="h5Scroll"
     class="platform-scroll platform-scroll--h5"
     :class="resolvedClasses"
     @scroll="onH5Scroll"
@@ -13,6 +14,7 @@
   <!-- #ifndef H5 -->
   <scroll-view
     scroll-y
+    :scroll-into-view="scrollIntoView"
     class="platform-scroll"
     :class="resolvedClasses"
     @scroll="onNativeScroll"
@@ -27,6 +29,11 @@
 export default {
   name: 'PlatformScroll',
   props: {
+    scrollIntoView: {
+      type: String,
+      default: '',
+      validator: (value) => !value || /^[A-Za-z][A-Za-z0-9_-]*$/.test(value),
+    },
     variant: {
       type: String,
       default: '',
@@ -53,7 +60,26 @@ export default {
       return [...semanticClass, this.containerClass];
     },
   },
+  watch: {
+    scrollIntoView() {
+      this.scrollToTarget();
+    },
+  },
   methods: {
+    async scrollToTarget() {
+      // #ifdef H5
+      await this.$nextTick();
+      const id = this.scrollIntoView;
+      if (!id || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(id)) return;
+      const ref = this.$refs.h5Scroll;
+      const container = ref?.$el || ref;
+      const target = container?.querySelector?.(`#${id}`);
+      if (!target || typeof container.scrollTo !== 'function') return;
+      const top = target.getBoundingClientRect().top
+        - container.getBoundingClientRect().top + container.scrollTop;
+      container.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+      // #endif
+    },
     normalizeScrollTop(event) {
       const top = event?.detail?.scrollTop
         ?? event?.scrollTop

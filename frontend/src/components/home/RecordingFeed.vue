@@ -493,6 +493,14 @@ export default {
   order: 5;
 }
 
+.recording-feed__list :deep(.recording-card__playback-status) {
+  order: 5;
+}
+
+.recording-feed__list :deep(.recording-card__playback-message) {
+  color: var(--on-immersive-color);
+}
+
 .recording-feed__list :deep(.recording-card__community) {
   order: 6;
   border-color: var(--immersive-border-color);
