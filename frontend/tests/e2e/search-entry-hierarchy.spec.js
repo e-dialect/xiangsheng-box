@@ -183,11 +183,13 @@ test('entry detail keeps later regional recordings reachable and retries a faile
       await route.fulfill({ json: { count: 2, next: null, results: [makeRecording(12, '仙游')] } });
       return;
     }
-    await route.fulfill({ json: {
-      count: 2,
-      next: '/recordings/?entry_id=21&page=2&page_size=50',
-      results: [makeRecording(11, '莆田')],
-    } });
+    await route.fulfill({
+      json: {
+        count: 2,
+        next: '/recordings/?entry_id=21&page=2&page_size=50',
+        results: [makeRecording(11, '莆田')],
+      },
+    });
   });
   await page.goto('/pages/entries/details?id=21');
   await expect(page.getByText('莆田真人样例', { exact: true })).toBeVisible();
