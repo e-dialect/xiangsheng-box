@@ -13,7 +13,7 @@ let wrapper;
 beforeEach(() => {
   vi.useFakeTimers();
   getEntry.mockResolvedValue({ id: 42, display_writing: '行', summary: '走路' });
-  globalThis.uni = { getStorageSync: vi.fn(() => 1), setStorageSync: vi.fn() };
+  globalThis.uni = { getStorageSync: vi.fn(() => 1), setStorageSync: vi.fn(), showToast: vi.fn() };
   globalThis.getApp = () => ({ globalData: {} });
 });
 afterEach(() => {
@@ -38,6 +38,20 @@ function mountPage() {
 }
 
 describe('linked recording task', () => {
+  it('shows retained association and retry when metadata is unavailable', async () => {
+    const page = mountPage();
+    getEntry.mockRejectedValueOnce(new Error('offline'));
+    await page.loadEntry(42);
+    await page.$nextTick();
+    expect(wrapper.find('.record-entry-context').text()).toContain('已保留原词条关联');
+    expect(wrapper.find('.record-entry-context').text()).toContain('保存草稿或提交不会取消关联');
+    expect(wrapper.find('.entry-linker').exists()).toBe(false);
+    await wrapper.find('.record-entry-context button').trigger('click');
+    await page.$nextTick();
+    expect(page.linkedEntryId).toBe(42);
+    expect(page.selectedEntry.summary).toBe('走路');
+  });
+
   it('shows the selected word outside the collapsed optional fields and allows cancellation', async () => {
     const page = mountPage();
     await page.loadEntry(42);

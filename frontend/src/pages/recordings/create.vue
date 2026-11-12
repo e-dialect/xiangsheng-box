@@ -74,7 +74,7 @@
         scroll-to-first-error=""
       >
         <view
-          v-if="selectedEntry"
+          v-if="linkedEntryId"
           class="record-entry-context"
         >
           <view class="record-entry-context__label">
@@ -85,12 +85,21 @@
           >
             <view>
               <view class="selected-entry__title">
-                {{ entryTitle(selectedEntry) }}
+                {{ selectedEntry ? entryTitle(selectedEntry) : '已保留原词条关联' }}
               </view>
               <view class="selected-entry__summary">
-                {{ selectedEntry.summary }}
+                {{ selectedEntry ? selectedEntry.summary : '词条信息暂时无法读取，保存草稿或提交不会取消关联。' }}
               </view>
             </view>
+            <BaseButton
+              v-if="!selectedEntry"
+              size="small"
+              variant="ghost"
+              :loading="entryLoading"
+              :disabled="entryLoading"
+              text="重试读取词条"
+              @click="loadEntry(linkedEntryId)"
+            />
             <BaseButton
               size="small"
               variant="ghost"
@@ -266,7 +275,7 @@
               />
 
               <view
-                v-if="!selectedEntry"
+                v-if="!linkedEntryId"
                 class="entry-linker"
               >
                 <view class="entry-linker__heading">
@@ -440,6 +449,9 @@ export default {
       entryCandidates: [],
       entrySearching: false,
       selectedEntry: null,
+      linkedEntryId: null,
+      entryLoading: false,
+      entryLoadVersion: 0,
       submitting: false,
       draftId: '',
       ownerScope: '',
@@ -500,7 +512,7 @@ export default {
   watch: {
     form: { deep: true, handler() { this.scheduleDraft(); } },
     audio: { deep: true, handler() { this.scheduleDraft(); } },
-    selectedEntry() { this.scheduleDraft(); },
+    linkedEntryId() { this.scheduleDraft(); },
   },
   async onLoad(options = {}) {
     if (!requireAuth('record_recording', { page: 'record' })) return;
@@ -515,14 +527,15 @@ export default {
         this.form = { ...this.form, ...draft.form };
         this.audio = draft.audio || emptyAudio();
         if (!this.audio.path) this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
-        if (draft.entryId) await this.loadEntry(draft.entryId);
+        this.clearEntry();
+        if (draft.entryId) this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
     } else if (options.entry_id) {
       const matchingDraft = listRecordingDrafts(this.ownerScope)
         .filter((draft) => String(draft.entryId) === String(options.entry_id))
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0))[0];
       if (matchingDraft) await this.restoreDraft(matchingDraft.id);
-      else await this.loadEntry(options.entry_id);
+      else this.loadEntry(options.entry_id);
     } else {
       const [latestDraft] = listRecordingDrafts(this.ownerScope)
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
@@ -555,13 +568,14 @@ export default {
     releaseDraftAudioUrl(this.audio);
     this.audio = emptyAudio();
     this.form = Object.fromEntries(Object.keys(this.form).map((key) => [key, '']));
-    this.selectedEntry = null;
+    this.clearEntry();
     this.draftId = '';
     this.draftMessage = '账号已切换，请重新打开录音页';
     this.goRecordingDrafts();
   },
   onHide() { this.persistDirtyDraft(); },
   onUnload() {
+    this.entryLoadVersion += 1;
     clearTimeout(this.draftTimer);
     this.persistDirtyDraft().finally(() => { releaseDraftAudioUrl(this.audio); });
   },
@@ -575,7 +589,8 @@ export default {
         if (!this.audio.path || draft.audioInvalid) {
           this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
         }
-        if (draft.entryId) await this.loadEntry(draft.entryId);
+        this.clearEntry();
+        if (draft.entryId) this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
     },
     async goRecordingDrafts() {
@@ -583,7 +598,7 @@ export default {
       goRecordingDrafts();
     },
     draftSignature() {
-      return JSON.stringify([this.form, this.audio.path, this.selectedEntry?.id || null]);
+      return JSON.stringify([this.form, this.audio.path, this.linkedEntryId || null]);
     },
     scheduleDraft() {
       clearTimeout(this.draftTimer);
@@ -621,7 +636,7 @@ export default {
           id: this.draftId,
           form: { ...this.form },
           audio: { ...this.audio },
-          entryId: this.selectedEntry?.id,
+          entryId: this.linkedEntryId,
         }, this.ownerScope);
         if (draftOwner() !== this.ownerScope) {
           return { restorable: false, message: '账号已切换，请重新打开录音页' };
@@ -660,10 +675,21 @@ export default {
       }
     },
     async loadEntry(id) {
+      if (!id) return;
+      this.entryLoadVersion += 1;
+      const version = this.entryLoadVersion;
+      this.linkedEntryId = id;
+      this.selectedEntry = null;
+      this.entryLoading = true;
       try {
-        this.selectedEntry = await getEntry(id);
+        const entry = await getEntry(id);
+        if (version === this.entryLoadVersion) this.selectedEntry = entry;
       } catch (error) {
-        notify({ title: '原词条暂时无法读取', icon: 'none' });
+        if (version === this.entryLoadVersion) {
+          notify({ title: '原词条暂时无法读取，关联已保留', icon: 'none' });
+        }
+      } finally {
+        if (version === this.entryLoadVersion) this.entryLoading = false;
       }
     },
     onAudioChange(audio) {
@@ -700,10 +726,16 @@ export default {
       }
     },
     selectEntry(entry) {
+      this.entryLoadVersion += 1;
+      this.entryLoading = false;
+      this.linkedEntryId = entry.id;
       this.selectedEntry = entry;
       this.entryCandidates = [];
     },
     clearEntry() {
+      this.entryLoadVersion += 1;
+      this.entryLoading = false;
+      this.linkedEntryId = null;
       this.selectedEntry = null;
       this.entryCandidates = [];
     },
@@ -752,12 +784,12 @@ export default {
           original_pronunciation: String(this.form.original_pronunciation || '').trim(),
           citation: String(this.form.citation || '').trim(),
         };
-        if (this.selectedEntry?.id) payload.primary_entry_id = this.selectedEntry.id;
+        if (this.linkedEntryId) payload.primary_entry_id = this.linkedEntryId;
         const recording = await createRecording(payload);
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'success',
-          metadata: { has_linked_entry: Boolean(this.selectedEntry?.id) },
+          metadata: { has_linked_entry: Boolean(this.linkedEntryId) },
         });
         this.submitted = true;
         clearTimeout(this.draftTimer);
@@ -770,7 +802,7 @@ export default {
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'error',
-          metadata: { has_linked_entry: Boolean(this.selectedEntry?.id) },
+          metadata: { has_linked_entry: Boolean(this.linkedEntryId) },
         });
         this.fieldErrors = {
           ...this.fieldErrors,
