@@ -139,7 +139,7 @@ export default {
       const links = (recording.entry_links || []).filter((link) => link.is_current === true);
       const hasCompetingLink = links.some((link) => (
         (link.role === 'competing' && link.status !== 'rejected')
-        || (link.role === 'primary' && link.status === 'disputed')
+        || (link.role === 'primary' && ['suggested', 'disputed'].includes(link.status))
       ));
       if (hasCompetingLink) return null;
       const primary = links.filter((link) => link.role === 'primary'
