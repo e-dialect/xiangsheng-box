@@ -26,6 +26,20 @@
       </view>
     </view>
 
+    <view
+      v-if="refreshRequired"
+      class="bookmark-pagination"
+      role="status"
+    >
+      <text>{{ loading ? '收藏已移除，正在刷新列表…' : '列表暂时刷新失败，已显示的词条仍可查看。' }}</text>
+      <BaseButton
+        text="重新加载收藏列表"
+        :loading="loading"
+        :disabled="loading || removingId !== null"
+        @click="load(false, true)"
+      />
+    </view>
+
     <BaseLoading
       v-if="loading && !entries.length"
       text="正在读取你的词条收藏…"
@@ -36,6 +50,11 @@
       :description="error"
       action-text="重新加载"
       @action="load()"
+    />
+    <EmptyState
+      v-else-if="!entries.length && refreshRequired"
+      title="收藏列表等待刷新"
+      description="已移除的收藏不会恢复，请使用上方按钮重新加载。"
     />
     <EmptyState
       v-else-if="!entries.length && appliedSearch"
@@ -167,6 +186,7 @@ export default {
       loading: false,
       error: '',
       paginationError: false,
+      refreshRequired: false,
       removingId: null,
       keyword: '',
       appliedSearch: '',
@@ -204,13 +224,14 @@ export default {
       this.keyword = '';
       this.submitSearch();
     },
-    async load(more = false) {
-      if (this.loading || (more && !this.next)) return;
+    async load(more = false, preserveEntries = false) {
+      if (this.loading || (more && (!this.next || this.refreshRequired))) return;
       const page = more ? this.page + 1 : 1;
       this.loading = true;
       this.error = '';
       this.paginationError = false;
-      if (!more) {
+      if (!more && !preserveEntries) {
+        this.refreshRequired = false;
         this.entries = [];
         this.next = false;
       }
@@ -220,14 +241,20 @@ export default {
           ...(this.appliedSearch ? { search: this.appliedSearch } : {}),
         });
         const results = pageResults(response);
-        const loadedIds = new Set(this.entries.map((entry) => entry.id));
-        this.entries = [...this.entries, ...results.filter((entry) => !loadedIds.has(entry.id))];
+        const existing = more ? this.entries : [];
+        const loadedIds = new Set(existing.map((entry) => entry.id));
+        this.entries = [...existing, ...results.filter((entry) => {
+          if (loadedIds.has(entry.id)) return false;
+          loadedIds.add(entry.id);
+          return true;
+        })];
+        this.refreshRequired = false;
         this.page = page;
         this.total = response.count ?? this.entries.length;
         this.next = Boolean(response.next);
       } catch (error) {
         if (more) this.paginationError = true;
-        else this.error = error?.message || '请检查网络或登录状态后重试';
+        else if (!preserveEntries) this.error = error?.message || '请检查网络或登录状态后重试';
       } finally {
         this.loading = false;
       }
@@ -241,7 +268,11 @@ export default {
         this.total = Math.max(0, this.total - 1);
         notifySuccess('已移出收藏');
         // Removing a row shifts the offset for pages that have not been loaded.
-        if (this.next) await this.load();
+        if (this.next || this.refreshRequired) {
+          this.refreshRequired = true;
+          this.next = false;
+          await this.load(false, true);
+        }
       } catch (error) {
         notify({ title: error?.message || '暂时无法移出收藏' });
       } finally {
