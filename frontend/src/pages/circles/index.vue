@@ -18,17 +18,20 @@
         name="circle-search"
         label="搜索地区或方言"
         placeholder="例如：莆田、闽语"
+        :disabled="loading"
+        @blur="captureSearch"
         @confirm="refresh"
       />
       <BaseButton
         block
         text="搜索"
+        :disabled="loading"
         @click="refresh"
       />
     </view>
 
     <BaseLoading
-      v-if="loading"
+      v-if="loading && !circles.length"
       text="正在加载方言圈…"
     />
     <EmptyState
@@ -56,7 +59,7 @@
             圈子目录
           </view>
           <view class="circle-directory__title">
-            {{ search.trim() ? '搜索结果' : '全部方言圈' }}
+            {{ appliedSearch ? '搜索结果' : '全部方言圈' }}
           </view>
         </view>
         <view class="circle-directory__count">
@@ -110,6 +113,23 @@
           </view>
         </view>
       </view>
+      <view
+        v-if="next"
+        class="circle-pagination"
+      >
+        <text
+          v-if="moreError"
+          role="status"
+        >
+          更多地区暂时没加载出来，已显示的圈子仍可打开。
+        </text>
+        <BaseButton
+          variant="ghost"
+          :loading="loading"
+          :text="moreError ? '重试加载更多地区' : '查看更多地区'"
+          @click="loadMore"
+        />
+      </view>
     </view>
   </PageShell>
 </template>
@@ -121,6 +141,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import PageShell from '@/components/PageShell.vue';
 import { requireAuth } from '@/services/authGuard';
+import { pageResults } from '@/services/entryRecording';
 import { goCircleDetail, goHome } from '@/services/navigation';
 import {
   joinCircle, leaveCircle, listCircles,
@@ -132,22 +153,57 @@ export default {
   },
   data() {
     return {
-      circles: [], error: '', loading: false, membershipBusyId: null, search: '', total: 0,
+      circles: [],
+      error: '',
+      loading: false,
+      membershipBusyId: null,
+      search: '',
+      appliedSearch: '',
+      total: 0,
+      page: 1,
+      next: false,
+      moreError: false,
     };
   },
   onLoad() {
     this.refresh();
   },
   methods: {
-    async refresh() {
+    captureSearch(event) {
+      const value = typeof event === 'string' ? event : event?.value;
+      if (typeof value === 'string') this.search = value;
+    },
+    async refresh(event) {
+      this.captureSearch(event);
+      await this.$nextTick();
+      if (this.loading) return;
+      this.appliedSearch = this.search.trim();
+      this.circles = [];
+      this.next = false;
+      await this.load(1);
+    },
+    loadMore() {
+      if (this.next) return this.load(this.page + 1);
+      return undefined;
+    },
+    async load(page) {
+      if (this.loading) return;
+      const more = page > 1;
       this.loading = true;
       this.error = '';
+      this.moreError = false;
       try {
-        const response = await listCircles({ search: this.search.trim() });
-        this.circles = response.results || response || [];
+        const response = await listCircles({ page, search: this.appliedSearch });
+        const loadedIds = new Set(this.circles.map((circle) => circle.id));
+        this.circles = [
+          ...this.circles, ...pageResults(response).filter((circle) => !loadedIds.has(circle.id)),
+        ];
         this.total = Number(response.count ?? this.circles.length);
+        this.page = page;
+        this.next = Boolean(response.next);
       } catch (error) {
-        this.error = error.message || '方言圈加载失败';
+        if (more) this.moreError = true;
+        else this.error = error.message || '方言圈加载失败';
       } finally {
         this.loading = false;
       }
@@ -178,6 +234,15 @@ export default {
 </script>
 
 <style scoped>
+.circle-pagination {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+}
+
 .circle-intro,
 .search-panel,
 .circle-card {
