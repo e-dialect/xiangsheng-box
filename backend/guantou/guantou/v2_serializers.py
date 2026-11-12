@@ -330,6 +330,19 @@ class EntryCardSerializer(serializers.ModelSerializer):
         return self.get_recording_count(obj) == 0
 
 
+class PublicCreatorEntrySerializer(serializers.ModelSerializer):
+    display_writing = serializers.SerializerMethodField()
+    usage_dialect = DialectRefSerializer(read_only=True)
+
+    class Meta:
+        model = Entry
+        fields = ("id", "display_writing", "summary", "usage_dialect")
+        read_only_fields = fields
+
+    def get_display_writing(self, obj):
+        return _display_writing(obj)
+
+
 class EntrySerializer(ProtectedScopeUpdateMixin, EntryCardSerializer):
     scope_field = "usage_dialect"
     scope_target_type = "entry"

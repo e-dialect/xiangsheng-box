@@ -73,7 +73,10 @@ vi.mock('@/services/guantou', () => ({
   listAllDialects: vi.fn(async () => []),
 }));
 
-vi.mock('@/services/entryRecording', () => ({
+vi.mock('@/services/entryRecording', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listPublicCreatorEntries: vi.fn(async () => ({ results: [] })),
+  listRecordings: vi.fn(async () => ({ results: [] })),
   getCurationSummary: vi.fn(async () => {
     throw Object.assign(new Error('forbidden'), { statusCode: 403 });
   }),

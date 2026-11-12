@@ -57,6 +57,7 @@ from .v2_serializers import (
     EvidenceRecordSerializer,
     LegacyReviewCandidateSerializer,
     PronunciationVariantSerializer,
+    PublicCreatorEntrySerializer,
     RecordingEntryLinkSerializer,
     RecordingSerializer,
     UsageAttestationSerializer,
@@ -406,6 +407,42 @@ class EntryViewSet(viewsets.ModelViewSet):
         from .restoration import entry_suggestions
 
         return entry_suggestions(self, request, popular=True)
+
+    @action(detail=False, methods=["get"], url_path="public-contributions")
+    def public_contributions(self, request):
+        message = "creator_id 必须是有效的用户编号"
+        try:
+            creator_id = int(request.query_params.get("creator_id", ""))
+        except ValueError as error:
+            raise BadRequestException(message) from error
+        if not 0 < creator_id <= 2**63 - 1:
+            raise BadRequestException(message)
+        entries = (
+            Entry.objects.filter(
+                created_by_id=creator_id,
+                visibility=True,
+                status__in=(Entry.Status.REVIEWED, Entry.Status.DISPUTED),
+            )
+            .select_related("usage_dialect", "usage_dialect__parent")
+            .prefetch_related(
+                Prefetch(
+                    "entry_writings",
+                    queryset=EntryWriting.objects.filter(
+                        is_current=True,
+                        relation_type=EntryWriting.RelationType.PRIMARY,
+                        status=EntryWriting.Status.REVIEWED,
+                    ).select_related("writing"),
+                ),
+            )
+            .order_by("-created_at", "-id")
+        )
+        page = self.paginate_queryset(entries)
+        serializer = PublicCreatorEntrySerializer(
+            page if page is not None else entries, many=True
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def get_serializer_class(self):
         return EntryCardSerializer if self.action == "list" else EntrySerializer

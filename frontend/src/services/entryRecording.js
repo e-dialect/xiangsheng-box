@@ -20,6 +20,12 @@ export function listEntryBookmarks(params = {}) {
   return request.get('/entries/bookmarks/', params, true, PAGE_LOAD_OPTIONS);
 }
 
+export function listPublicCreatorEntries(creatorId, page) {
+  return request.get('/entries/public-contributions/', {
+    creator_id: creatorId, page,
+  }, true, PAGE_LOAD_OPTIONS);
+}
+
 export function bookmarkEntry(id) {
   return request.put(`/entries/${id}/bookmark/`, {});
 }
