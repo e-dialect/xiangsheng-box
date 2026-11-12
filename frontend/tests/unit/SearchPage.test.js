@@ -41,6 +41,30 @@ describe('entry-first search page orchestration', () => {
     vi.clearAllMocks();
   });
 
+  it('shares the submitted keyword across WeChat entry points without the draft or filters', () => {
+    const page = pageContext();
+    page.submittedKeyword = '行 & hiŋ+?';
+    page.filters.keyword = '尚未提交';
+    page.filters.dialectId = 12;
+    page.entries = [{ id: 1 }];
+    Object.defineProperty(page, 'keywordShare', {
+      get: () => SearchPage.computed.keywordShare.call(page),
+    });
+
+    const friend = SearchPage.onShareAppMessage.call(page);
+    const timeline = SearchPage.onShareTimeline.call(page);
+    expect(friend.path).toBe('/pages/search?key=%E8%A1%8C%20%26%20hi%C5%8B%2B%3F');
+    expect(friend.title).toContain(page.submittedKeyword);
+    expect(timeline).toEqual({
+      title: friend.title,
+      query: friend.path.split('?')[1],
+      imageUrl: '/static/share-cover.png',
+    });
+    page.loading = true;
+    expect(SearchPage.onShareAppMessage.call(page).path).toBe('/pages/search');
+    expect(SearchPage.onShareTimeline.call(page).query).toBe('key=');
+  });
+
   it('keeps same-writing results as separate entries', async () => {
     const page = pageContext();
     page.filters.keyword = '行';
