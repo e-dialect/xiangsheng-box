@@ -3,6 +3,9 @@ import { appRoutePath, goNotFound } from '@/services/navigation';
 // app.js
 import { getLoginStatus } from '@/services/login';
 import { hydrateCapabilities } from '@/services/capabilities';
+// #ifdef MP-QQ
+import { openQQSharedContent } from '@/services/contentShare';
+// #endif
 import { isH5Runtime } from '@/services/platform';
 import {
   ensureDialectOnboarding,
@@ -73,6 +76,11 @@ export default {
       );
     }
   },
+  // #ifdef MP-QQ
+  onShow(options) {
+    openQQSharedContent(options?.query);
+  },
+  // #endif
   globalData: {
     userInfo: {
       avatar: '',

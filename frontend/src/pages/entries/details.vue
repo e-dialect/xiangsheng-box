@@ -25,7 +25,16 @@
           {{ entryTitle(entry) }}
         </view>
         <view class="entry-hero__summary">
-          {{ entry.summary || '大意待补充' }}
+          <view>{{ entry.summary || '大意待补充' }}</view>
+          <BaseButton
+            v-if="shareMessage"
+            class="entry-hero__share"
+            size="small"
+            variant="ghost"
+            :open-type="shareType"
+            :text="shareType || canSystemShare ? '分享词条' : '复制词条链接'"
+            @click="shareEntry"
+          />
         </view>
         <view
           v-if="entry.senses?.length"
@@ -307,6 +316,13 @@ import { notifySuccess } from '@/services/feedback';
 import { goRecord, openPage, ROUTES } from '@/services/navigation';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
+import {
+  defaultContentShareMessage, entryShareMessage, qqContentShareMessage, syncContentShareMenu,
+} from '@/services/contentShare';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 
 export default {
   components: {
@@ -331,6 +347,21 @@ export default {
       attestedDialects: new Set(),
     };
   },
+  computed: {
+    shareType() {
+      return canUseNativeMiniProgramShare() ? 'share' : '';
+    },
+    canSystemShare: canUseSystemShare,
+    shareMessage() {
+      if (!hasShareTarget() || this.loading || this.errorMessage) return null;
+      return entryShareMessage(this.entry);
+    },
+  },
+  watch: {
+    shareMessage(message) {
+      syncContentShareMenu(this, Boolean(message));
+    },
+  },
   onLoad(options = {}) {
     this.id = Number(options.id) || null;
     this.anchorCommentId = Number(options.comment) || null;
@@ -338,10 +369,29 @@ export default {
     this.load();
   },
   onShow() {
+    syncContentShareMenu(this, false);
     if (this.id && this.entry) this.load();
   },
+  // #ifdef MP-WEIXIN || MP-QQ
+  onShareAppMessage() {
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'entry');
+    const { title, path } = this.shareMessage || defaultContentShareMessage();
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
+  // #ifdef MP-WEIXIN
+  onShareTimeline() {
+    const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
+  },
+  // #endif
   methods: {
     entryTitle,
+    shareEntry() {
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.shareMessage, '词条链接已复制');
+      // #endif
+    },
     openReview() {
       openPage(ROUTES.entryReview, { entry_id: this.id });
     },
@@ -424,8 +474,19 @@ export default {
 .entry-detail,
 .recording-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24rpx;
 }
+
+.entry-detail {
+  overflow-wrap: anywhere;
+}
+
+/* #ifdef H5 */
+.recording-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+}
+/* #endif */
 
 .entry-hero,
 .detail-section,
@@ -480,6 +541,10 @@ export default {
   color: var(--text-secondary-color);
   font-size: 30rpx;
   line-height: 1.65;
+}
+
+.entry-hero__share {
+  margin-top: 16rpx;
 }
 
 .meaning-block,
