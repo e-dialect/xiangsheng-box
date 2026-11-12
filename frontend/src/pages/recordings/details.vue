@@ -68,6 +68,13 @@
           :text="`${entryTitle(link.entry)} · ${linkLabel(link)}`"
           @click="goEntryDetail(link.entry.id)"
         />
+        <BaseButton
+          v-if="recordingTarget"
+          size="small"
+          variant="ghost"
+          text="录下我这边的说法"
+          @click="recordFor(recordingTarget.id)"
+        />
       </view>
       <DiscussionThread
         :key="id"
@@ -126,6 +133,19 @@ export default {
 
   }),
   computed: {
+    recordingTarget() {
+      const { recording } = this;
+      if (recording?.visibility !== true || recording.status === 'rejected') return null;
+      const links = (recording.entry_links || []).filter((link) => link.is_current === true);
+      const hasCompetingLink = links.some((link) => (
+        (link.role === 'competing' && link.status !== 'rejected')
+        || (link.role === 'primary' && link.status === 'disputed')
+      ));
+      if (hasCompetingLink) return null;
+      const primary = links.filter((link) => link.role === 'primary'
+        && link.status === 'accepted' && link.entry?.id);
+      return primary.length === 1 ? primary[0].entry : null;
+    },
     recorderName() {
       return this.recording?.recorder?.nickname || this.recording?.recorder?.username || '乡音贡献者';
     },
@@ -170,6 +190,7 @@ export default {
     dialectLabel,
     goEntryDetail,
     recordFor(id) {
+      if (!requireAuth('record_recording', { entryId: id })) return;
       goRecord({
         entry_id: id,
       });
