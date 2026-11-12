@@ -99,6 +99,7 @@ import {
 } from '@/services/navigation';
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
+import { stopAudio } from '@/utils/audio';
 import {
   defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
@@ -154,6 +155,12 @@ export default {
   onShow() {
     syncContentShareMenu(this, false);
     this.load();
+  },
+  onHide() {
+    stopAudio();
+  },
+  onUnload() {
+    stopAudio();
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
