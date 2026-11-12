@@ -196,14 +196,14 @@
             义项 {{ displaySensesCount }}
           </view>
         </view>
-        <view class="works-empty">
+        <view
+          v-if="isSelf || !showPublicRecordings"
+          class="works-empty"
+        >
           <view class="works-empty-title">
             {{ worksPanelTitle }}
           </view>
-          <view
-            v-if="isSelf || !showPublicRecordings"
-            class="works-empty-copy"
-          >
+          <view class="works-empty-copy">
             {{ worksPanelCopy }}
           </view>
           <BaseButton
@@ -224,7 +224,7 @@
             查看贡献履历
           </BaseButton>
           <BaseButton
-            v-else-if="!showPublicRecordings"
+            v-else
             class="works-empty-action"
             variant="ghost"
             block
@@ -522,7 +522,7 @@ export default {
 .profile-recordings {
   display: grid;
   gap: var(--space-3);
-  margin-top: var(--space-3);
+  padding: var(--space-3);
 }
 
 .profile-overview {
