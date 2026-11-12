@@ -1,6 +1,7 @@
 import { APP_NAME } from '@/const/branding';
-import { notify } from '@/services/feedback';
 import { pageUrl, ROUTES } from '@/services/navigation';
+import { showWechatShareMenu } from '@/services/pageShare';
+import { isWechatMiniProgram } from '@/services/platform';
 import { naturalDialectName } from '@/utils/dialectTree';
 
 function shareText(value, limit) {
@@ -39,14 +40,10 @@ export function defaultContentShareMessage() {
   return { title: APP_NAME, path: ROUTES.home };
 }
 
-export function copyContentShareLink(message, successTitle) {
-  // #ifdef H5
-  if (!message || typeof window === 'undefined') return;
-  const mount = import.meta.env.BASE_URL.replace(/\/$/, '');
-  uni.setClipboardData({
-    data: `${window.location.origin}${mount}${message.path}`,
-    success: () => notify({ title: successTitle }),
-    fail: () => notify({ title: '复制失败，请重试' }),
-  });
-  // #endif
+export function syncContentShareMenu(page, shareable) {
+  if (!isWechatMiniProgram()) return;
+  const pages = getCurrentPages();
+  if (pages[pages.length - 1]?.$vm !== page) return;
+  if (shareable) showWechatShareMenu();
+  else uni.hideShareMenu({ fail() {} });
 }

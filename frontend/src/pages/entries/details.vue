@@ -32,7 +32,7 @@
             size="small"
             variant="ghost"
             :open-type="shareType"
-            :text="shareType ? '分享词条' : '复制词条链接'"
+            :text="shareType || canSystemShare ? '分享词条' : '复制词条链接'"
             @click="shareEntry"
           />
         </view>
@@ -317,8 +317,12 @@ import { goRecord, openPage, ROUTES } from '@/services/navigation';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 import {
-  copyContentShareLink, defaultContentShareMessage, entryShareMessage,
+  defaultContentShareMessage, entryShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
+import { isWechatMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 
 export default {
   components: {
@@ -345,10 +349,17 @@ export default {
   },
   computed: {
     shareType() {
-      return typeof window === 'undefined' ? 'share' : '';
+      return isWechatMiniProgram() ? 'share' : '';
     },
+    canSystemShare: canUseSystemShare,
     shareMessage() {
-      return !this.loading && !this.errorMessage ? entryShareMessage(this.entry) : null;
+      if (!hasShareTarget() || this.loading || this.errorMessage) return null;
+      return entryShareMessage(this.entry);
+    },
+  },
+  watch: {
+    shareMessage(message) {
+      syncContentShareMenu(this, Boolean(message));
     },
   },
   onLoad(options = {}) {
@@ -358,18 +369,25 @@ export default {
     this.load();
   },
   onShow() {
+    syncContentShareMenu(this, false);
     if (this.id && this.entry) this.load();
   },
+  // #ifdef MP-WEIXIN
   onShareAppMessage() {
-    return this.shareMessage || defaultContentShareMessage();
+    const { title, path } = this.shareMessage || defaultContentShareMessage();
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
   onShareTimeline() {
-    return this.shareMessage || defaultContentShareMessage();
+    const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
   methods: {
     entryTitle,
     shareEntry() {
-      copyContentShareLink(this.shareMessage, '词条链接已复制');
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.shareMessage, '词条链接已复制');
+      // #endif
     },
     openReview() {
       openPage(ROUTES.entryReview, { entry_id: this.id });

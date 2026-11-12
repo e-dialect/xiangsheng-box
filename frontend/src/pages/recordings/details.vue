@@ -45,7 +45,7 @@
             v-if="shareMessage"
             variant="ghost"
             :open-type="shareType"
-            :text="shareType ? '分享乡音' : '复制乡音链接'"
+            :text="shareType || canSystemShare ? '分享乡音' : '复制乡音链接'"
             @click="share"
           />
         </view>
@@ -98,8 +98,12 @@ import {
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
 import {
-  copyContentShareLink, defaultContentShareMessage, recordingShareMessage,
+  defaultContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
+import { isWechatMiniProgram } from '@/services/platform';
+import {
+  canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
+} from '@/services/pageShare';
 
 export default {
   components: {
@@ -126,10 +130,17 @@ export default {
       return this.recording?.recorder?.nickname || this.recording?.recorder?.username || '乡音贡献者';
     },
     shareType() {
-      return typeof window === 'undefined' ? 'share' : '';
+      return isWechatMiniProgram() ? 'share' : '';
     },
+    canSystemShare: canUseSystemShare,
     shareMessage() {
-      return !this.loading && !this.error ? recordingShareMessage(this.recording) : null;
+      if (!hasShareTarget() || this.loading || this.error) return null;
+      return recordingShareMessage(this.recording);
+    },
+  },
+  watch: {
+    shareMessage(message) {
+      syncContentShareMenu(this, Boolean(message));
     },
   },
   onLoad(options = {}) {
@@ -138,14 +149,19 @@ export default {
     this.anchorRootId = Number(options.root) || this.anchorCommentId;
   },
   onShow() {
+    syncContentShareMenu(this, false);
     this.load();
   },
+  // #ifdef MP-WEIXIN
   onShareAppMessage() {
-    return this.shareMessage || defaultContentShareMessage();
+    const { title, path } = this.shareMessage || defaultContentShareMessage();
+    return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
   onShareTimeline() {
-    return this.shareMessage || defaultContentShareMessage();
+    const { title, query = 'id=' } = this.shareMessage || defaultContentShareMessage();
+    return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
+  // #endif
   methods: {
     entryTitle,
     dialectLabel,
@@ -193,7 +209,9 @@ export default {
       }
     },
     share() {
-      copyContentShareLink(this.shareMessage, '乡音链接已复制');
+      // #ifdef H5 || APP-PLUS
+      return sharePage(this.shareMessage, '乡音链接已复制');
+      // #endif
     },
   },
 };
