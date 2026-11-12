@@ -393,9 +393,9 @@ import {
 import { goEntryDetail, goRecord, goCollections } from '@/services/navigation';
 import { confirm, notify } from '@/services/feedback';
 import {
-  collectionShareMessage, defaultContentShareMessage, syncContentShareMenu,
+  collectionShareMessage, defaultContentShareMessage, qqContentShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
-import { canUseNativeMiniProgramShare } from '@/services/platform';
+import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
@@ -461,6 +461,7 @@ export default {
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
+    if (isQQMiniProgram()) return qqContentShareMessage(this.shareMessage, 'collection');
     const { title, path } = this.shareMessage || defaultContentShareMessage();
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },

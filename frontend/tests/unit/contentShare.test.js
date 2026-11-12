@@ -83,6 +83,13 @@ describe('QQ mini-program share destination', () => {
     expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/entries/details?id=12' });
   });
 
+  it('opens a shared public collection from its QQ launch query', () => {
+    vi.stubGlobal('uni', { reLaunch: vi.fn(), navigateTo: vi.fn() });
+    vi.stubGlobal('getCurrentPages', () => []);
+    openQQSharedContent({ box_share: 'collection', id: '19' });
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/collections/details?id=19' });
+  });
+
   it('ignores invalid routes and IDs and does not reopen the current item', () => {
     const uni = { reLaunch: vi.fn(), navigateTo: vi.fn() };
     vi.stubGlobal('uni', uni);

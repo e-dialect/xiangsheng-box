@@ -59,7 +59,11 @@ export function qqContentShareMessage(message, kind) {
 }
 
 export function openQQSharedContent(query) {
-  const routes = { entry: ROUTES.entryDetail, recording: ROUTES.recordingDetail };
+  const routes = {
+    entry: ROUTES.entryDetail,
+    recording: ROUTES.recordingDetail,
+    collection: ROUTES.collectionDetail,
+  };
   const kind = query?.box_share;
   const route = Object.prototype.hasOwnProperty.call(routes, kind) ? routes[kind] : null;
   const id = String(query?.id ?? '');
