@@ -7,6 +7,20 @@ import { h5NotFoundRoutePlugin } from './build/h5NotFoundRoutePlugin.mjs';
 
 const projectRootDir = fileURLToPath(new URL('.', import.meta.url));
 const uni = uniModule.default;
+const localTDesignIconFont = {
+  name: 'guantou:h5-local-tdesign-icon-font',
+  enforce: 'pre',
+  transform(source, id) {
+    if (!id.split('?')[0].endsWith('/@tdesign/uniapp/dist/icon/icon.css')) return;
+
+    // Keep the glyphs paired with TDesign's pinned 0.4.5 icon stylesheet.
+    // Vite emits the local font under the configured H5 asset base.
+    return source.replace(
+      /src:\s*url\(['"]https:\/\/tdesign\.gtimg\.com\/icon\/0\.4\.5\/fonts\/t\.eot['"]\)[^;]*;/,
+      "src: url('/src/assets/fonts/tdesign-icons-0.4.5.woff') format('woff');",
+    );
+  },
+};
 const h5DevServerPort = process.env.H5_DEV_SERVER_PORT
   ? Number(process.env.H5_DEV_SERVER_PORT)
   : null;
@@ -46,6 +60,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    ...(process.env.UNI_PLATFORM === 'h5' ? [localTDesignIconFont] : []),
     uni(),
     alias(),
     ...(isolatedH5Server ? [isolatedH5Server] : []),
