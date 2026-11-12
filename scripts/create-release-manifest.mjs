@@ -54,7 +54,7 @@ const release = {
   ciRunId: process.env.CI_RUN_ID,
   createdAt: new Date().toISOString(),
   build: {
-    frontend: { VITE_BACKEND_URL: '' },
+    frontend: { VITE_BACKEND_URL: '', VITE_PHONE_CODE_LOGIN_ENABLED: 'false' },
     backend: {},
   },
   recovery: {
