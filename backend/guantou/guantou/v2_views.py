@@ -810,17 +810,16 @@ class RecordingViewSet(viewsets.ModelViewSet):
             if value:
                 queryset = queryset.filter(**{parameter: value})
         entry_id = self.request.query_params.get("entry_id")
-        if entry_id:
-            queryset = queryset.filter(
-                entry_links__entry_id=entry_id,
-                entry_links__is_current=True,
-            )
         role = self.request.query_params.get("role")
-        if role:
-            queryset = queryset.filter(
-                entry_links__role=role,
-                entry_links__is_current=True,
-            )
+        if entry_id or role:
+            matching_links = RecordingEntryLink.objects.filter(
+                recording_id=OuterRef("pk"), is_current=True
+            ).exclude(status=RecordingEntryLink.Status.REJECTED)
+            if entry_id:
+                matching_links = matching_links.filter(entry_id=entry_id)
+            if role:
+                matching_links = matching_links.filter(role=role)
+            queryset = queryset.filter(Exists(matching_links))
         ids = selected_dialect_ids(self.request)
         if ids is not None:
             queryset = queryset.filter(usage_dialect_id__in=ids)
