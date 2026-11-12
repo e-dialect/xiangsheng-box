@@ -109,8 +109,8 @@ describe('entry detail information hierarchy', () => {
   it('keeps identity evidence and contribution actions out of the hero', () => {
     const wrapper = mountPage();
 
-    expect(wrapper.find('[data-detail-section="meaning"]').text()).toContain('本义项的原文例句');
-    expect(wrapper.find('[data-detail-section="meaning"]').text()).toContain('本义项的原文解释');
+    expect(wrapper.find('.sense-row').text()).toContain('本义项的原文例句');
+    expect(wrapper.find('.sense-row').text()).toContain('本义项的原文解释');
     expect(wrapper.find('[data-detail-section="meaning"]').text()).not.toContain('辨识说明');
     expect(wrapper.find('[data-detail-section="evidence"]').text()).toContain('辨识说明');
     expect(wrapper.find('[data-detail-section="evidence"]').text()).toContain('已整理');
