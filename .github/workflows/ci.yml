@@ -304,6 +304,7 @@ jobs:
       - backend
       - frontend-unit
       - frontend-build
+      - e2e-h5-shards
       - e2e-h5
       - docker
       - release-safety
