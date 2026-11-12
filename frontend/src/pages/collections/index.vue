@@ -22,6 +22,25 @@
           />
         </view>
       </view>
+      <view
+        v-if="!mine"
+        class="box-panel box-search"
+      >
+        <BaseField
+          :model-value="searchInput"
+          name="collection-search"
+          label="找主题集盒"
+          placeholder="例如：拜年、称呼"
+          confirm-type="search"
+          clearable
+          @update:model-value="updateSearchInput"
+          @confirm="searchCollections"
+        />
+        <BaseButton
+          text="查找集盒"
+          @click="searchCollections"
+        />
+      </view>
       <BaseForm
         v-if="mine"
         ref="form"
@@ -42,7 +61,7 @@
         />
       </BaseForm>
       <BaseLoading
-        v-if="loading"
+        v-if="loading && !boxes.length"
         text="正在打开集盒…"
       />
       <EmptyState
@@ -54,7 +73,9 @@
       <template v-else>
         <EmptyState
           v-if="!boxes.length"
-          :title="mine ? '还没有自己的集盒' : '还没有公开集盒'"
+          :title="emptyTitle"
+          :action-text="!mine && searchTerm ? '查看全部集盒' : ''"
+          @action="clearSearch"
         />
         <view
           v-for="box in boxes"
@@ -75,10 +96,19 @@
             @click="goCollectionDetail(box.id)"
           />
         </view>
+        <text
+          v-if="loadMoreError"
+          class="box-note"
+          role="status"
+          aria-live="polite"
+        >
+          {{ loadMoreError }}
+        </text>
         <BaseButton
           v-if="next"
           variant="ghost"
-          text="更多集盒"
+          :text="loadMoreError ? '重试加载更多' : '更多集盒'"
+          :loading="loading"
           @click="load(true)"
         />
       </template>
@@ -115,6 +145,10 @@ export default {
     loading: false,
     busy: false,
     error: '',
+    loadMoreError: '',
+    searchInput: '',
+    searchTerm: '',
+    loadRequest: 0,
     form: {
       title: '',
     },
@@ -125,12 +159,19 @@ export default {
       }],
     },
   }),
-  onLoad(options) {
+  computed: {
+    emptyTitle() {
+      if (this.mine) return '还没有自己的集盒';
+      return this.searchTerm ? '没有找到相关集盒' : '还没有公开集盒';
+    },
+  },
+  onLoad(options = {}) {
     this.mine = options.mine === 'true';
   },
   onShow() {
     if (!this.mine || requireAuth('manage_collection')) this.load();
   },
+  onUnload() { this.loadRequest += 1; },
   methods: {
     goCollectionDetail,
     switchMode(mine) {
@@ -138,25 +179,47 @@ export default {
       this.mine = mine;
       this.load();
     },
+    updateSearchInput(value) {
+      this.searchInput = value;
+      if (!value && this.searchTerm) this.searchCollections();
+    },
+    searchCollections() {
+      this.searchTerm = String(this.searchInput || '').trim();
+      this.load();
+    },
+    clearSearch() {
+      this.searchInput = '';
+      this.searchCollections();
+    },
     async load(more = false) {
-      if (this.loading) return;
+      const append = more === true;
+      if (append && (this.loading || !this.next)) return;
+      this.loadRequest += 1;
+      const requestId = this.loadRequest;
       this.loading = true;
       this.error = '';
-      const page = more === true ? this.page + 1 : 1;
+      this.loadMoreError = '';
+      const page = append ? this.page + 1 : 1;
+      if (!append) {
+        this.boxes = [];
+        this.next = null;
+      }
       try {
         const response = await listCollections({
-          ...(this.mine ? {
-            mine: true,
-          } : {}),
+          ...(this.mine ? { mine: true } : {}),
+          ...(!this.mine && this.searchTerm ? { search: this.searchTerm } : {}),
           page,
         });
+        if (requestId !== this.loadRequest) return;
         this.boxes = page === 1 ? pageResults(response) : [...this.boxes, ...pageResults(response)];
         this.page = page;
-        this.next = response.next;
+        this.next = response?.next || null;
       } catch (error) {
-        this.error = '集盒暂时无法读取';
+        if (requestId !== this.loadRequest) return;
+        if (append) this.loadMoreError = '更多集盒暂时没加载出来，请重试。';
+        else this.error = '集盒暂时无法读取';
       } finally {
-        this.loading = false;
+        if (requestId === this.loadRequest) this.loading = false;
       }
     },
     async create() {
@@ -178,3 +241,16 @@ export default {
 };
 </script>
 <style src="@/styles/collections.scss" lang="scss"></style>
+<style scoped lang="scss">
+.box-search {
+  display: grid;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .box-search {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+</style>
