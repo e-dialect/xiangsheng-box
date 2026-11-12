@@ -370,8 +370,8 @@
           <BaseButton
             block
             size="large"
-            :loading="submitting"
-            :disabled="submitting || savingDraft"
+            :loading="submitting || validatingSubmission"
+            :disabled="submitting || validatingSubmission || savingDraft"
             text="提交并公开"
             @click="submit"
           />
@@ -477,6 +477,7 @@ export default {
       entryLoading: false,
       entryLoadVersion: 0,
       submitting: false,
+      validatingSubmission: false,
       draftId: '',
       ownerScope: '',
       savingDraft: false,
@@ -798,12 +799,19 @@ export default {
       return true;
     },
     async submit() {
-      if (this.submitting || this.savingDraft || !await this.validateForm()) return;
+      if (this.submitting || this.savingDraft || this.validatingSubmission) return;
+      // Block repeated taps without suppressing draft persistence while validating.
+      this.validatingSubmission = true;
+      try {
+        if (!await this.validateForm()) return;
+      } finally {
+        this.validatingSubmission = false;
+      }
       if (draftOwner() !== this.ownerScope) { notify({ title: '账号已切换，请重新打开录音页' }); return; }
       this.submitting = true;
       clearTimeout(this.draftTimer);
-      await this.saveDraft({ silent: true });
       try {
+        await this.saveDraft({ silent: true });
         const uploaded = await uploadFile(this.audio.path);
         if (draftOwner() !== this.ownerScope) throw new Error('账号已切换，请重新打开录音页');
         const payload = {
