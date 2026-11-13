@@ -85,10 +85,10 @@ describe('recording region catalog recovery', () => {
       global: { renderStubDefaultSlot: true },
     });
     await wrapper.setData({ dialectsError: '地区列表暂时无法读取，请重试。' });
-    const retry = wrapper.findAllComponents({ name: 'BaseButton' })
-      .find((button) => button.props('text') === '重新加载地区');
+    const retry = wrapper.findComponent({ name: 'EmptyState' });
     expect(retry.exists()).toBe(true);
-    retry.vm.$emit('click');
+    expect(retry.props('actionText')).toBe('重新加载地区');
+    retry.vm.$emit('action');
     await vi.waitFor(() => expect(wrapper.vm.dialects).toEqual(catalog));
     expect(wrapper.vm.dialectsError).toBe('');
     wrapper.unmount();

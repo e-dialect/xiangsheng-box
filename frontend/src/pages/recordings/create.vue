@@ -200,22 +200,14 @@
               v-if="dialectsLoading"
               text="正在读取地区列表"
             />
-            <view
-              v-if="dialectsError"
+            <EmptyState
+              v-else-if="dialectsError"
+              title="暂时读不到地区列表"
+              :description="dialectsError"
+              :action-text="isSubmissionLocked() ? '' : '重新加载地区'"
               role="alert"
-            >
-              <text class="field-error">
-                {{ dialectsError }}
-              </text>
-              <BaseButton
-                size="small"
-                variant="ghost"
-                text="重新加载地区"
-                :loading="dialectsLoading"
-                :disabled="dialectsLoading || isSubmissionLocked()"
-                @click="loadDialects"
-              />
-            </view>
+              @action="loadDialects"
+            />
             <view
               v-if="fieldErrors.usage_dialect_id"
               class="field-error"
@@ -424,6 +416,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
   createRecording,
@@ -461,6 +454,7 @@ export default {
     BaseForm,
     BaseLoading,
     DialectSelector,
+    EmptyState,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -611,10 +605,10 @@ export default {
     releaseDraftAudioUrl(this.audio);
     this.audio = emptyAudio();
     this.form = Object.fromEntries(Object.keys(this.form).map((key) => [key, '']));
-    this.clearEntry();
+    this.resetEntrySelection();
     this.draftId = '';
     this.draftMessage = '账号已切换，请重新打开录音页';
-    this.goRecordingDrafts();
+    goRecordingDrafts();
   },
   onHide() { this.persistDirtyDraft(); },
   onUnload() {
@@ -812,6 +806,9 @@ export default {
     },
     clearEntry() {
       if (this.isSubmissionLocked()) return;
+      this.resetEntrySelection();
+    },
+    resetEntrySelection() {
       this.entryLoadVersion += 1;
       this.entryLoading = false;
       this.linkedEntryId = null;
@@ -866,8 +863,11 @@ export default {
       clearTimeout(this.draftTimer);
       try {
         const savedDraft = await this.saveDraft({ silent: true });
+        if (!this.draftReady) return;
+        if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
         // Native saveFile moves the temporary file; use its persisted location.
         const uploaded = await uploadFile(savedDraft?.audioPath || submission.audio.path);
+        if (!this.draftReady) return;
         if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
         const payload = {
           audio_url: uploaded.url,
@@ -882,6 +882,7 @@ export default {
         };
         if (submission.entryId) payload.primary_entry_id = submission.entryId;
         const recording = await createRecording(payload);
+        if (!this.draftReady || draftOwner() !== submission.owner) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'success',
@@ -895,6 +896,7 @@ export default {
         }
         goRecordingDetail(recording.id, { replace: true });
       } catch (error) {
+        if (!this.draftReady) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'error',

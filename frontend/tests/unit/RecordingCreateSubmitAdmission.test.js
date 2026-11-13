@@ -36,6 +36,7 @@ vi.mock('@/services/productAnalytics', () => ({
 const { draftOwner, saveRecordingDraft, restoreRecordingDraft } = await import('@/services/recordingDrafts');
 const { createRecording } = await import('@/services/entryRecording');
 const { uploadFile } = await import('@/services/file');
+const { goRecordingDrafts, goRecordingDetail } = await import('@/services/navigation');
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
 
 function deferred() {
@@ -222,6 +223,36 @@ describe('recording submit admission', () => {
     page.onAudioChange({ path: 'blob:B', durationMs: 2000 });
     expect(page.form.original_gloss).toBe('retry');
     expect(page.audio.path).toBe('blob:B');
+  });
+
+  it('opens the new account draft list while an old account upload is pending', async () => {
+    const uploadStarted = deferred();
+    const upload = deferred();
+    const page = pageContext();
+    page.selectEntry({ id: 10 });
+    uploadFile.mockImplementationOnce(() => {
+      uploadStarted.resolve();
+      return upload.promise;
+    });
+    const submission = page.submit();
+    await uploadStarted.promise;
+    await page.goRecordingDrafts();
+    expect(goRecordingDrafts).not.toHaveBeenCalled();
+
+    draftOwner.mockReturnValue('user:2');
+    RecordingCreate.onShow.call(page);
+    expect(goRecordingDrafts).toHaveBeenCalledTimes(1);
+    expect(page.linkedEntryId).toBeNull();
+    expect(page.audio.path).toBe('');
+    expect(page.form.original_gloss).toBe('');
+    upload.resolve({ url: 'https://example.com/old-account.mp3' });
+    await submission;
+    RecordingCreate.onShow.call(page);
+    expect(goRecordingDrafts).toHaveBeenCalledTimes(1);
+    expect(createRecording).not.toHaveBeenCalled();
+    expect(goRecordingDetail).not.toHaveBeenCalled();
+    expect(saveRecordingDraft).toHaveBeenCalledTimes(1);
+    expect(page.isSubmissionLocked()).toBe(false);
   });
 
   it.each([false, true])('uploads the moved native file even when metadata storage fails: %s', async (fails) => {
