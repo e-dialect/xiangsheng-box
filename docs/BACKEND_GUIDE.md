@@ -25,6 +25,10 @@ migration 只用于数据归档与迁移回溯。不要为它们新增 router、
 的 `dialect_scope=subtree` 才展开后代。普通 serializer 返回自然名称与路径标签，限定码
 只用于 resolve、导入和管理工具。
 
+词条查询同时指定 `source_type` 和 `source` 时，来源类型与出处文字必须匹配同一条
+证据；单独使用任一条件仍可查询。自由关键词保持跨字段检索，不要求与来源筛选
+命中同一条证据。
+
 ## 应用边界
 
 账户在 `user`，公告在 `announcements`，站点配置在 `siteconfig`，文件在 `files`，通知在

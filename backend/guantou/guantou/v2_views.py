@@ -512,39 +512,47 @@ class EntryViewSet(viewsets.ModelViewSet):
             )
         filters = {
             "status": "status",
-            "writing_type": "entry_writings__writing__form_type",
             "source_type": "evidence_links__evidence__source_type",
+            "source": "evidence_links__evidence__citation__icontains",
         }
+        filter_values = {}
         for parameter, lookup in filters.items():
             value = self.request.query_params.get(parameter)
             if value:
-                queryset = queryset.filter(**{lookup: value})
+                filter_values[lookup] = (
+                    value.strip() if parameter == "source" else value
+                )
+        # Keep source type and citation on the same evidence record.
+        queryset = queryset.filter(**filter_values)
         writing = self.request.query_params.get("writing")
-        if writing:
-            queryset = queryset.filter(
-                entry_writings__is_current=True,
-                entry_writings__writing__text__iexact=writing.strip(),
-            )
-        ipa = self.request.query_params.get("ipa")
-        if ipa:
-            queryset = queryset.filter(
-                pronunciation_variants__ipa__icontains=ipa.strip()
-            )
-        romanization = self.request.query_params.get("romanization")
-        if romanization:
-            queryset = queryset.filter(
-                Q(
-                    pronunciation_variants__base_romanization__icontains=romanization.strip()
+        writing_type = self.request.query_params.get("writing_type")
+        if writing or writing_type:
+            # Both explicit writing conditions belong to one current relation.
+            writing_filters = {"entry_writings__is_current": True}
+            if writing:
+                writing_filters["entry_writings__writing__text__iexact"] = (
+                    writing.strip()
                 )
-                | Q(
-                    pronunciation_variants__surface_romanization__icontains=romanization.strip()
+            if writing_type:
+                writing_filters["entry_writings__writing__form_type"] = writing_type
+            queryset = queryset.filter(**writing_filters)
+        ids = selected_dialect_ids(self.request)
+        ipa = (self.request.query_params.get("ipa") or "").strip()
+        romanization = (self.request.query_params.get("romanization") or "").strip()
+        if ipa or romanization:
+            # All explicit reading conditions must describe one actual variant,
+            # rather than borrowing each field from another reading or region.
+            variants = PronunciationVariant.objects.filter(entry_id=OuterRef("pk"))
+            if ipa:
+                variants = variants.filter(ipa__icontains=ipa)
+            if romanization:
+                variants = variants.filter(
+                    Q(base_romanization__icontains=romanization)
+                    | Q(surface_romanization__icontains=romanization)
                 )
-            )
-        source = self.request.query_params.get("source")
-        if source:
-            queryset = queryset.filter(
-                evidence_links__evidence__citation__icontains=source.strip()
-            )
+            if ids is not None:
+                variants = variants.filter(dialect_id__in=ids)
+            queryset = queryset.filter(Exists(variants))
         concept = self.request.query_params.get("concept")
         if concept:
             if concept.isdigit():
@@ -553,12 +561,14 @@ class EntryViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(
                     senses__concept_links__concept__code__iexact=concept
                 )
-        ids = selected_dialect_ids(self.request)
-        if ids is not None:
+        if ids is not None and not (ipa or romanization):
+            regional_recordings = available_recording_links_for_user(
+                self.request.user
+            ).filter(entry_id=OuterRef("pk"), recording__usage_dialect_id__in=ids)
             queryset = queryset.filter(
                 Q(usage_dialect_id__in=ids)
                 | Q(pronunciation_variants__dialect_id__in=ids)
-                | Q(recording_links__recording__usage_dialect_id__in=ids)
+                | Q(Exists(regional_recordings))
                 | Q(
                     usage_attestations__dialect_id__in=ids,
                     usage_attestations__active=True,
@@ -803,17 +813,16 @@ class RecordingViewSet(viewsets.ModelViewSet):
             if value:
                 queryset = queryset.filter(**{parameter: value})
         entry_id = self.request.query_params.get("entry_id")
-        if entry_id:
-            queryset = queryset.filter(
-                entry_links__entry_id=entry_id,
-                entry_links__is_current=True,
-            )
         role = self.request.query_params.get("role")
-        if role:
-            queryset = queryset.filter(
-                entry_links__role=role,
-                entry_links__is_current=True,
-            )
+        if entry_id or role:
+            matching_links = RecordingEntryLink.objects.filter(
+                recording_id=OuterRef("pk"), is_current=True
+            ).exclude(status=RecordingEntryLink.Status.REJECTED)
+            if entry_id:
+                matching_links = matching_links.filter(entry_id=entry_id)
+            if role:
+                matching_links = matching_links.filter(role=role)
+            queryset = queryset.filter(Exists(matching_links))
         ids = selected_dialect_ids(self.request)
         if ids is not None:
             queryset = queryset.filter(usage_dialect_id__in=ids)
