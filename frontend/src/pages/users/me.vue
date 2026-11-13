@@ -277,6 +277,20 @@
             />
           </view>
 
+          <AccountSettingsMenu
+            :theme-label="themeLabel"
+            :email="email"
+            :show-wechat="showWechatMenu"
+            :wechat-bound="wechatBound"
+            :wechat-busy="isBinding"
+            @theme="toThemeCenter"
+            @profile="toUserInfoPage"
+            @email="toEmailPage"
+            @password="toChangePasswordPage"
+            @wechat="onWechatMenuTap"
+            @logout="exit"
+          />
+
           <view class="account-section">
             <view class="section-kicker">
               录音与授权
@@ -320,68 +334,6 @@
               :text="curationActionText"
               @click="toCuration"
             />
-          </view>
-
-          <view class="menu">
-            <view class="section-kicker menu-kicker">
-              主题
-            </view>
-            <view
-              class="menu-item pressable"
-              @tap="toThemeCenter"
-            >
-              <view>主题中心</view>
-              <view class="menu-value">
-                {{ themeLabel }}
-              </view>
-            </view>
-          </view>
-
-          <view class="menu">
-            <view class="section-kicker menu-kicker">
-              个人资料、隐私与安全
-            </view>
-            <view
-              class="menu-item pressable"
-              @tap="toUserInfoPage"
-            >
-              <view>个人资料与隐私</view>
-              <view class="menu-value">
-                查看与修改
-              </view>
-            </view>
-            <view
-              class="menu-item pressable"
-              @tap="toEmailPage"
-            >
-              <view>邮箱</view>
-              <view class="menu-value">
-                {{ emailLabel }}
-              </view>
-            </view>
-            <view
-              class="menu-item pressable"
-              @tap="toChangePasswordPage"
-            >
-              修改密码
-            </view>
-            <view
-              v-if="showWechatMenu"
-              class="menu-item pressable"
-              :class="{ busy: isBinding }"
-              @tap="onWechatMenuTap"
-            >
-              <view>微信</view>
-              <view class="menu-value">
-                {{ wechatStatusText }}
-              </view>
-            </view>
-            <view
-              class="menu-item danger pressable"
-              @tap="exit"
-            >
-              退出登录
-            </view>
           </view>
         </template>
       </template>
@@ -514,9 +466,12 @@ import {
   clearUserInfo,
   getUserInfo,
 } from '@/services/user';
+import AccountSettingsMenu from './settings/components/AccountSettingsMenu.vue';
 
 export default {
-  components: { AppShell, BaseButton, TCell },
+  components: {
+    AppShell, BaseButton, TCell, AccountSettingsMenu,
+  },
   data() {
     return {
       id: '',
@@ -533,6 +488,7 @@ export default {
       unreadMailsCount: 0,
       followedDialects: [],
       email: '',
+      themeLabel: getActiveTheme().name,
       wechatBound: false,
       canUseWechatAuth: isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH),
       isBinding: false,
@@ -583,19 +539,8 @@ export default {
       }
       return '录下一个你会说的词或短语，只需标明地区并说明大意。';
     },
-    emailLabel() {
-      return this.email || '未绑定';
-    },
     showWechatMenu() {
       return this.canUseWechatAuth || this.wechatBound;
-    },
-    wechatStatusText() {
-      if (this.isBinding) return this.wechatBound ? '解绑中…' : '绑定中…';
-      if (this.wechatBound) return '已绑定 · 点此解绑';
-      return '未绑定 · 点此授权';
-    },
-    themeLabel() {
-      return getActiveTheme().name;
     },
     curatorPending() {
       const pending = this.curationSummary?.pending || {};
@@ -620,6 +565,7 @@ export default {
     this.getInfo();
   },
   onShow() {
+    this.themeLabel = getActiveTheme().name;
     this.canUseWechatAuth = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
     this.loggedIn = Boolean(uni.getStorageSync('token'));
     if (this.loggedIn) this.getInfo();

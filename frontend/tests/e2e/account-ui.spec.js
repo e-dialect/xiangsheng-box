@@ -357,7 +357,7 @@ test('H5 mine account menu hides WeChat bind and keeps email', async ({ page }) 
   await mockSignedInCollector(page);
   await page.goto('/pages/users/me');
 
-  await expect(page.getByText('个人资料、隐私与安全')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '账户与安全' })).toBeVisible();
   await expect(page.getByText('主题中心')).toBeVisible();
   await expect(page.getByText('邮箱')).toBeVisible();
   await expect(page.getByText('修改密码')).toBeVisible();
