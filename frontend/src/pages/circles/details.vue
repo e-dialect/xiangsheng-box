@@ -67,14 +67,14 @@
             </view>
           </view>
           <BaseButton
-            v-if="recordings.length && !loadingRecordings && !recordingsError"
+            v-if="recordings.length"
             size="small"
             text="录一段"
             @click="recordHere"
           />
         </view>
         <BaseLoading
-          v-if="loadingRecordings"
+          v-if="loadingRecordings && !recordings.length"
           text="正在寻找圈内乡音…"
         />
         <EmptyState
@@ -82,7 +82,7 @@
           :title="recordingsError"
           description="圈子资料已经载入，可以只重新获取公开录音。"
           action-text="重新获取录音"
-          @action="loadRecordings"
+          @action="loadRecordings()"
         />
         <EmptyState
           v-else-if="!recordings.length"
@@ -101,6 +101,23 @@
             :recording="recording"
             @open-entry="goEntryDetail"
             @continue="continueChain"
+          />
+        </view>
+        <view
+          v-if="hasMoreRecordings"
+          class="recording-pagination"
+        >
+          <text
+            v-if="moreError"
+            role="status"
+          >
+            更多乡音暂时没加载出来，已显示的录音仍可听。
+          </text>
+          <BaseButton
+            variant="ghost"
+            :text="moreError ? '重试加载更多乡音' : '听更多乡音'"
+            :loading="loadingRecordings"
+            @click="loadRecordings(true)"
           />
         </view>
       </view>
@@ -135,6 +152,9 @@ export default {
       membershipBusy: false,
       recordings: [],
       recordingsError: '',
+      recordingPage: 1,
+      hasMoreRecordings: false,
+      moreError: false,
     };
   },
   onLoad(options) {
@@ -155,16 +175,27 @@ export default {
         this.loadingCircle = false;
       }
     },
-    async loadRecordings() {
+    async loadRecordings(more = false) {
+      if (this.loadingRecordings || (more && !this.hasMoreRecordings)) return;
+      const page = more ? this.recordingPage + 1 : 1;
       this.loadingRecordings = true;
       this.recordingsError = '';
+      this.moreError = false;
       try {
-        this.recordings = pageResults(await listCircleRecordings(this.circleId, {
+        const response = await listCircleRecordings(this.circleId, {
+          page,
           page_size: 50,
-        }));
+        });
+        const existing = more ? this.recordings : [];
+        const loadedIds = new Set(existing.map((recording) => recording.id));
+        this.recordings = [
+          ...existing, ...pageResults(response).filter((recording) => !loadedIds.has(recording.id)),
+        ];
+        this.recordingPage = page;
+        this.hasMoreRecordings = Boolean(response.next);
       } catch (error) {
-        this.recordings = [];
-        this.recordingsError = error.message || '圈内录音暂时无法读取';
+        if (more) this.moreError = true;
+        else this.recordingsError = error.message || '圈内录音暂时无法读取';
       } finally {
         this.loadingRecordings = false;
       }
@@ -203,6 +234,15 @@ export default {
 </script>
 
 <style scoped>
+.recording-pagination {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+}
+
 :deep(.circle-detail-content) {
   padding: var(--space-3) 28rpx var(--space-5);
 }
