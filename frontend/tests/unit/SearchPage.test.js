@@ -18,6 +18,7 @@ vi.mock('@/services/guantou', () => ({
 }));
 
 const request = (await import('@/utils/request')).default;
+const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
 
@@ -39,6 +40,81 @@ function pageContext() {
 describe('entry-first search page orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    listAllDialects.mockReset().mockResolvedValue([]);
+  });
+
+  it('starts a shared keyword search before the optional region catalog settles', async () => {
+    const catalog = deferred();
+    listAllDialects.mockReturnValueOnce(catalog.promise);
+    const page = pageContext();
+    page.search = vi.fn().mockResolvedValue();
+    request.get.mockResolvedValue({ results: [] });
+
+    const loading = SearchPage.onLoad.call(page, { key: 'hiŋ' });
+    await Promise.resolve();
+    const callsBeforeCatalog = page.search.mock.calls.length;
+    catalog.resolve([{ id: 1, name: '莆仙方言' }]);
+    await loading;
+
+    expect(callsBeforeCatalog).toBe(1);
+    expect(page.search).toHaveBeenCalledOnce();
+  });
+
+  it('reports a failed region catalog and retries without replacing search state', async () => {
+    const page = pageContext();
+    page.filters.keyword = '行';
+    page.filters.dialectId = 23;
+    page.filters.hasRecording = false;
+    page.entries = [{ id: 7 }];
+    page.appliedFilters = { ...page.filters, keyword: '前次查询', hasRecording: true };
+    const appliedFilters = { ...page.appliedFilters };
+    page.next = '/entries/?page=2';
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+
+    await page.loadDialects();
+    expect(page.dialectsError).toBeTruthy();
+    expect(page.dialectsLoading).toBe(false);
+
+    const filters = { ...page.filters };
+    listAllDialects.mockResolvedValueOnce([{ id: 23, name: '城里' }]);
+    await page.loadDialects();
+    expect(page.dialects).toEqual([{ id: 23, name: '城里' }]);
+    expect(page.dialectsError).toBe('');
+    expect(page.filters).toEqual(filters);
+    expect(page.appliedFilters).toEqual(appliedFilters);
+    expect(page.entries).toEqual([{ id: 7 }]);
+    expect(page.next).toBe('/entries/?page=2');
+    expect(request.get).not.toHaveBeenCalled();
+  });
+
+  it('makes an empty region catalog recoverable', async () => {
+    const page = pageContext();
+    await page.loadDialects();
+    expect(page.dialectsError).toBeTruthy();
+    expect(page.dialectsLoading).toBe(false);
+  });
+
+  it('admits only one region retry at a time', async () => {
+    const catalog = deferred();
+    listAllDialects.mockReturnValueOnce(catalog.promise);
+    const page = pageContext();
+    const first = page.loadDialects();
+    const second = page.loadDialects();
+    expect(page.dialectsLoading).toBe(true);
+    expect(listAllDialects).toHaveBeenCalledOnce();
+    catalog.resolve([{ id: 1, name: '莆仙方言' }]);
+    await Promise.all([first, second]);
+    expect(page.dialectsLoading).toBe(false);
+  });
+
+  it('keeps existing region choices when refreshing the catalog fails', async () => {
+    const page = pageContext();
+    page.dialects = [{ id: 23, name: '城里' }];
+    page.filters.dialectId = 23;
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    await page.loadDialects();
+    expect(page.dialects).toEqual([{ id: 23, name: '城里' }]);
+    expect(page.filters.dialectId).toBe(23);
   });
 
   it('round-trips the submitted keyword in WeChat without the draft or filters', async () => {
