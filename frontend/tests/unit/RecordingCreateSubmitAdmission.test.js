@@ -169,7 +169,7 @@ describe('recording submit admission', () => {
     else uploadFile.mockReturnValue(gate.promise);
     const pending = page.submit();
     if (stage === 'upload') {
-      while (!uploadFile.mock.calls.length) await Promise.resolve();
+      await vi.waitFor(() => expect(uploadFile).toHaveBeenCalled());
     }
     expect(page.isSubmissionLocked()).toBe(true);
     expect(page.dialectPickerVisible).toBe(false);
@@ -188,8 +188,11 @@ describe('recording submit admission', () => {
     await pending;
     expect(uploadFile).toHaveBeenCalledWith('blob:recording');
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
-      original_gloss: '家乡话', usage_dialect_id: 1, primary_entry_id: 10,
-      duration_ms: 1000, rights_statement: '',
+      original_gloss: '家乡话',
+      usage_dialect_id: 1,
+      primary_entry_id: 10,
+      duration_ms: 1000,
+      rights_statement: '',
     }));
   });
 
@@ -199,7 +202,7 @@ describe('recording submit admission', () => {
     page.linkedEntryId = 10;
     uploadFile.mockReturnValue(gate.promise);
     const pending = page.submit();
-    while (!uploadFile.mock.calls.length) await Promise.resolve();
+    await vi.waitFor(() => expect(uploadFile).toHaveBeenCalled());
     page.form.original_gloss = 'unexpected state';
     page.audio.durationMs = 9000;
     page.linkedEntryId = 20;
@@ -295,9 +298,12 @@ describe('recording submit admission', () => {
     await page.submit();
     expect(page.$refs.form.validate).not.toHaveBeenCalled();
     expect(uploadFile).not.toHaveBeenCalled();
-    restore.resolve({ id: 'draft-B', entryId: 20,
+    restore.resolve({
+      id: 'draft-B',
+      entryId: 20,
       form: { original_gloss: 'meaning B', usage_dialect_id: 2 },
-      audio: { path: 'blob:B', durationMs: 2000 } });
+      audio: { path: 'blob:B', durationMs: 2000 },
+    });
     await loading;
     expect(page.draftReady).toBe(true);
     expect(page.selectedEntry).toBeNull();
@@ -308,5 +314,4 @@ describe('recording submit admission', () => {
     }));
     entry.resolve();
   });
-
 });

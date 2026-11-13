@@ -1,13 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('@/services/recordingDrafts', () => ({ draftOwner: vi.fn(() => 'user:1'), saveRecordingDraft: vi.fn(), restoreRecordingDraft: vi.fn(), deleteRecordingDraft: vi.fn() }));
-vi.mock('@/services/collections', () => ({ listCollections: vi.fn(), createCollection: vi.fn(), addCollectionEntry: vi.fn(), addCollectionRecording: vi.fn(), getCollection: vi.fn(), updateCollection: vi.fn(), deleteCollection: vi.fn(), removeCollectionItem: vi.fn(), orderCollection: vi.fn() }));
-vi.mock('@/services/entrySearchAssist', () => ({ suggestEntries: vi.fn(), popularEntries: vi.fn(), searchHistory: vi.fn(() => []), rememberSearch: vi.fn(), clearSearchHistory: vi.fn() }));
-vi.mock('@/services/recordingSocial', () => ({ likeRecording: vi.fn(), listComments: vi.fn(), createComment: vi.fn(), deleteComment: vi.fn(), likeComment: vi.fn(), commentRequestId: vi.fn(() => 'same-request') }));
-vi.mock('@/services/authGuard', () => ({ requireAuth: vi.fn(() => true) }));
-vi.mock('@/services/feedback', () => ({ notify: vi.fn(), confirm: vi.fn(async () => true) }));
-vi.mock('@/services/navigation', async (importOriginal) => ({
-  ...await importOriginal(), goRecordingDrafts: vi.fn(),
-}));
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
 import { goRecordingDrafts } from '@/services/navigation';
 import RecordingCreate from '@/pages/recordings/create.vue';
 import { saveRecordingDraft, draftOwner } from '@/services/recordingDrafts';
@@ -17,7 +10,39 @@ import Detail from '@/components/DiscussionThread.vue';
 import { addCollectionEntry, addCollectionRecording } from '@/services/collections';
 import { suggestEntries } from '@/services/entrySearchAssist';
 import { createComment, listComments } from '@/services/recordingSocial';
-const context = (component, extra = {}) => ({ ...component.data(), ...component.methods, ...extra });
+
+vi.mock('@/services/recordingDrafts', () => ({
+  draftOwner: vi.fn(() => 'user:1'), saveRecordingDraft: vi.fn(), restoreRecordingDraft: vi.fn(), deleteRecordingDraft: vi.fn(),
+}));
+vi.mock('@/services/collections', () => ({
+  listCollections: vi.fn(),
+  createCollection: vi.fn(),
+  addCollectionEntry: vi.fn(),
+  addCollectionRecording: vi.fn(),
+  getCollection: vi.fn(),
+  updateCollection: vi.fn(),
+  deleteCollection: vi.fn(),
+  removeCollectionItem: vi.fn(),
+  orderCollection: vi.fn(),
+}));
+vi.mock('@/services/entrySearchAssist', () => ({
+  suggestEntries: vi.fn(),
+  popularEntries: vi.fn(),
+  searchHistory: vi.fn(() => []),
+  rememberSearch: vi.fn(),
+  clearSearchHistory: vi.fn(),
+}));
+vi.mock('@/services/recordingSocial', () => ({
+  likeRecording: vi.fn(), listComments: vi.fn(), createComment: vi.fn(), deleteComment: vi.fn(), likeComment: vi.fn(), commentRequestId: vi.fn(() => 'same-request'),
+}));
+vi.mock('@/services/authGuard', () => ({ requireAuth: vi.fn(() => true) }));
+vi.mock('@/services/feedback', () => ({ notify: vi.fn(), confirm: vi.fn(async () => true) }));
+vi.mock('@/services/navigation', async (importOriginal) => ({
+  ...await importOriginal(), goRecordingDrafts: vi.fn(),
+}));
+const context = (component, extra = {}) => ({
+  ...component.data(), ...component.methods, ...extra,
+});
 beforeEach(() => { vi.clearAllMocks(); });
 describe('restored journeys', () => {
   it('retries with the saved native path after draft index persistence fails', async () => {
@@ -53,7 +78,8 @@ describe('restored journeys', () => {
   it('ignores a late suggestion response after the user changes the query', async () => {
     vi.useFakeTimers();
     let resolveFirst;
-    suggestEntries.mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; })).mockResolvedValueOnce([{ id: 2 }]);
+    suggestEntries.mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce([{ id: 2 }]);
     const search = context(Search);
     Search.watch['filters.keyword'].call(search, '月');
     await vi.advanceTimersByTimeAsync(250);
@@ -64,7 +90,9 @@ describe('restored journeys', () => {
     vi.useRealTimers();
   });
   it('retains a comment request id after a failed send to prevent duplicate comments', async () => {
-    const detail = context(Detail, { targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } } });
+    const detail = context(Detail, {
+      targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } },
+    });
     createComment.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
     await detail.sendTopLevel(); expect(detail.form.body).toBe('乡音');
@@ -104,7 +132,9 @@ describe('draft interruption recovery', () => {
   });
   it('keeps the currently selected replacement audio during an in-flight save', async () => {
     let finish;
-    saveRecordingDraft.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    saveRecordingDraft.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = resolve;
+    }));
     const page = context(RecordingCreate, { ownerScope: 'user:1', audio: { path: 'wxfile://old' } });
     const saving = page.saveDraft();
     await Promise.resolve(); await Promise.resolve();
@@ -118,7 +148,9 @@ describe('draft interruption recovery', () => {
 
 describe('entry discussion payload', () => {
   it('posts to Entry discussion without accidentally attaching a Recording', async () => {
-    const detail = context(Detail, { targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } } });
+    const detail = context(Detail, {
+      targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } },
+    });
     createComment.mockResolvedValue({ id: 1, created_at: '2026-09-01T00:00:00Z' });
     await detail.sendTopLevel();
     expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ entry_id: 9 }), 'entry');
@@ -319,7 +351,9 @@ describe('discussion replies sheet', () => {
 });
 
 it('clears displayed draft content when returning under another account', () => {
-  const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', draftId: 'old', audio: { path: 'wxfile://old' }, form: { original_gloss: 'private' } });
+  const page = context(RecordingCreate, {
+    draftReady: true, ownerScope: 'user:1', draftId: 'old', audio: { path: 'wxfile://old' }, form: { original_gloss: 'private' },
+  });
   draftOwner.mockReturnValueOnce('user:2');
   RecordingCreate.onShow.call(page);
   expect(page.form.original_gloss).toBe('');
@@ -329,11 +363,12 @@ it('clears displayed draft content when returning under another account', () => 
   expect(saveRecordingDraft).not.toHaveBeenCalled();
 });
 
-
 describe('review regressions', () => {
   it('persists clearing an existing draft instead of restoring stale content', async () => {
     saveRecordingDraft.mockResolvedValueOnce({ id: 'existing', audio: null });
-    const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', draftId: 'existing', savedDraftSignature: 'previous content' });
+    const page = context(RecordingCreate, {
+      draftReady: true, ownerScope: 'user:1', draftId: 'existing', savedDraftSignature: 'previous content',
+    });
     await page.persistDirtyDraft();
     expect(saveRecordingDraft).toHaveBeenCalledWith(expect.objectContaining({ id: 'existing', form: expect.objectContaining({ original_gloss: '' }) }), 'user:1');
   });
@@ -348,7 +383,9 @@ describe('review regressions', () => {
   });
   it('does not repopulate a cleared page with another account’s in-flight save', async () => {
     let finish;
-    saveRecordingDraft.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    saveRecordingDraft.mockImplementationOnce(() => new Promise((resolve) => {
+      finish = resolve;
+    }));
     const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', audio: { path: 'old' } });
     const saving = page.saveDraft();
     await Promise.resolve(); await Promise.resolve();
