@@ -19,13 +19,14 @@ it('offers a retry when saved drafts cannot be read and leaves the storage intac
     await flushPromises();
     const recovery = wrapper.getComponent({ name: 'EmptyState' });
     expect(recovery.props('title')).toBe('暂时读不到草稿');
-    expect(recovery.props('actionText')).toBe('重新读取草稿');
+    expect(recovery.props('actionText')).toBe('');
+    expect(wrapper.getComponent({ name: 'PageShell' }).props('refreshable')).toBe(true);
     expect(setStorageSync).not.toHaveBeenCalled();
     getStorageSync.mockImplementation((key) => {
       if (key === 'id') return 7;
       return key === 'recording_drafts:v2:user:7' ? saved : '';
     });
-    recovery.vm.$emit('action');
+    wrapper.getComponent({ name: 'PageShell' }).vm.$emit('refresh');
     await flushPromises();
     expect(wrapper.text()).toContain('保留这句话');
     expect(wrapper.findComponent({ name: 'EmptyState' }).exists()).toBe(false);

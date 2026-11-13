@@ -1,5 +1,10 @@
 <template>
-  <PageShell title="录音草稿">
+  <PageShell
+    title="录音草稿"
+    refreshable
+    :refreshing="loading"
+    @refresh="refresh"
+  >
     <view class="box-stack">
       <view
         v-if="legacyWarnings.length"
@@ -47,10 +52,8 @@
       <EmptyState
         v-else-if="loadFailed"
         title="暂时读不到草稿"
-        description="可以在这里重试。"
-        action-text="重新读取草稿"
+        description="下拉刷新即可重新读取，或使用右上角刷新。"
         role="alert"
-        @action="load"
       />
       <EmptyState
         v-else-if="!items.length"
@@ -125,6 +128,10 @@ export default {
   },
   methods: {
     goRecord,
+    refresh() {
+      if (this.loading || this.cleaningAudio || this.cleaningLegacy) return;
+      this.load();
+    },
     async load() {
       this.generation += 1;
       const { generation } = this;
