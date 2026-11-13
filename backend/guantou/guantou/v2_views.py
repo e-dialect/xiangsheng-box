@@ -513,11 +513,17 @@ class EntryViewSet(viewsets.ModelViewSet):
         filters = {
             "status": "status",
             "source_type": "evidence_links__evidence__source_type",
+            "source": "evidence_links__evidence__citation__icontains",
         }
+        filter_values = {}
         for parameter, lookup in filters.items():
             value = self.request.query_params.get(parameter)
             if value:
-                queryset = queryset.filter(**{lookup: value})
+                filter_values[lookup] = (
+                    value.strip() if parameter == "source" else value
+                )
+        # Keep source type and citation on the same evidence record.
+        queryset = queryset.filter(**filter_values)
         writing = self.request.query_params.get("writing")
         writing_type = self.request.query_params.get("writing_type")
         if writing or writing_type:
@@ -547,11 +553,6 @@ class EntryViewSet(viewsets.ModelViewSet):
             if ids is not None:
                 variants = variants.filter(dialect_id__in=ids)
             queryset = queryset.filter(Exists(variants))
-        source = self.request.query_params.get("source")
-        if source:
-            queryset = queryset.filter(
-                evidence_links__evidence__citation__icontains=source.strip()
-            )
         concept = self.request.query_params.get("concept")
         if concept:
             if concept.isdigit():
