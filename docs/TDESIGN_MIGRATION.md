@@ -252,7 +252,11 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 ### 录音页地区目录失败恢复
 
-关联 [#643](https://github.com/e-dialect/xiangsheng-box/issues/643)。使用既有 BaseLoading 与 BaseButton，在必填地区步骤提供读取状态和原页重试；重试保留录音、文字、词条关联和已选地区，不用档案默认地区覆盖新选择。回归覆盖失败/空目录、重复点击、等待期间选择及草稿恢复路径。
+关联 [#643](https://github.com/e-dialect/xiangsheng-box/issues/643) 和 [PR #645](https://github.com/e-dialect/xiangsheng-box/pull/645)。使用既有 BaseLoading 与 EmptyState，在必填地区步骤提供读取状态和原页重试；重试保留录音、文字、词条关联和已选地区，不用档案默认地区覆盖新选择。读取、验证或提交期间不提供重试动作，方法内仍保留并发保护。回归覆盖失败/空目录、重复点击、等待期间选择及草稿恢复路径。
+
+### 提交期间切换账号的恢复导航
+
+关联 [PR #645](https://github.com/e-dialect/xiangsheng-box/pull/645) 对 [#638 评审意见](https://github.com/e-dialect/xiangsheng-box/pull/638#discussion_r4559426746) 的修复。用户主动编辑、取消词条关联与导航仍受提交锁保护；账号切换的生命周期恢复独立清除关联、使迟到词条请求失效并直接进入当前账号草稿箱，不通过会保存草稿的用户导航入口。单测覆盖上传和草稿保存等待期间的账号切换、旧请求返回及新账号隔离。
 
 ## 2026-10-24：公开初稿标识
 

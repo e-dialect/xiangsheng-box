@@ -5,6 +5,10 @@ vi.mock('@/services/entrySearchAssist', () => ({ suggestEntries: vi.fn(), popula
 vi.mock('@/services/recordingSocial', () => ({ likeRecording: vi.fn(), listComments: vi.fn(), createComment: vi.fn(), deleteComment: vi.fn(), likeComment: vi.fn(), commentRequestId: vi.fn(() => 'same-request') }));
 vi.mock('@/services/authGuard', () => ({ requireAuth: vi.fn(() => true) }));
 vi.mock('@/services/feedback', () => ({ notify: vi.fn(), confirm: vi.fn(async () => true) }));
+vi.mock('@/services/navigation', async (importOriginal) => ({
+  ...await importOriginal(), goRecordingDrafts: vi.fn(),
+}));
+import { goRecordingDrafts } from '@/services/navigation';
 import RecordingCreate from '@/pages/recordings/create.vue';
 import { saveRecordingDraft, draftOwner } from '@/services/recordingDrafts';
 import Picker from '@/components/CollectionPicker.vue';
@@ -315,13 +319,13 @@ describe('discussion replies sheet', () => {
 });
 
 it('clears displayed draft content when returning under another account', () => {
-  const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', draftId: 'old', audio: { path: 'wxfile://old' }, form: { original_gloss: 'private' }, goRecordingDrafts: vi.fn() });
+  const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', draftId: 'old', audio: { path: 'wxfile://old' }, form: { original_gloss: 'private' } });
   draftOwner.mockReturnValueOnce('user:2');
   RecordingCreate.onShow.call(page);
   expect(page.form.original_gloss).toBe('');
   expect(page.audio.path).toBe('');
   expect(page.draftId).toBe('');
-  expect(page.goRecordingDrafts).toHaveBeenCalled();
+  expect(goRecordingDrafts).toHaveBeenCalledTimes(1);
   expect(saveRecordingDraft).not.toHaveBeenCalled();
 });
 
@@ -345,7 +349,7 @@ describe('review regressions', () => {
   it('does not repopulate a cleared page with another account’s in-flight save', async () => {
     let finish;
     saveRecordingDraft.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
-    const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', audio: { path: 'old' }, goRecordingDrafts: vi.fn() });
+    const page = context(RecordingCreate, { draftReady: true, ownerScope: 'user:1', audio: { path: 'old' } });
     const saving = page.saveDraft();
     await Promise.resolve(); await Promise.resolve();
     draftOwner.mockReturnValue('user:2');
@@ -354,6 +358,7 @@ describe('review regressions', () => {
     await saving;
     expect(page.draftId).toBe('');
     expect(page.audio.path).toBe('');
+    expect(goRecordingDrafts).toHaveBeenCalledTimes(1);
     draftOwner.mockReturnValue('user:1');
   });
 });
