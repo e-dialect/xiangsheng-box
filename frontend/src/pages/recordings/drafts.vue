@@ -45,6 +45,14 @@
         text="正在检查草稿音频…"
       />
       <EmptyState
+        v-else-if="loadFailed"
+        title="暂时读不到草稿"
+        description="可以在这里重试。"
+        action-text="重新读取草稿"
+        role="alert"
+        @action="load"
+      />
+      <EmptyState
         v-else-if="!items.length"
         title="还没有草稿"
         action-text="录一段乡音"
@@ -100,6 +108,7 @@ export default {
   data: () => ({
     items: [],
     loading: false,
+    loadFailed: false,
     owner: '',
     generation: 0,
     legacyWarnings: [],
@@ -119,11 +128,14 @@ export default {
     async load() {
       this.generation += 1;
       const { generation } = this;
-      const owner = draftOwner();
       this.loading = true;
+      this.loadFailed = false;
       this.items = [];
-      this.owner = owner;
+      this.legacyWarnings = [];
+      this.owner = '';
       try {
+        const owner = draftOwner();
+        this.owner = owner;
         await migrateLegacyRecordingDrafts(owner);
         const items = await listRecordingDraftsWithAudioStatus(owner);
         const legacyWarnings = listLegacyRecordingDrafts().filter(
@@ -133,6 +145,8 @@ export default {
           this.items = items;
           this.legacyWarnings = legacyWarnings;
         }
+      } catch (error) {
+        if (generation === this.generation) this.loadFailed = true;
       } finally { if (generation === this.generation) this.loading = false; }
     },
     async clearInvalidAudio() {

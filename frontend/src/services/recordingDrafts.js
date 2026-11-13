@@ -45,10 +45,10 @@ export function draftOwner() {
   return `guest:${sessionId}`;
 }
 
-function parseItems(owner) {
+function parseItems(owner, { strict = false } = {}) {
   try {
     const items = JSON.parse(uni.getStorageSync(key(owner)) || '[]');
-    if (!Array.isArray(items)) return [];
+    if (!Array.isArray(items)) throw new Error('草稿列表格式异常');
     return items
       .filter((item) => item && typeof item === 'object' && item.owner === owner)
       .map((item) => ({
@@ -59,6 +59,7 @@ function parseItems(owner) {
         recordingType: item.recordingType || item.form?.recording_type || 'word',
       }));
   } catch (error) {
+    if (strict) throw error;
     return [];
   }
 }
@@ -155,7 +156,7 @@ export async function deleteRecordingDraft(id, owner = draftOwner()) {
 }
 
 export async function listRecordingDraftsWithAudioStatus(owner = draftOwner()) {
-  return Promise.all(listRecordingDrafts(owner).map(async (item) => {
+  return Promise.all(parseItems(owner, { strict: true }).map(async (item) => {
     if (!item.audio) return item;
     const available = await isDraftAudioAvailable(item.audio);
     return {
