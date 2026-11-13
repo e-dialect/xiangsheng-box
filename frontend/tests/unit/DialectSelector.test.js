@@ -112,4 +112,98 @@ describe('hierarchical dialect selection and labels', () => {
 
     expect(wrapper.text()).toContain('默认 · 闽语 · 莆仙方言 · 莆田 · 城里');
   });
+  it('keeps selecting a dialect when saving the optional recent shortcut fails', () => {
+    uni.setStorageSync.mockImplementation(() => { throw new Error('storage quota exceeded'); });
+    const wrapper = mount(DialectSelector, { props: { visible: true, dialects } });
+
+    expect(() => wrapper.vm.selectNode(dialects[3])).not.toThrow();
+    expect(wrapper.emitted('change')).toEqual([[{ value: 4, dialect: dialects[3] }]]);
+    expect(wrapper.emitted('update:visible')).toEqual([[false]]);
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(wrapper.vm.recentIds).toEqual([4]);
+  });
+
+  it('replaces recent shortcuts when the visible selector changes account scope', async () => {
+    const storage = {
+      'dialect-selector:recent:7': '[4,3]',
+      'dialect-selector:recent:8': '[2]',
+    };
+    uni.getStorageSync.mockImplementation((key) => storage[key] || '');
+    const wrapper = mount(DialectSelector, {
+      props: { visible: true, dialects, ownerScope: 7 },
+    });
+    expect(wrapper.vm.recentIds).toEqual([4, 3]);
+
+    await wrapper.setProps({ ownerScope: 8 });
+    expect(wrapper.vm.recentIds).toEqual([2]);
+    wrapper.vm.selectNode(dialects[0]);
+    expect(uni.setStorageSync).toHaveBeenLastCalledWith('dialect-selector:recent:8', '[1,2]');
+
+    await wrapper.setProps({ ownerScope: 'guest' });
+    expect(wrapper.vm.recentIds).toEqual([]);
+  });
+
+  it('loads the new account history on reopen without changing the selected dialect', async () => {
+    uni.getStorageSync.mockImplementation((key) => (
+      key === 'dialect-selector:recent:7' ? '[4,3]' : '[2]'
+    ));
+    const wrapper = mount(DialectSelector, {
+      props: {
+        visible: true, dialects, ownerScope: 7, value: 4, defaultDialect: dialects[3],
+      },
+    });
+    await wrapper.setProps({ visible: false });
+    await wrapper.setProps({ ownerScope: 8 });
+    expect(wrapper.emitted('change')).toBeUndefined();
+    await wrapper.setProps({ visible: true });
+
+    expect(wrapper.vm.recentIds).toEqual([2]);
+    expect(wrapper.vm.currentNode.id).toBe(4);
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('refreshes the profile default when the account changes while the sheet stays open', async () => {
+    const app = { globalData: { userInfo: { primary_dialect: dialects[3] } } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: { visible: true, dialects, ownerScope: 7 },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+
+    app.globalData.userInfo = { primary_dialect: dialects[1] };
+    await wrapper.setProps({ ownerScope: 8 });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(2);
+
+    app.globalData.userInfo = null;
+    await wrapper.setProps({ ownerScope: 'guest' });
+    expect(wrapper.vm.resolvedDefaultDialect).toBeNull();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('picks up a late global profile when the async dialect catalog arrives', async () => {
+    const app = { globalData: { userInfo: null } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: { visible: true, dialects: [], ownerScope: 7 },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect).toBeNull();
+    app.globalData.userInfo = { primary_dialect: dialects[3] };
+    await wrapper.setProps({ dialects });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+  });
+
+  it('refreshes the global fallback after an explicit default is removed', async () => {
+    const app = { globalData: { userInfo: { primary_dialect: dialects[1] } } };
+    globalThis.getApp = vi.fn(() => app);
+    const wrapper = mount(DialectSelector, {
+      props: {
+        visible: true, dialects, ownerScope: 7, defaultDialect: dialects[3],
+      },
+    });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(4);
+    app.globalData.userInfo = { primary_dialect: dialects[2] };
+    await wrapper.setProps({ defaultDialect: null });
+    expect(wrapper.vm.resolvedDefaultDialect.id).toBe(3);
+  });
 });

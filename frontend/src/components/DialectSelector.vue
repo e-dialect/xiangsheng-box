@@ -217,6 +217,7 @@ export default {
       cursorId: null,
       query: '',
       recentIds: [],
+      profileDefaultDialect: null,
     };
   },
   computed: {
@@ -236,13 +237,7 @@ export default {
       return this.currentNode?.children || this.tree;
     },
     resolvedDefaultDialect() {
-      // App startup refreshes the signed-in user asynchronously. Reading the
-      // global profile again whenever the sheet opens avoids losing the
-      // default shortcut when a page renders before that refresh completes.
-      const profileDefault = this.visible && typeof getApp === 'function'
-        ? getApp()?.globalData?.userInfo?.primary_dialect
-        : null;
-      const requested = this.defaultDialect || profileDefault;
+      const requested = this.defaultDialect || this.profileDefaultDialect;
       return this.flatDialects.find((item) => String(item.id) === String(requested?.id)) || null;
     },
     recentDialects() {
@@ -263,6 +258,15 @@ export default {
     },
   },
   watch: {
+    flatDialects() {
+      if (this.visible) this.refreshProfileDefault();
+    },
+    defaultDialect() {
+      if (this.visible) this.refreshProfileDefault();
+    },
+    ownerScope() {
+      if (this.visible) this.refreshShortcuts();
+    },
     value(next) {
       if (!this.visible) return;
       const path = findDialectPath(this.tree, next);
@@ -273,13 +277,23 @@ export default {
       handler(next) {
         if (!next) return;
         this.query = '';
-        this.loadRecent();
+        this.refreshShortcuts();
         const path = findDialectPath(this.tree, this.value);
         this.cursorId = path[path.length - 1]?.id || null;
       },
     },
   },
   methods: {
+    refreshShortcuts() {
+      this.loadRecent();
+      this.refreshProfileDefault();
+    },
+    refreshProfileDefault() {
+      // Global profile data is not reactive. Refresh when opening or changing identity.
+      this.profileDefaultDialect = typeof getApp === 'function'
+        ? getApp()?.globalData?.userInfo?.primary_dialect || null
+        : null;
+    },
     storageKey() {
       return `${RECENT_KEY}:${this.ownerScope || 'guest'}`;
     },
@@ -296,7 +310,11 @@ export default {
         Number(id),
         ...this.recentIds.filter((item) => String(item) !== String(id)),
       ].slice(0, MAX_RECENT);
-      uni.setStorageSync(this.storageKey(), JSON.stringify(this.recentIds));
+      try {
+        uni.setStorageSync(this.storageKey(), JSON.stringify(this.recentIds));
+      } catch (error) {
+        // Recent shortcuts are optional; unavailable storage must not block selection.
+      }
     },
     breadcrumbFor(dialect) {
       return dialectBreadcrumb(dialect, this.dialects);
