@@ -15,7 +15,7 @@ import { installVisualFixture, openVisualRoute } from './helpers/visualReviewFix
     await expect(page.getByText('重新加载地区', { exact: true })).toBeVisible();
     await page.locator('textarea:visible').first().fill('网络恢复后保留的大意');
     const chooser = page.waitForEvent('filechooser');
-    await page.getByText('选择已有录音', { exact: true }).click();
+    await page.getByText('选择本地录音', { exact: true }).click();
     const wav = Buffer.alloc(16044);
     wav.write('RIFF'); wav.writeUInt32LE(16036, 4); wav.write('WAVE', 8);
     wav.write('fmt ', 12); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20);
