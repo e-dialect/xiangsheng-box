@@ -119,7 +119,10 @@ export default {
       recorder: null,
       recorderManager: null,
       stream: null,
-      chunks: [],
+      releaseMicrophone: null,
+      recordingRequest: 0,
+      starting: false,
+      disposed: false,
       recording: false,
       supported: true,
       recordingSupported: true,
@@ -143,6 +146,7 @@ export default {
       return Math.min(1, this.playbackPosition / this.resolvedDurationMs);
     },
     titleText() {
+      if (this.starting) return '等待麦克风授权';
       if (this.playing) return '正在播放';
       if (this.recording) return '录音中';
       if (this.invalid) return '录音已失效';
@@ -151,6 +155,7 @@ export default {
       return '让这句乡音留下来';
     },
     subtitleText() {
+      if (this.starting) return '请允许使用麦克风，也可选择已有录音';
       if (this.recording) {
         return `${formatSeconds(this.recordingElapsed)} / ${formatSeconds(MAX_RECORD_MS)}`;
       }
@@ -170,6 +175,7 @@ export default {
       return '●';
     },
     primaryLabel() {
+      if (this.starting) return '等待授权';
       if (this.playing) return '暂停';
       if (this.recording) return '点击完成';
       if (this.audio.path) return '播放';
@@ -188,6 +194,8 @@ export default {
     this.initRecorder();
   },
   beforeUnmount() {
+    this.disposed = true;
+    this.cancelH5Recording();
     this.clearTimer();
     this.stopPlayback();
     const activeRecorder = this.recorderManager || this.recorder;
@@ -197,9 +205,6 @@ export default {
       } catch (error) {
         // 录音器已经停止时无需再处理。
       }
-    }
-    if (this.stream) {
-      this.stream.getTracks().forEach((track) => track.stop());
     }
   },
   methods: {
@@ -231,9 +236,12 @@ export default {
         this.recorderManager = uni.getRecorderManager();
         this.recorder = this.recorderManager;
         this.recorderManager.onStop(
-          (res) => this.onRecordStop(res.tempFilePath, res.duration),
+          (res) => {
+            if (!this.disposed) this.onRecordStop(res.tempFilePath, res.duration);
+          },
         );
         this.recorderManager.onError((error) => {
+          if (this.disposed) return;
           this.recording = false;
           this.clearTimer();
           this.$emit('error', error);
@@ -251,21 +259,59 @@ export default {
       this.recordingSupported = this.supported;
       // #endif
     },
-    async prepareH5Recorder() {
+    cancelH5Recording() {
+      if (this.recorderManager) return;
+      this.recordingRequest += 1;
+      this.starting = false;
+      const wasRecording = this.recording;
+      this.recording = false;
+      this.clearTimer();
+      if (wasRecording && this.recorder) {
+        try {
+          this.recorder.stop();
+        } catch (error) {
+          // A failed or already stopped recorder still needs its tracks released.
+        }
+      }
+      this.releaseMicrophone?.();
+      this.releaseMicrophone = null;
+      this.stream = null;
+      this.recorder = null;
+    },
+    async prepareH5Recorder(request) {
       // #ifdef H5
       if (!this.supported) return false;
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.chunks = [];
-      this.recorder = new MediaRecorder(this.stream);
-      this.recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size) this.chunks.push(event.data);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (this.disposed || request !== this.recordingRequest) {
+        stream.getTracks().forEach((track) => track.stop());
+        return false;
+      }
+      this.stream = stream;
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        stream.getTracks().forEach((track) => track.stop());
+        if (this.recordingRequest === request) this.stream = null;
       };
-      this.recorder.onstop = () => {
-        const blob = new Blob(this.chunks, { type: this.recorder.mimeType || 'audio/webm' });
-        const duration = Date.now() - this.startAt;
-        this.onRecordStop(URL.createObjectURL(blob), duration, blob);
-        this.stream.getTracks().forEach((track) => track.stop());
-        this.stream = null;
+      this.releaseMicrophone = release;
+      const chunks = [];
+      const recorder = new MediaRecorder(stream);
+      this.recorder = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size) chunks.push(event.data);
+      };
+      recorder.onstop = () => {
+        try {
+          if (this.disposed || request !== this.recordingRequest) return;
+          this.recording = false;
+          this.clearTimer();
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          const duration = Date.now() - this.startAt;
+          this.onRecordStop(URL.createObjectURL(blob), duration, blob);
+        } finally {
+          release();
+        }
       };
       return true;
       // #endif
@@ -286,15 +332,19 @@ export default {
       await this.startRecord();
     },
     async startRecord() {
+      if (this.starting || this.recording || this.disposed) return;
       this.stopPlayback();
       if (!this.recordingSupported) {
         notify({ title: '请选择已有录音', icon: 'none' });
         return;
       }
+      this.starting = true;
+      this.recordingRequest += 1;
+      const request = this.recordingRequest;
       try {
         if (!this.recorderManager) {
-          const ready = await this.prepareH5Recorder();
-          if (!ready) return;
+          const ready = await this.prepareH5Recorder(request);
+          if (!ready || this.disposed || request !== this.recordingRequest) return;
         }
         const activeRecorder = this.recorderManager || this.recorder;
         if (!activeRecorder) return;
@@ -307,15 +357,21 @@ export default {
         this.stopTimer = setTimeout(() => this.stopRecord(true), MAX_RECORD_MS);
 
         // #ifdef MP-WEIXIN
-        activeRecorder.start({ duration: MAX_RECORD_MS, format: 'mp3' });
+        if (this.recorderManager) {
+          activeRecorder.start({ duration: MAX_RECORD_MS, format: 'mp3' });
+        }
         // #endif
         // #ifdef H5
         if (activeRecorder !== this.recorderManager) activeRecorder.start();
         // #endif
       } catch (error) {
+        if (this.disposed || request !== this.recordingRequest) return;
+        this.cancelH5Recording();
         this.recording = false;
         this.clearTimer();
         this.$emit('error', error);
+      } finally {
+        if (request === this.recordingRequest) this.starting = false;
       }
     },
     stopRecord(autoStopped = false) {
@@ -378,15 +434,18 @@ export default {
       if (this.audio.path) playAudio(this.audio.path);
     },
     clearAudio() {
+      this.cancelH5Recording();
       this.stopPlayback();
       this.$emit('clear');
     },
     restartRecording() {
+      this.cancelH5Recording();
       this.stopPlayback();
       this.$emit('clear');
       this.$nextTick(() => this.startRecord());
     },
     async chooseFile() {
+      this.cancelH5Recording();
       this.stopPlayback();
       try {
         const selected = await chooseAudioFile();

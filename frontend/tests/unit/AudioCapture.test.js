@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import {
-  beforeEach, describe, expect, it, vi,
+  afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
 
 vi.mock('@/services/feedback', () => ({ notify: vi.fn() }));
@@ -19,8 +19,10 @@ vi.mock('@/utils/audio', () => ({
   stopAudio: vi.fn(),
 }));
 
+const wrappers = [];
+
 function mountCapture(audio = {}) {
-  return mount(AudioCapture, {
+  const wrapper = mount(AudioCapture, {
     props: {
       audio: {
         path: '',
@@ -31,9 +33,159 @@ function mountCapture(audio = {}) {
       },
     },
   });
+  wrappers.push(wrapper);
+  return wrapper;
+}
+
+function deferred() {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
+function mockMicrophone(getUserMedia) {
+  const recorders = [];
+  vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+  vi.stubGlobal('MediaRecorder', vi.fn(function Recorder(stream) {
+    this.stream = stream;
+    this.start = vi.fn();
+    this.stop = vi.fn();
+    this.mimeType = 'audio/webm';
+    recorders.push(this);
+  }));
+  vi.stubGlobal('URL', class extends globalThis.URL {
+    static createObjectURL = vi.fn(() => 'blob:recording');
+  });
+  return recorders;
+}
+
+function microphoneStream() {
+  const stop = vi.fn();
+  return { getTracks: () => [{ stop }], stop };
 }
 
 describe('AudioCapture', () => {
+  afterEach(() => {
+    wrappers.splice(0).forEach((wrapper) => { if (wrapper.exists()) wrapper.unmount(); });
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does not request a second microphone while authorization is pending', async () => {
+    const permission = deferred();
+    const getUserMedia = vi.fn(() => permission.promise);
+    const recorders = mockMicrophone(getUserMedia);
+    const wrapper = mountCapture();
+    const first = wrapper.vm.startRecord();
+    const second = wrapper.vm.startRecord();
+    permission.resolve(microphoneStream());
+    await Promise.all([first, second]);
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(recorders).toHaveLength(1);
+    expect(wrapper.vm.recording).toBe(true);
+  });
+
+  it('releases a microphone granted after leaving without starting or emitting', async () => {
+    const permission = deferred();
+    const recorders = mockMicrophone(vi.fn(() => permission.promise));
+    const stream = microphoneStream();
+    const wrapper = mountCapture();
+    const start = wrapper.vm.startRecord();
+    wrapper.unmount();
+    permission.resolve(stream);
+    await start;
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+    expect(recorders).toHaveLength(0);
+    expect(wrapper.emitted('change')).toBeUndefined();
+    expect(wrapper.vm.stopTimer).toBeNull();
+  });
+
+  it('cancels pending microphone authorization when choosing an existing recording', async () => {
+    const permission = deferred();
+    const recorders = mockMicrophone(vi.fn(() => permission.promise));
+    const stream = microphoneStream();
+    chooseAudioFile.mockResolvedValue({ path: '/voice.m4a' });
+    const wrapper = mountCapture();
+    const start = wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    permission.resolve(stream);
+    await start;
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+    expect(recorders).toHaveLength(0);
+    expect(wrapper.vm.recording).toBe(false);
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    expect(wrapper.emitted('change')[0][0].path).toBe('/voice.m4a');
+  });
+
+  it('keeps a stale stop callback from reading or stopping the next microphone', async () => {
+    vi.useFakeTimers();
+    const firstStream = microphoneStream();
+    const secondStream = microphoneStream();
+    const recorders = mockMicrophone(vi.fn()
+      .mockResolvedValueOnce(firstStream).mockResolvedValueOnce(secondStream));
+    const wrapper = mountCapture();
+    await wrapper.vm.startRecord();
+    vi.advanceTimersByTime(1500);
+    wrapper.vm.stopRecord();
+    await wrapper.vm.startRecord();
+    recorders[0].ondataavailable({ data: new Blob(['old']) });
+    recorders[0].onstop();
+    expect(firstStream.stop).toHaveBeenCalledTimes(1);
+    expect(secondStream.stop).not.toHaveBeenCalled();
+    expect(wrapper.vm.recording).toBe(true);
+    expect(wrapper.emitted('change')).toBeUndefined();
+    vi.advanceTimersByTime(1500);
+    recorders[1].ondataavailable({ data: new Blob(['new']) });
+    wrapper.vm.stopRecord();
+    recorders[1].onstop();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    expect(wrapper.emitted('change')[0][0].blob.size).toBe(3);
+    expect(secondStream.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores stop callbacks after unmount and releases an active stream only once', async () => {
+    const stream = microphoneStream();
+    const recorders = mockMicrophone(vi.fn().mockResolvedValue(stream));
+    const wrapper = mountCapture();
+    await wrapper.vm.startRecord();
+    wrapper.unmount();
+    recorders[0].ondataavailable({ data: new Blob(['late']) });
+    recorders[0].onstop();
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.stream).toBeNull();
+    expect(wrapper.emitted('change')).toBeUndefined();
+    expect(wrapper.emitted('error')).toBeUndefined();
+  });
+
+  it('releases the microphone if constructing the browser recorder fails', async () => {
+    const stream = microphoneStream();
+    mockMicrophone(vi.fn().mockResolvedValue(stream));
+    MediaRecorder.mockImplementation(() => { throw new Error('unsupported recorder'); });
+    const wrapper = mountCapture();
+    await wrapper.vm.startRecord();
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.recording).toBe(false);
+    expect(wrapper.emitted('error')).toHaveLength(1);
+  });
+
+  it('releases the microphone if starting the browser recorder fails', async () => {
+    const stream = microphoneStream();
+    const recorders = mockMicrophone(vi.fn().mockResolvedValue(stream));
+    const wrapper = mountCapture();
+    const prepare = wrapper.vm.prepareH5Recorder;
+    vi.spyOn(wrapper.vm, 'prepareH5Recorder').mockImplementation(async (...args) => {
+      const ready = await prepare(...args);
+      recorders[0].start.mockImplementation(() => { throw new Error('start failed'); });
+      return ready;
+    });
+    await wrapper.vm.startRecord();
+    expect(stream.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.stopTimer).toBeNull();
+    expect(wrapper.emitted('error')).toHaveLength(1);
+  });
+
   it('allows recording again after H5 microphone authorization fails', async () => {
     const wrapper = mountCapture();
     wrapper.vm.supported = true;
