@@ -32,7 +32,7 @@
     <BaseButton
       v-if="!audio.path || recording"
       class="record-primary"
-      :disabled="!supported"
+      :disabled="!supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
       variant="light"
       shape="circle"
       :aria-label="primaryLabel"
@@ -57,10 +57,11 @@
         variant="ghost"
         size="large"
         icon="refresh"
+        :disabled="selectingFile || (nativeBusy && !nativeStopFailed)"
         block
         @click="restartRecording"
       >
-        重新录制
+        {{ nativeStopFailed ? '重试停止' : '重新录制' }}
       </BaseButton>
       <BaseButton
         class="record-ready-action record-ready-action--primary"
@@ -78,7 +79,7 @@
         class="record-action"
         variant="light"
         size="small"
-        :disabled="!fileSelectionSupported"
+        :disabled="!fileSelectionSupported || selectingFile"
         @click="chooseFile"
       >
         {{ audio.path ? '选择其他录音' : '选择已有录音' }}
@@ -88,6 +89,7 @@
 </template>
 
 <script>
+import { reactive } from 'vue';
 import BaseButton from '@/components/BaseButton.vue';
 import { notify } from '@/services/feedback';
 import { chooseAudioFile, supportsAudioFileSelection } from '@/services/file';
@@ -95,6 +97,8 @@ import { playAudio, playManaged, stopAudio } from '@/utils/audio';
 
 const MAX_RECORD_MS = 15 * 1000;
 const MIN_RECORD_MS = 1000;
+// The WeChat manager survives component disposal and does not tag its callbacks.
+const nativeSessions = reactive(new WeakMap());
 
 function formatSeconds(milliseconds) {
   return `${Math.max(0, Math.ceil(Number(milliseconds || 0) / 1000))} 秒`;
@@ -118,6 +122,8 @@ export default {
     return {
       recorder: null,
       recorderManager: null,
+      nativeSession: null,
+      selectingFile: false,
       stream: null,
       releaseMicrophone: null,
       recordingRequest: 0,
@@ -138,6 +144,12 @@ export default {
     };
   },
   computed: {
+    nativeBusy() {
+      return Boolean(this.recorderManager && nativeSessions.has(this.recorderManager));
+    },
+    nativeStopFailed() {
+      return Boolean(this.recorderManager && nativeSessions.get(this.recorderManager)?.stopFailed);
+    },
     resolvedDurationMs() {
       return Number(this.audio.durationMs || this.audio.duration || this.playbackDuration || 0);
     },
@@ -146,6 +158,7 @@ export default {
       return Math.min(1, this.playbackPosition / this.resolvedDurationMs);
     },
     titleText() {
+      if (this.nativeStopFailed) return '录音尚未结束';
       if (this.starting) return '等待麦克风授权';
       if (this.playing) return '正在播放';
       if (this.recording) return '录音中';
@@ -155,6 +168,7 @@ export default {
       return '让这句乡音留下来';
     },
     subtitleText() {
+      if (this.nativeStopFailed) return '停止录音失败，请重试停止后继续';
       if (this.starting) return '请允许使用麦克风，也可选择已有录音';
       if (this.recording) {
         return `${formatSeconds(this.recordingElapsed)} / ${formatSeconds(MAX_RECORD_MS)}`;
@@ -175,6 +189,7 @@ export default {
       return '●';
     },
     primaryLabel() {
+      if (this.nativeStopFailed) return '重试停止';
       if (this.starting) return '等待授权';
       if (this.playing) return '暂停';
       if (this.recording) return '点击完成';
@@ -195,17 +210,10 @@ export default {
   },
   beforeUnmount() {
     this.disposed = true;
+    this.cancelNativeRecording();
     this.cancelH5Recording();
     this.clearTimer();
     this.stopPlayback();
-    const activeRecorder = this.recorderManager || this.recorder;
-    if (this.recording && activeRecorder) {
-      try {
-        activeRecorder.stop();
-      } catch (error) {
-        // 录音器已经停止时无需再处理。
-      }
-    }
   },
   methods: {
     emitAudio(payload) {
@@ -237,14 +245,25 @@ export default {
         this.recorder = this.recorderManager;
         this.recorderManager.onStop(
           (res) => {
-            if (!this.disposed) this.onRecordStop(res.tempFilePath, res.duration);
+            const session = this.nativeSession;
+            if (!session) return;
+            nativeSessions.delete(this.recorderManager);
+            this.nativeSession = null;
+            this.recording = false;
+            this.clearTimer();
+            if (!this.disposed && session && !session.cancelled) {
+              this.onRecordStop(res.tempFilePath, res.duration);
+            }
           },
         );
         this.recorderManager.onError((error) => {
-          if (this.disposed) return;
+          const session = this.nativeSession;
+          if (!session) return;
+          nativeSessions.delete(this.recorderManager);
+          this.nativeSession = null;
           this.recording = false;
           this.clearTimer();
-          this.$emit('error', error);
+          if (!this.disposed && !session.cancelled) this.$emit('error', error);
         });
       }
       // #endif
@@ -258,6 +277,31 @@ export default {
       );
       this.recordingSupported = this.supported;
       // #endif
+    },
+    retryNativeStop() {
+      const session = this.recorderManager && nativeSessions.get(this.recorderManager);
+      if (!session?.stopFailed) return;
+      session.stopFailed = false;
+      if (this.nativeSession) this.recording = false;
+      try {
+        this.recorderManager.stop();
+      } catch (error) {
+        session.stopFailed = true;
+        if (this.nativeSession) this.recording = true;
+        if (!this.disposed) this.$emit('error', error);
+      }
+    },
+    cancelNativeRecording() {
+      const session = this.recorderManager && nativeSessions.get(this.recorderManager);
+      if (!session) return;
+      session.cancelled = true;
+      if (session.stopFailed) {
+        this.retryNativeStop();
+        return;
+      }
+      // Keep the session until onStop/onError: the singleton manager does not
+      // identify callbacks, so a new recording must not start before it settles.
+      if (this.recording) this.stopRecord();
     },
     cancelH5Recording() {
       if (this.recorderManager) return;
@@ -332,7 +376,12 @@ export default {
       await this.startRecord();
     },
     async startRecord() {
-      if (this.starting || this.recording || this.disposed) return;
+      if (this.disposed || this.starting || this.selectingFile) return;
+      if (this.nativeBusy) {
+        this.retryNativeStop();
+        return;
+      }
+      if (this.recording) return;
       this.stopPlayback();
       if (!this.recordingSupported) {
         notify({ title: '请选择已有录音', icon: 'none' });
@@ -358,6 +407,8 @@ export default {
 
         // #ifdef MP-WEIXIN
         if (this.recorderManager) {
+          this.nativeSession = { cancelled: false };
+          nativeSessions.set(this.recorderManager, this.nativeSession);
           activeRecorder.start({ duration: MAX_RECORD_MS, format: 'mp3' });
         }
         // #endif
@@ -366,6 +417,8 @@ export default {
         // #endif
       } catch (error) {
         if (this.disposed || request !== this.recordingRequest) return;
+        if (this.recorderManager) nativeSessions.delete(this.recorderManager);
+        this.nativeSession = null;
         this.cancelH5Recording();
         this.recording = false;
         this.clearTimer();
@@ -381,10 +434,16 @@ export default {
       this.recording = false;
       this.clearTimer();
       try {
+        if (this.nativeSession) this.nativeSession.stopFailed = false;
         activeRecorder.stop();
         if (autoStopped) notify({ title: '已自动截取前15秒', icon: 'none' });
       } catch (error) {
-        this.$emit('error', error);
+        if (this.nativeSession) {
+          // Preserve callback ownership until a successful retry settles it.
+          this.nativeSession.stopFailed = true;
+          this.recording = true;
+        }
+        if (!this.disposed) this.$emit('error', error);
       }
     },
     onRecordStop(path, duration, blob = null) {
@@ -434,25 +493,36 @@ export default {
       if (this.audio.path) playAudio(this.audio.path);
     },
     clearAudio() {
+      this.cancelNativeRecording();
       this.cancelH5Recording();
       this.stopPlayback();
       this.$emit('clear');
     },
     restartRecording() {
+      if (this.disposed || this.selectingFile) return;
+      if (this.nativeBusy) {
+        this.retryNativeStop();
+        return;
+      }
       this.cancelH5Recording();
       this.stopPlayback();
       this.$emit('clear');
       this.$nextTick(() => this.startRecord());
     },
     async chooseFile() {
+      if (this.disposed || this.selectingFile) return;
+      this.selectingFile = true;
+      this.cancelNativeRecording();
       this.cancelH5Recording();
       this.stopPlayback();
       try {
         const selected = await chooseAudioFile();
-        if (!selected) return;
+        if (this.disposed || !selected) return;
         this.emitAudio({ ...selected, origin: selected.origin || 'upload' });
       } catch (error) {
-        notify({ title: error?.message || '选择录音失败', icon: 'none' });
+        if (!this.disposed) notify({ title: error?.message || '选择录音失败', icon: 'none' });
+      } finally {
+        this.selectingFile = false;
       }
     },
   },

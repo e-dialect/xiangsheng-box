@@ -2,12 +2,12 @@ import { mount } from '@vue/test-utils';
 import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';
-
-vi.mock('@/services/feedback', () => ({ notify: vi.fn() }));
 import { notify } from '@/services/feedback';
 import AudioCapture from '@/components/AudioCapture.vue';
 import { chooseAudioFile } from '@/services/file';
 import { playAudio, playManaged, stopAudio } from '@/utils/audio';
+
+vi.mock('@/services/feedback', () => ({ notify: vi.fn() }));
 
 vi.mock('@/services/file', () => ({
   chooseAudioFile: vi.fn(),
@@ -64,7 +64,271 @@ function microphoneStream() {
   return { getTracks: () => [{ stop }], stop };
 }
 
+function mountNativeCapture() {
+  let stopped;
+  let failed;
+  const recorder = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    onStop: vi.fn((callback) => { stopped = callback; }),
+    onError: vi.fn((callback) => { failed = callback; }),
+  };
+  uni.getRecorderManager = () => recorder;
+  const wrapper = mountCapture();
+  wrapper.vm.recordingSupported = true;
+  return {
+    wrapper,
+    recorder,
+    stop: () => stopped({ tempFilePath: 'wxfile://record.mp3', duration: 2000 }),
+    fail: () => failed({ errMsg: 'recording interrupted' }),
+  };
+}
+
 describe('AudioCapture', () => {
+  it('waits for native stop before accepting a fresh recording and ignores duplicate stop', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    await wrapper.vm.startRecord();
+    wrapper.vm.stopRecord();
+    wrapper.vm.stopRecord();
+    await wrapper.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    stop();
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    await wrapper.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(2);
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(2);
+    expect(wrapper.vm.recording).toBe(false);
+    expect(wrapper.vm.stopTimer).toBeNull();
+  });
+
+  it('discards pending native stop even when file selection is cancelled', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    chooseAudioFile.mockResolvedValue(null);
+    await wrapper.vm.startRecord();
+    wrapper.vm.stopRecord();
+    await wrapper.vm.chooseFile();
+    stop();
+    expect(wrapper.emitted('change')).toBeUndefined();
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    await wrapper.vm.startRecord();
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+  });
+
+  it('blocks recording and duplicate selection until the native file chooser settles', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    const selection = deferred();
+    chooseAudioFile.mockReturnValue(selection.promise);
+    await wrapper.vm.startRecord();
+    const pending = wrapper.vm.chooseFile();
+    stop();
+    await wrapper.vm.chooseFile();
+    await wrapper.vm.startRecord();
+    expect(chooseAudioFile).toHaveBeenCalledTimes(1);
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    selection.resolve({ path: 'wxfile://chosen.mp3' });
+    await pending;
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    expect(wrapper.vm.selectingFile).toBe(false);
+  });
+
+  it('does not accept a late native recording or selected file after disposal', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    const selection = deferred();
+    chooseAudioFile.mockReturnValue(selection.promise);
+    await wrapper.vm.startRecord();
+    const pending = wrapper.vm.chooseFile();
+    wrapper.unmount();
+    stop();
+    selection.resolve({ path: 'wxfile://chosen.mp3' });
+    await pending;
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('discards synchronous native cancellation and clears errors without overwriting selection', async () => {
+    const {
+      wrapper, recorder, stop, fail,
+    } = mountNativeCapture();
+    recorder.stop.mockImplementationOnce(stop);
+    chooseAudioFile.mockResolvedValue({ path: 'wxfile://chosen.mp3' });
+    await wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    await wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    fail();
+    expect(wrapper.emitted('error')).toBeUndefined();
+    await wrapper.vm.startRecord();
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(3);
+  });
+
+  it('recovers after native start throws or file selection fails', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    recorder.start.mockImplementationOnce(() => { throw new Error('start failed'); });
+    await wrapper.vm.startRecord();
+    expect(wrapper.vm.nativeSession).toBeNull();
+    expect(wrapper.vm.recording).toBe(false);
+    await wrapper.vm.startRecord();
+    chooseAudioFile.mockRejectedValue(new Error('selection failed'));
+    await wrapper.vm.chooseFile();
+    stop();
+    expect(wrapper.vm.selectingFile).toBe(false);
+    expect(wrapper.emitted('change')).toBeUndefined();
+    await wrapper.vm.startRecord();
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+  });
+
+  it('does not clear chosen audio when rerecord is attempted before cancelled native stop', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    chooseAudioFile.mockResolvedValue({ path: 'wxfile://chosen.mp3' });
+    await wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    wrapper.vm.restartRecording();
+    expect(wrapper.emitted('clear')).toBeUndefined();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    stop();
+    wrapper.vm.restartRecording();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('clear')).toHaveLength(1);
+    expect(recorder.start).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['stop', 'error'])('waits for disposed native session %s before a remounted component starts', async (event) => {
+    const callbacks = { stop: [], error: [] };
+    const recorder = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      onStop: vi.fn((callback) => { callbacks.stop.push(callback); }),
+      onError: vi.fn((callback) => { callbacks.error.push(callback); }),
+    };
+    uni.getRecorderManager = () => recorder;
+    const first = mountCapture();
+    first.vm.recordingSupported = true;
+    await first.vm.startRecord();
+    first.unmount();
+    const second = mountCapture();
+    second.vm.recordingSupported = true;
+    await second.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    callbacks[event].forEach((callback) => callback({
+      tempFilePath: 'wxfile://cancelled.mp3', duration: 2000, errMsg: 'interrupted',
+    }));
+    expect(first.emitted('change')).toBeUndefined();
+    expect(second.emitted('change')).toBeUndefined();
+    await second.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(2);
+    callbacks.stop.forEach((callback) => callback({
+      tempFilePath: 'wxfile://fresh.mp3', duration: 2000,
+    }));
+    expect(first.emitted('change')).toBeUndefined();
+    expect(second.emitted('change')[0][0].path).toBe('wxfile://fresh.mp3');
+  });
+
+  it('retains native ownership after stop throws and permits an explicit safe retry', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    recorder.stop.mockImplementationOnce(() => { throw new Error('stop failed'); });
+    await wrapper.vm.startRecord();
+    wrapper.vm.stopRecord();
+    expect(wrapper.vm.recording).toBe(true);
+    expect(wrapper.vm.nativeStopFailed).toBe(true);
+    expect(wrapper.vm.primaryLabel).toBe('重试停止');
+    expect(wrapper.emitted('error')).toHaveLength(1);
+    await wrapper.vm.handlePrimaryAction();
+    expect(recorder.stop).toHaveBeenCalledTimes(2);
+    expect(wrapper.vm.nativeBusy).toBe(true);
+    expect(wrapper.vm.nativeStopFailed).toBe(false);
+    await wrapper.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    stop();
+    await wrapper.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves a selected file while retrying a failed disposed manager stop', async () => {
+    const stops = [];
+    const recorder = {
+      start: vi.fn(),
+      stop: vi.fn().mockImplementationOnce(() => { throw new Error('stop failed'); }),
+      onStop: vi.fn((callback) => { stops.push(callback); }),
+      onError: vi.fn(),
+    };
+    uni.getRecorderManager = () => recorder;
+    const first = mountCapture();
+    first.vm.recordingSupported = true;
+    await first.vm.startRecord();
+    first.unmount();
+    const second = mountCapture({ path: 'wxfile://chosen.mp3' });
+    second.vm.recordingSupported = true;
+    expect(second.vm.nativeStopFailed).toBe(true);
+    expect(second.vm.titleText).toBe('录音尚未结束');
+    second.vm.restartRecording();
+    expect(second.emitted('clear')).toBeUndefined();
+    expect(recorder.stop).toHaveBeenCalledTimes(2);
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    second.vm.restartRecording();
+    expect(second.emitted('clear')).toBeUndefined();
+    stops.forEach((callback) => callback({ tempFilePath: 'wxfile://old.mp3', duration: 2000 }));
+    expect(second.emitted('change')).toBeUndefined();
+    expect(second.vm.nativeBusy).toBe(false);
+    second.vm.restartRecording();
+    await second.vm.$nextTick();
+    expect(second.emitted('clear')).toHaveLength(1);
+    expect(recorder.start).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not clear selected audio on remount while another native stop is pending', async () => {
+    const { wrapper: first, recorder } = mountNativeCapture();
+    const firstStop = recorder.onStop.mock.calls[0][0];
+    await first.vm.startRecord();
+    first.unmount();
+    const second = mountCapture({ path: 'wxfile://chosen.mp3' });
+    second.vm.restartRecording();
+    expect(second.vm.nativeBusy).toBe(true);
+    expect(second.emitted('clear')).toBeUndefined();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    firstStop({ tempFilePath: 'wxfile://old.mp3', duration: 2000 });
+    expect(second.vm.nativeBusy).toBe(false);
+  });
+
+  it('stops native recording on disposal and ignores completion', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    await wrapper.vm.startRecord();
+    wrapper.unmount();
+    stop();
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('discards native recording completion after choosing an existing file', async () => {
+    let onStop;
+    const recorder = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      onStop: vi.fn((callback) => { onStop = callback; }),
+      onError: vi.fn(),
+    };
+    uni.getRecorderManager = () => recorder;
+    const wrapper = mountCapture();
+    wrapper.vm.recordingSupported = true;
+    chooseAudioFile.mockResolvedValue({ path: 'wxfile://chosen.mp3' });
+
+    await wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    onStop({ tempFilePath: 'wxfile://cancelled.mp3', duration: 2000 });
+
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    expect(wrapper.emitted('change')[0][0].path).toBe('wxfile://chosen.mp3');
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.recording).toBe(false);
+    expect(wrapper.vm.stopTimer).toBeNull();
+  });
+
   afterEach(() => {
     wrappers.splice(0).forEach((wrapper) => { if (wrapper.exists()) wrapper.unmount(); });
     vi.clearAllTimers();
@@ -210,7 +474,8 @@ describe('AudioCapture', () => {
     let onStop;
     let onError;
     const recorder = {
-      start: vi.fn(), stop: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
       onStop: vi.fn((callback) => { onStop = callback; }),
       onError: vi.fn((callback) => { onError = callback; }),
     };
