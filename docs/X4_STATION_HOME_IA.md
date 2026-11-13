@@ -1,5 +1,7 @@
 # 兴化语记莆仙站首页 IA 与内容边界
 
+> 2026-11-14 决策补充：网站和微信小程序直接为兴化语记地方站，全程使用「兴化语记」，小字标注「powered by 乡声集盒」；共享前端、AppShell、Profile、内容和账户。主站切换须显式操作，深链、分享、登录返回保持站点语境，跨域 / AppID 会话单独验收。与本文历史原型有冲突时以此为准；#428 / #429 仅为设计与映射交付，运行时由 #670 / #671 承接。
+
 关联：[#428](https://github.com/e-dialect/xiangsheng-box/issues/428)，父项 [#424](https://github.com/e-dialect/xiangsheng-box/issues/424)。调查日期：2026-10-03；当前实现基线：`95aaeb6`。
 
 本交付定义设计与验收依据。地方站是一层品牌、内容策展和导航上下文；查词、录音、播放、详情、账户继续使用乡声集盒通用能力。可点击的[视觉与交互原型](assets/x4/station-wireframe.html)、[浅色总览](assets/x4/station-wireframe.png)、[深色总览](assets/x4/station-visual-dark.png)及[手机预览](assets/x4/station-visual-mobile.png)使用明确标注的示例内容，不表示真实生产资料、音频或已上线功能。文件名保留 `station-wireframe`，方便已有链接继续访问；内容已从灰框低保真提升为接近产品的视觉稿。
