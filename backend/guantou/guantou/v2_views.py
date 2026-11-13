@@ -562,10 +562,13 @@ class EntryViewSet(viewsets.ModelViewSet):
                     senses__concept_links__concept__code__iexact=concept
                 )
         if ids is not None and not (ipa or romanization):
+            regional_recordings = available_recording_links_for_user(
+                self.request.user
+            ).filter(entry_id=OuterRef("pk"), recording__usage_dialect_id__in=ids)
             queryset = queryset.filter(
                 Q(usage_dialect_id__in=ids)
                 | Q(pronunciation_variants__dialect_id__in=ids)
-                | Q(recording_links__recording__usage_dialect_id__in=ids)
+                | Q(Exists(regional_recordings))
                 | Q(
                     usage_attestations__dialect_id__in=ids,
                     usage_attestations__active=True,
