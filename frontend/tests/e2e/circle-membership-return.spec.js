@@ -32,6 +32,11 @@ const secondCircle = { ...circle, id: 665, name: '莆仙分页保留圈' };
       unexpectedRequests.push(route.request().url());
       await route.abort();
     });
+    // Uni H5 production builds inject this unrelated SDK; keep it local and inert.
+    await page.route('https://cn-shanghai-aliyun-cloudauth.oss-cn-shanghai.aliyuncs.com/web_sdk_js/jsvm_all.js', (route) => route.fulfill({
+      contentType: 'application/javascript',
+      body: '/* CloudAuth is not used by the circle membership fixture. */',
+    }));
     await installVisualFixture(page, { persona: 'member', theme });
     await page.route(/\/circles\/(?:\?.*)?$/, async (route) => {
       const params = new URL(route.request().url()).searchParams;
