@@ -36,7 +36,7 @@ import { installVisualFixture, openVisualRoute } from './helpers/visualReviewFix
     await expect(page.locator('#record-required-dialect')).toContainText('莆仙');
     await expect(page.locator('textarea:visible').first()).toHaveValue('网络恢复后保留的大意');
     await expect(page.getByText('播放录音', { exact: true })).toBeVisible();
-    await expect(page.getByText('三项必要信息已齐，可以保存')).toBeVisible();
+    await expect(page.getByText('三项必要信息已齐，可以提交')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`region-recovered-${theme}.png`) });
   });
 });

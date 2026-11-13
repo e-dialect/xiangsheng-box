@@ -43,7 +43,11 @@ import { installVisualFixture, observeRuntime, openVisualRoute } from './helpers
     await expect(page.getByText('落大雨', { exact: true }).first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`unavailable-${theme}.png`), fullPage: true });
     await page.locator('textarea:visible').first().fill('音频暂时打不开时仍可以改文字');
-    await expect(page.getByText('草稿已保存，可稍后继续', { exact: true }).first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => {
+      const raw = uni.getStorageSync('recording_drafts:v2:user:7');
+      const draft = raw ? JSON.parse(raw)[0] : null;
+      return draft?.form.original_gloss;
+    })).toBe('音频暂时打不开时仍可以改文字');
     const saved = await page.evaluate(() => uni.getStorageSync('recording_drafts:v2:user:7'));
     expect(JSON.parse(saved)[0].audio.mediaId).toBe('restore-test');
     await page.reload();
