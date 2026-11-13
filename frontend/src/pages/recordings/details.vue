@@ -48,6 +48,7 @@
             :text="shareType || canSystemShare ? '分享乡音' : '复制乡音链接'"
             @click="share"
           />
+          <RecordingContributorButton :recording="recording" />
         </view>
         <CollectionPicker :recording="recording" />
       </view>
@@ -85,6 +86,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
+import RecordingContributorButton from '@/components/RecordingContributorButton.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
 import {
   getRecording, entryTitle, dialectLabel,
@@ -97,6 +99,7 @@ import {
 } from '@/services/navigation';
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
+import { stopAudio } from '@/utils/audio';
 import {
   defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
@@ -113,6 +116,7 @@ export default {
     BaseLoading,
     EmptyState,
     EntryRecordingCard,
+    RecordingContributorButton,
     CollectionPicker,
   },
   data: () => ({
@@ -151,6 +155,12 @@ export default {
   onShow() {
     syncContentShareMenu(this, false);
     this.load();
+  },
+  onHide() {
+    stopAudio();
+  },
+  onUnload() {
+    stopAudio();
   },
   // #ifdef MP-WEIXIN || MP-QQ
   onShareAppMessage() {
