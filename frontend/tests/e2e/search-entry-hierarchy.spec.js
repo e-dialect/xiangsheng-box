@@ -158,3 +158,46 @@ test('entry detail keeps evidence and actions after pronunciation and recordings
   await expect(page.getByText('本条只收录“步行”义，不与金融机构用字合并。')).toBeVisible();
   await expect(page.getByRole('button', { name: '录下我这边的说法' })).toBeVisible();
 });
+
+test('entry detail keeps later regional recordings reachable and retries a failed page', async ({ page }) => {
+  await routeCapabilities(page);
+  await routeBackgroundRequests(page);
+  await page.route('**/entries/21/**', (route) => route.fulfill({ json: entry }));
+  let pageTwoRequests = 0;
+  const makeRecording = (id, name) => ({
+    id,
+    original_gloss: `${name}真人样例`,
+    recording_type: 'word',
+    usage_dialect: { id, name },
+    entry_links: [],
+    audio_url: '',
+  });
+  await page.route(/\/recordings\/(?:\?.*)?$/, async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('page') === '2') {
+      pageTwoRequests += 1;
+      if (pageTwoRequests === 1) {
+        await route.fulfill({ status: 503, json: { detail: 'unavailable' } });
+        return;
+      }
+      await route.fulfill({ json: { count: 2, next: null, results: [makeRecording(12, '仙游')] } });
+      return;
+    }
+    await route.fulfill({
+      json: {
+        count: 2,
+        next: '/recordings/?entry_id=21&page=2&page_size=50',
+        results: [makeRecording(11, '莆田')],
+      },
+    });
+  });
+  await page.goto('/pages/entries/details?id=21');
+  await expect(page.getByText('莆田真人样例', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '听更多乡音', exact: true }).click();
+  await expect(page.getByText('更多乡音暂时没加载出来，已显示的录音仍可播放。请重试。')).toBeVisible();
+  await expect(page.getByText('莆田真人样例', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重试加载更多乡音', exact: true }).click();
+  await expect(page.getByText('仙游真人样例', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-testid="load-more-recordings"]')).toHaveCount(0);
+  expect(pageTwoRequests).toBe(2);
+});

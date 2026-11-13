@@ -217,6 +217,7 @@ describe('entry detail flow', () => {
     expect(entryRecording.getEntry).toHaveBeenCalledWith(7);
     expect(entryRecording.listRecordings).toHaveBeenCalledWith({
       entry_id: 7,
+      page: 1,
       page_size: 50,
     });
     expect(page.recordings).toHaveLength(2);
