@@ -28,7 +28,9 @@ vi.mock('@/routers/user', () => ({
 }));
 
 vi.mock('@/utils/audio', () => ({
-  playAudio: vi.fn(),
+  playManaged: vi.fn(),
+  stopAudio: vi.fn(),
+  onExternalStop: vi.fn(),
 }));
 
 globalThis.getApp = vi.fn(() => ({
@@ -37,6 +39,7 @@ globalThis.getApp = vi.fn(() => ({
   },
 }));
 
+import { playManaged, stopAudio, onExternalStop } from '@/utils/audio';
 import { listAllDialects } from '@/services/guantou';
 import { loadDialectSample, saveDialectProfile } from '@/services/dialectOnboarding';
 import { resumeInterruptedPageAfterLogin } from '@/services/login';
@@ -60,6 +63,8 @@ function mountPage() {
 describe('dialect onboarding page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    onExternalStop.mockReturnValue(vi.fn());
+    playManaged.mockImplementation(() => ({ destroy: vi.fn() }));
     globalThis.uni = {
       getStorageSync: vi.fn((key) => (key === 'id' ? 7 : '')),
       reLaunch: vi.fn(),
@@ -163,5 +168,124 @@ describe('dialect onboarding page', () => {
     expect(wrapper.vm.dialectsError).toBe(false);
     expect(wrapper.text()).toContain('逐级选择主方言');
     expect(wrapper.text()).not.toContain('西南官话.四川');
+  });
+});
+
+describe('onboarding sample ownership', () => {
+  let externalStop;
+  let handles;
+  let wrapper;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    handles = [];
+    globalThis.uni = {
+      getStorageSync: vi.fn(() => 7), showToast: vi.fn(), reLaunch: vi.fn(),
+    };
+    onExternalStop.mockImplementation((listener) => {
+      externalStop = listener;
+      return vi.fn();
+    });
+    playManaged.mockImplementation((src, callbacks) => {
+      const handle = { src, callbacks, destroy: vi.fn() };
+      handle.destroyOriginal = handle.destroy;
+      handles.push(handle);
+      return handle;
+    });
+    loadDialectSample.mockResolvedValue({ id: 2, audio_url: 'b.mp3' });
+    saveDialectProfile.mockResolvedValue({ id: 7 });
+    wrapper = mountPage();
+    wrapper.vm.step = 2;
+    wrapper.vm.selectedDialectId = 1;
+    wrapper.vm.sample = { id: 1, audio_url: 'a.mp3' };
+  });
+
+  it('stops A immediately when selecting B, including failed sample loading', async () => {
+    wrapper.vm.playSample();
+    loadDialectSample.mockRejectedValueOnce(new Error('offline'));
+    const pending = wrapper.vm.selectDialect({ id: 2 });
+    expect(stopAudio).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.sample).toBeNull();
+    await pending;
+    expect(wrapper.vm.selectedDialectId).toBe(2);
+    expect(wrapper.vm.sample).toBeNull();
+  });
+
+  it.each(['onHide', 'onUnload', 'beforeUnmount'])('releases owned audio on %s once', async (hook) => {
+    wrapper.vm.playSample();
+    wrapper.vm.$options[hook].call(wrapper.vm);
+    if (hook === 'beforeUnmount') expect(onExternalStop.mock.results.at(-1).value).toHaveBeenCalledTimes(1);
+    wrapper.vm.$options[hook].call(wrapper.vm);
+    expect(stopAudio).toHaveBeenCalledTimes(1);
+    expect(wrapper.vm.samplePlayback).toBeNull();
+    wrapper.vm.playSample();
+    expect(playManaged).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['previous', 'finish', 'abandon'])('stops audio on %s', async (action) => {
+    wrapper.vm.playSample();
+    await wrapper.vm[action]();
+    expect(stopAudio).toHaveBeenCalledTimes(1);
+    if (action === 'previous') expect(wrapper.vm.step).toBe(1);
+  });
+
+  it('does not stop another page after external replacement or emit late failures', () => {
+    wrapper.vm.playSample();
+    externalStop(handles[0]);
+    wrapper.vm.$options.onHide.call(wrapper.vm);
+    handles[0].callbacks.onError(new Error('late'));
+    expect(stopAudio).not.toHaveBeenCalled();
+    expect(uni.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: '播放失败' }));
+  });
+
+  it('replaces repeated playback and ignores old terminal callbacks', () => {
+    wrapper.vm.playSample();
+    wrapper.vm.playSample();
+    handles[0].callbacks.onEnded();
+    handles[0].callbacks.onError(new Error('late'));
+    expect(wrapper.vm.samplePlayback.handle).toBe(handles[1]);
+    expect(stopAudio).toHaveBeenCalledTimes(1);
+    handles[1].callbacks.onEnded();
+    expect(wrapper.vm.samplePlayback).toBeNull();
+    expect(handles[1].destroyOriginal).toHaveBeenCalledTimes(1);
+    wrapper.vm.$options.onUnload.call(wrapper.vm);
+    expect(stopAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores pending samples after leaving and reloads on return', async () => {
+    let resolve;
+    loadDialectSample.mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const pending = wrapper.vm.loadSample(1);
+    wrapper.vm.$options.onHide.call(wrapper.vm);
+    resolve({ id: 1, audio_url: 'late.mp3' });
+    await pending;
+    expect(wrapper.vm.sample).toBeNull();
+    expect(wrapper.vm.loadingSample).toBe(false);
+    wrapper.vm.$options.onShow.call(wrapper.vm);
+    await flushPromises();
+    expect(wrapper.vm.sample.audio_url).toBe('b.mp3');
+  });
+
+  it('keeps invalid, start and failure feedback and permits retry', () => {
+    wrapper.vm.sample.audio_url = 'null';
+    wrapper.vm.playSample();
+    expect(uni.showToast).toHaveBeenCalledWith({ title: '不是一个可用文件', icon: 'error' });
+    expect(playManaged).not.toHaveBeenCalled();
+    wrapper.vm.sample.audio_url = 'a.mp3';
+    wrapper.vm.playSample();
+    expect(uni.showToast).toHaveBeenCalledWith({ title: '正在播放...', icon: 'none' });
+    handles[0].callbacks.onError(new Error('failed'));
+    expect(uni.showToast).toHaveBeenCalledWith({ title: '播放失败', icon: 'none' });
+    expect(wrapper.vm.samplePlayback).toBeNull();
+    wrapper.vm.playSample();
+    expect(playManaged).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears ownership after synchronous creation failure', () => {
+    playManaged.mockImplementationOnce(() => { throw new Error('cannot start'); });
+    wrapper.vm.playSample();
+    expect(wrapper.vm.samplePlayback).toBeNull();
+    expect(uni.showToast).toHaveBeenCalledWith({ title: '播放失败', icon: 'none' });
+    wrapper.vm.playSample();
+    expect(playManaged).toHaveBeenCalledTimes(2);
   });
 });
