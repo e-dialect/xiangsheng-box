@@ -44,7 +44,8 @@
       <BaseButton
         v-if="!audio.path || recording"
         class="record-primary"
-        :disabled="disabled || !supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
+        :disabled="disabled || !supported || selectingFile
+          || (nativeBusy && !recording && !nativeStopFailed)"
         variant="light"
         shape="circle"
         :aria-label="primaryLabel"
@@ -526,7 +527,9 @@ export default {
       this.stopPlayback();
       try {
         const selected = await chooseAudioFile();
-        if (this.disposed || !selected || this.disabled || request !== this.selectionRequest) return;
+        if (
+          this.disposed || !selected || this.disabled || request !== this.selectionRequest
+        ) return;
         this.emitAudio({ ...selected, origin: selected.origin || 'upload' });
       } catch (error) {
         if (this.disposed || this.disabled || request !== this.selectionRequest) return;

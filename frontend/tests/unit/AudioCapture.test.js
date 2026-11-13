@@ -496,7 +496,6 @@ describe('AudioCapture', () => {
     wrapper.unmount();
   });
 
-
   it('blocks replacement controls and ignores a file selection opened before locking', async () => {
     let resolve;
     chooseAudioFile.mockReturnValue(new Promise((done) => { resolve = done; }));
@@ -515,6 +514,56 @@ describe('AudioCapture', () => {
     wrapper.unmount();
   });
 
+  it('keeps native callback ownership while submission invalidates a pending picker', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    const selection = deferred();
+    chooseAudioFile.mockReturnValue(selection.promise);
+    await wrapper.vm.startRecord();
+    const pending = wrapper.vm.chooseFile();
+    await wrapper.setProps({ disabled: true });
+    wrapper.vm.clearAudio();
+    wrapper.vm.restartRecording();
+    await wrapper.vm.startRecord();
+    await wrapper.vm.chooseFile();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(chooseAudioFile).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('clear')).toBeUndefined();
+
+    await wrapper.setProps({ disabled: false });
+    selection.resolve({ path: 'wxfile://stale-choice.mp3' });
+    await pending;
+    expect(wrapper.vm.selectingFile).toBe(false);
+    await wrapper.vm.startRecord();
+    expect(recorder.start).toHaveBeenCalledTimes(1);
+    stop();
+    expect(wrapper.emitted('change')).toBeUndefined();
+    await wrapper.vm.startRecord();
+    stop();
+    expect(wrapper.emitted('change')).toHaveLength(1);
+  });
+
+  it('preserves native stop recovery without clearing submitted audio while locked', async () => {
+    const { wrapper, recorder, stop } = mountNativeCapture();
+    await wrapper.vm.startRecord();
+    recorder.stop.mockImplementationOnce(() => { throw new Error('stop failed'); });
+    chooseAudioFile.mockResolvedValue({ path: 'wxfile://chosen.mp3' });
+    await wrapper.vm.chooseFile();
+    await wrapper.setProps({ audio: { path: 'wxfile://chosen.mp3' }, disabled: true });
+    expect(wrapper.vm.nativeStopFailed).toBe(true);
+    expect(wrapper.findComponent({ name: 'BaseButton' }).props('disabled')).toBe(true);
+    wrapper.vm.restartRecording();
+    expect(recorder.stop).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('clear')).toBeUndefined();
+
+    await wrapper.setProps({ disabled: false });
+    wrapper.vm.restartRecording();
+    expect(recorder.stop).toHaveBeenCalledTimes(2);
+    stop();
+    expect(wrapper.vm.nativeBusy).toBe(false);
+    expect(wrapper.emitted('change')).toHaveLength(1);
+    expect(wrapper.emitted('clear')).toBeUndefined();
+  });
 
   it('suppresses stale file selection errors after submission invalidates the picker', async () => {
     let reject;
