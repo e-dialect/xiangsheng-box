@@ -24,7 +24,7 @@ vi.mock('@/services/themeAnalytics', () => ({
 }));
 
 vi.mock('@/utils/themeShare', () => ({
-  copyThemeShareLink: vi.fn(() => 'https://example.com/theme'),
+  copyThemeShareLink: vi.fn((kind, item, success) => success()),
   saveThemePoster: vi.fn(async () => ({ ok: true })),
   themeShareCopy: vi.fn((item) => `分享 ${item.name}`),
 }));
@@ -79,8 +79,8 @@ describe('ThemeShareSheet', () => {
 
     buttonByName(wrapper, '分享到微信').vm.$emit('click');
     buttonByName(wrapper, '复制链接').vm.$emit('click');
-    expect(copyThemeShareLink).toHaveBeenNthCalledWith(1, 'theme', target.item);
-    expect(copyThemeShareLink).toHaveBeenNthCalledWith(2, 'theme', target.item);
+    expect(copyThemeShareLink).toHaveBeenNthCalledWith(1, 'theme', target.item, expect.any(Function));
+    expect(copyThemeShareLink).toHaveBeenNthCalledWith(2, 'theme', target.item, expect.any(Function));
     expect(trackThemeShare).toHaveBeenCalledWith('theme', target.item, 'wechat');
     expect(trackThemeShare).toHaveBeenCalledWith('theme', target.item, 'copy_link');
     expect(notifySuccess).toHaveBeenCalledTimes(2);
@@ -89,6 +89,16 @@ describe('ThemeShareSheet', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find('.poster').exists()).toBe(true);
     expect(wrapper.text()).toContain('保存到相册');
+  });
+
+  it.each(['onCopy', 'onWechatH5'])('waits for clipboard success in %s', (method) => {
+    let complete;
+    copyThemeShareLink.mockImplementationOnce((kind, item, success) => { complete = success; });
+    const wrapper = mount(ThemeShareSheet, { props: { target } });
+    wrapper.vm[method]();
+    expect(notifySuccess).not.toHaveBeenCalled();
+    complete();
+    expect(notifySuccess).toHaveBeenCalledOnce();
   });
 
   it('keeps the mini program share capability on the named design-system button', () => {

@@ -67,8 +67,8 @@ export function themeSharePayload(kind, item) {
   };
 }
 
-export function copyThemeShareLink(kind, item) {
-  setClipboardQuiet(themeShareUrl(kind, item));
+export function copyThemeShareLink(kind, item, onSuccess) {
+  setClipboardQuiet(themeShareUrl(kind, item), onSuccess);
   return themeShareUrl(kind, item);
 }
 
