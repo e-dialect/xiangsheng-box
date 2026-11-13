@@ -514,11 +514,17 @@ class EntryViewSet(viewsets.ModelViewSet):
             "status": "status",
             "writing_type": "entry_writings__writing__form_type",
             "source_type": "evidence_links__evidence__source_type",
+            "source": "evidence_links__evidence__citation__icontains",
         }
+        filter_values = {}
         for parameter, lookup in filters.items():
             value = self.request.query_params.get(parameter)
             if value:
-                queryset = queryset.filter(**{lookup: value})
+                filter_values[lookup] = (
+                    value.strip() if parameter == "source" else value
+                )
+        # Keep source type and citation on the same evidence record.
+        queryset = queryset.filter(**filter_values)
         writing = self.request.query_params.get("writing")
         if writing:
             queryset = queryset.filter(
@@ -539,11 +545,6 @@ class EntryViewSet(viewsets.ModelViewSet):
                 | Q(
                     pronunciation_variants__surface_romanization__icontains=romanization.strip()
                 )
-            )
-        source = self.request.query_params.get("source")
-        if source:
-            queryset = queryset.filter(
-                evidence_links__evidence__citation__icontains=source.strip()
             )
         concept = self.request.query_params.get("concept")
         if concept:
