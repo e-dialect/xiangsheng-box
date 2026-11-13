@@ -2718,12 +2718,12 @@
   dependencies:
     "@vue/shared" "3.4.21"
 
-"@vue/reactivity@3.5.44":
-  version "3.5.44"
-  resolved "https://registry.yarnpkg.com/@vue/reactivity/-/reactivity-3.5.44.tgz#6721374ab041003d16f2a90304f720c3b35d568c"
-  integrity sha512-u+QJdKeBBEADkPdevsL+6E12QlYVfBD8Zcw5qjDQKtamI6l14KyqazJMobhCKelhWN5zpyKUiEDoTyHE93cqWw==
+"@vue/reactivity@3.5.45":
+  version "3.5.45"
+  resolved "https://registry.yarnpkg.com/@vue/reactivity/-/reactivity-3.5.45.tgz#f1abf52d03d352db1608d788551541fd3c680332"
+  integrity sha512-WqkyubNWpI4OYBOipSrjIssMdJO8K1i9Zts/Wm8Er10/0msOEwCyWWWvZnAI7WW3kQsTong6DJp8Cbb+vd4cPA==
   dependencies:
-    "@vue/shared" "3.5.44"
+    "@vue/shared" "3.5.45"
 
 "@vue/runtime-core@3.4.21":
   version "3.4.21"
@@ -2733,13 +2733,13 @@
     "@vue/reactivity" "3.4.21"
     "@vue/shared" "3.4.21"
 
-"@vue/runtime-core@3.5.44":
-  version "3.5.44"
-  resolved "https://registry.yarnpkg.com/@vue/runtime-core/-/runtime-core-3.5.44.tgz#e3e4a2cd13aee28c2a447df583614138b86dbabd"
-  integrity sha512-uEa/ndwjhrrhnOfb2p+sZy6zeoamJOISqaLSJGk/8R6nABT1ZldpzcJoPzKj+zHVomVBPcmQYyC2r4LtvDV6CQ==
+"@vue/runtime-core@3.5.45":
+  version "3.5.45"
+  resolved "https://registry.yarnpkg.com/@vue/runtime-core/-/runtime-core-3.5.45.tgz#170664cec5211b4270de3b747db2c8bc5ab39c45"
+  integrity sha512-bzIO3+FABjpj85uIKSc+Qnj36/sxDNI3tcH9i6w6xKA1k6e0ejv0G0jMCfeJBvK3yGL5XbJ3DMZj+ClqyCHFYw==
   dependencies:
-    "@vue/reactivity" "3.5.44"
-    "@vue/shared" "3.5.44"
+    "@vue/reactivity" "3.5.45"
+    "@vue/shared" "3.5.45"
 
 "@vue/runtime-dom@3.4.21":
   version "3.4.21"
@@ -2767,11 +2767,6 @@
   version "3.5.41"
   resolved "https://registry.yarnpkg.com/@vue/shared/-/shared-3.5.41.tgz#ac476497f74495f7525087270849841756555cf2"
   integrity sha512-IOnwSCma8j+9xJT6b8H0dEYidC80NsYmNMlZxRsukYcSoGaDBohog5hDxzeUXdFeGWFA++vWvxqOmrr96VlqMA==
-
-"@vue/shared@3.5.44":
-  version "3.5.44"
-  resolved "https://registry.yarnpkg.com/@vue/shared/-/shared-3.5.44.tgz#eefe91aa2e17c617260c4ae4c21246be5d85642e"
-  integrity sha512-H82XLH0DjmSOdbEwO15x3QTo1f5PWEtv237eLpYKc0mqLu+B8hnq16lFWmuBmNurkeiG3wr+oM1FhOll/YVFRg==
 
 "@vue/shared@3.5.45", "@vue/shared@^3.5.18":
   version "3.5.45"
