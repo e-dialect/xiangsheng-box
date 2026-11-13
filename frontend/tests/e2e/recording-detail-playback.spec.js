@@ -40,7 +40,7 @@ import { installVisualFixture, openVisualRoute } from './helpers/visualReviewFix
       });
       await openVisualRoute(page, '/pages/recordings/details?id=11');
       await page.getByRole('button', { name: '听录音', exact: true }).click();
-      await expect(page.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '停止播放', exact: true })).toBeVisible();
       expect(await page.evaluate(() => window.testAudio.some((audio) => !audio.paused))).toBe(true);
       await page.getByRole('button', { name: '听这位乡友的录音', exact: true }).click();
       await expect(page).toHaveURL(/\/pages\/users\/details\?id=12$/);
@@ -51,7 +51,7 @@ import { installVisualFixture, openVisualRoute } from './helpers/visualReviewFix
       await page.goBack();
       await expect(page).toHaveURL(/\/pages\/recordings\/details\?id=11$/);
       await page.getByRole('button', { name: '听录音', exact: true }).click();
-      await expect(page.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: '停止播放', exact: true })).toBeVisible();
       expect(await page.evaluate(() => window.testAudio.some((audio) => !audio.paused))).toBe(true);
       await page.getByRole('button', { name: '听这位乡友的录音', exact: true }).click();
       await expect(page).toHaveURL(/\/pages\/users\/details\?id=12$/);
