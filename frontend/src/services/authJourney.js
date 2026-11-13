@@ -4,6 +4,7 @@ import {
   saveInterceptIntent,
 } from '@/services/authGuard';
 import {
+  goBack,
   openPage,
   routeDestination,
   ROUTES,
@@ -14,6 +15,18 @@ export const AUTH_DESTINATION_KINDS = {
   FALLBACK: 'fallback',
   URL: 'url',
 };
+
+const GUEST_RETURN_ROUTES = new Set([
+  ROUTES.home,
+  ROUTES.search,
+  ROUTES.entryDetail,
+  ROUTES.recordingDetail,
+  ROUTES.collectionDetail,
+  ROUTES.circleList,
+  ROUTES.circleDetail,
+  ROUTES.userDetail,
+  ROUTES.mine,
+]);
 
 export function resolveAuthDestination(intent) {
   if (!intent) return { kind: AUTH_DESTINATION_KINDS.DEFAULT };
@@ -72,14 +85,26 @@ export function openLoginFromMine() {
   toLoginPage();
 }
 
-export function cancelLoginToSearch() {
+export function canReturnToGuestPage() {
+  const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+  const previousPage = pages[pages.length - 2];
+  const route = String(previousPage?.route || '').replace(/^\//, '');
+  return GUEST_RETURN_ROUTES.has(`/${route}`);
+}
+
+export function cancelLogin() {
   clearInterceptIntent();
+  if (canReturnToGuestPage()) {
+    goBack(ROUTES.search);
+    return;
+  }
   openPage(ROUTES.search, {}, { reset: true });
 }
 
 export default {
   AUTH_DESTINATION_KINDS,
-  cancelLoginToSearch,
+  cancelLogin,
+  canReturnToGuestPage,
   openLoginFromMine,
   resolveAuthDestination,
 };

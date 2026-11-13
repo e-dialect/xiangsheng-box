@@ -1,4 +1,52 @@
 import { expect, test } from '@playwright/test';
+import { stableScreenshot } from './helpers/stableScreenshot';
+import { installVisualFixture, observeRuntime, openVisualRoute } from './helpers/visualReviewFixture';
+
+test('cancelling direct login returns to its public collection without submitting', async ({ page }) => {
+  await installVisualFixture(page);
+  await page.route('**/collections/1/', (route) => route.fulfill({
+    json: {
+      id: 1,
+      title: '合成公开集盒',
+      description: '',
+      is_public: true,
+      editable: false,
+      entry_count: 1,
+      recording_count: 0,
+      pending: [],
+      sections: [{
+        id: 1,
+        entry: {
+          id: 21, display_writing: '拜年', summary: '问候', recording_count: 0,
+        },
+        recording_count: 0,
+        recordings: [],
+      }],
+    },
+  }));
+  let submissions = 0;
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/recordings/') {
+      submissions += 1;
+    }
+  });
+  await openVisualRoute(page, '/pages/collections/details?id=1');
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    uni.setStorageSync('auth_intercept_intent', JSON.stringify({
+      version: 1,
+      action: 'record_recording',
+      context: { entryId: 21 },
+      createdAt: Date.now(),
+      voluntary: false,
+    }));
+    uni.navigateTo({ url: '/pages/login/login', success: resolve, fail: reject });
+  }));
+  await expect(page).toHaveURL(/\/pages\/login\/login$/);
+  await page.getByRole('button', { name: '暂不登录，返回浏览', exact: true }).click();
+  await expect(page).toHaveURL(/\/pages\/collections\/details\?id=1$/);
+  expect(await page.evaluate(() => localStorage.getItem('auth_intercept_intent'))).toBeNull();
+  expect(submissions).toBe(0);
+});
 
 test('guest can cancel an intercepted action and return to search', async ({ page }) => {
   await page.addInitScript(() => {
@@ -25,4 +73,32 @@ test('guest can cancel an intercepted action and return to search', async ({ pag
   await expect(page).toHaveURL(/\/pages\/search$/);
   await expect(page.locator('.entry-search__bar input')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('auth_intercept_intent'))).toBeNull();
+});
+
+test('cancelling a guest bookmark returns to the same entry without bookmarking', async ({ page }) => {
+  const runtimeIssues = observeRuntime(page);
+  const bookmarkRequests = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/entries/21/bookmark/') {
+      bookmarkRequests.push(request.method());
+    }
+  });
+  await installVisualFixture(page);
+  const entryUrl = '/pages/entries/details?id=21';
+  await openVisualRoute(page, entryUrl);
+  const bookmark = page.getByRole('button', { name: /^(已收藏|收藏词条)$/ });
+  await bookmark.click();
+  await expect(page).toHaveURL(/\/pages\/login\/login$/);
+  await expect(page.getByText('你刚才想收藏词条，验证身份后会回到原来的位置。')).toBeVisible();
+
+  const browseFirst = page.getByRole('button', { name: '暂不登录，返回浏览' });
+  await browseFirst.scrollIntoViewIfNeeded();
+  await stableScreenshot(page, { path: 'test-results/guest-return-to-entry-390x844.png' });
+  await browseFirst.click();
+
+  await expect(page).toHaveURL(/\/pages\/entries\/details\?id=21$/);
+  await expect(bookmark).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('auth_intercept_intent'))).toBeNull();
+  expect(bookmarkRequests).toEqual([]);
+  expect(runtimeIssues).toEqual([]);
 });
