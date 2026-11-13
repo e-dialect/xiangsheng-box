@@ -80,7 +80,7 @@ function mountPage() {
           props: ['dialect'],
           template: '<span>{{ dialect && dialect.name }}</span>',
         },
-        EntryRecordingCard: true,
+        EntryRecordingCard: { template: '<div />', methods: { stopPlayback: vi.fn() } },
       },
     },
     data: () => ({

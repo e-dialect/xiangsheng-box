@@ -140,7 +140,7 @@
           <BaseButton
             variant="ghost"
             :disabled="saving"
-            @click="step = 1"
+            @click="previous"
           >
             上一步
           </BaseButton>
@@ -185,7 +185,8 @@ import { listAllDialects } from '@/services/guantou';
 import { entryTitle, primaryEntryLink } from '@/services/entryRecording';
 import { resumeInterruptedPageAfterLogin } from '@/services/login';
 import { clearUserInfo } from '@/services/user';
-import { playAudio } from '@/utils/audio';
+import { markRaw } from 'vue';
+import { onExternalStop, playManaged, stopAudio } from '@/utils/audio';
 import { dialectBreadcrumb, dialectCardLabel } from '@/utils/dialectTree';
 
 export default {
@@ -205,6 +206,8 @@ export default {
       reason: ONBOARDING_REASONS.MISSING_DIALECT,
       sample: null,
       sampleRequestId: 0,
+      samplePlayback: null,
+      pageActive: true,
       saving: false,
       selectedDialectId: user.primary_dialect?.id || null,
       step: 1,
@@ -265,6 +268,27 @@ export default {
       return milliseconds ? `${Math.max(1, Math.round(milliseconds / 1000))} 秒` : '时长未知';
     },
   },
+  created() {
+    this.unsubscribeSampleStop = onExternalStop((handle) => {
+      if (this.samplePlayback?.handle === handle) this.samplePlayback = null;
+    });
+  },
+  onShow() {
+    this.pageActive = true;
+    if (this.selectedDialectId && !this.sample && !this.loadingSample) {
+      this.loadSample(this.selectedDialectId);
+    }
+  },
+  onHide() {
+    this.leaveSample();
+  },
+  onUnload() {
+    this.leaveSample();
+  },
+  beforeUnmount() {
+    this.leaveSample();
+    this.unsubscribeSampleStop?.();
+  },
   async onLoad(options = {}) {
     this.reason = normalizeOnboardingReason(options.reason);
     if (!this.userId) {
@@ -300,7 +324,24 @@ export default {
       this.error = '';
       this.step = 2;
     },
+    previous() {
+      this.stopSample();
+      this.step = 1;
+    },
+    stopSample() {
+      if (!this.samplePlayback) return;
+      this.samplePlayback = null;
+      // External replacement and terminal callbacks clear ownership first.
+      stopAudio();
+    },
+    leaveSample() {
+      this.pageActive = false;
+      this.sampleRequestId += 1;
+      this.loadingSample = false;
+      this.stopSample();
+    },
     async selectDialect(dialect) {
+      this.stopSample();
       this.selectedDialectId = dialect.id;
       this.error = '';
       await this.loadSample(dialect.id);
@@ -309,6 +350,8 @@ export default {
       await this.selectDialect(dialect);
     },
     async loadSample(dialectId) {
+      if (!this.pageActive) return;
+      this.sample = null;
       const requestId = this.sampleRequestId + 1;
       this.sampleRequestId = requestId;
       this.loadingSample = true;
@@ -322,13 +365,49 @@ export default {
       }
     },
     playSample() {
-      playAudio(this.sample?.audio_url);
+      if (!this.pageActive || this.step !== 2 || this.loadingSample) return;
+      const src = this.sample?.audio_url;
+      if (!src || src === 'null') {
+        uni.showToast({ title: '不是一个可用文件', icon: 'error' });
+        return;
+      }
+      this.stopSample();
+      const playback = markRaw({ handle: null });
+      this.samplePlayback = playback;
+      const settle = (failed = false) => {
+        if (this.samplePlayback !== playback) return;
+        this.samplePlayback = null;
+        playback.handle?.destroy();
+        if (failed) uni.showToast({ title: '播放失败', icon: 'none' });
+      };
+      uni.showToast({ title: '正在播放...', icon: 'none' });
+      try {
+        playback.handle = playManaged(src, {
+          onEnded: () => settle(),
+          onError: () => settle(true),
+        });
+        if (playback.handle) {
+          // Both this page and newer shared players may release on completion.
+          // Make our handle safe to release once without touching other audio.
+          const destroy = playback.handle.destroy.bind(playback.handle);
+          let disposed = false;
+          playback.handle.destroy = () => {
+            if (disposed) return;
+            disposed = true;
+            destroy();
+          };
+        }
+        if (this.samplePlayback !== playback) playback.handle?.destroy();
+      } catch (error) {
+        settle(true);
+      }
     },
     async finish() {
       if (!this.selectedDialectId) {
         this.error = '请选择主方言';
         return;
       }
+      this.stopSample();
       this.error = '';
       this.saving = true;
       try {
@@ -343,6 +422,7 @@ export default {
       }
     },
     abandon() {
+      this.leaveSample();
       clearUserInfo();
       goSearch({ reset: true });
     },
