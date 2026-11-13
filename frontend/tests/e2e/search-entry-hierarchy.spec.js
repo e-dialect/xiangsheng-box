@@ -41,6 +41,7 @@ const entry = {
     sense_number: 1,
     gloss: '走；步行',
     usage_note: '常用于描述出门或赶路。',
+    examples: [{ type: '例', content: '有出处的原文例句，不与其他义项合并。', explain: '这里只展示资料已有的解释。' }],
     concepts: [{ code: 'WALK', label: '行走' }],
   }],
   writings: [{
@@ -74,6 +75,27 @@ async function routeBackgroundRequests(page) {
   });
   await page.route('**/dialects/**', async (route) => {
     await route.fulfill({ json: { count: 0, results: [] } });
+  });
+}
+
+for (const width of [390, 1440]) {
+  test(`entry examples remain readable on Web at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await routeCapabilities(page);
+    await routeBackgroundRequests(page);
+    await page.route('**/entries/21/**', (route) => route.fulfill({ json: entry }));
+    await page.route(/\/recordings\/(?:\?.*)?$/, (route) => route.fulfill({
+      json: { count: 0, next: null, results: [] },
+    }));
+    await page.goto('/pages/entries/details?id=21');
+    const examples = page.locator('.sense-examples');
+    await expect(examples).toBeVisible();
+    await expect(examples).toContainText('有出处的原文例句，不与其他义项合并。');
+    await expect(examples).toContainText('这里只展示资料已有的解释。');
+    const bounds = await examples.boundingBox();
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: `/tmp/xsb-web-examples-${width}.png`, fullPage: true });
   });
 }
 

@@ -61,6 +61,7 @@
               >
                 {{ sense.usage_note }}
               </view>
+              <SenseExamples :examples="Array.isArray(sense.examples) ? sense.examples : []" />
               <view
                 v-if="sense.concepts?.length"
                 class="sense-row__concepts"
@@ -310,6 +311,7 @@
 </template>
 
 <script>
+import SenseExamples from '@/components/SenseExamples.vue';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
 import BaseButton from '@/components/BaseButton.vue';
@@ -342,6 +344,7 @@ import {
 
 export default {
   components: {
+    SenseExamples,
     DiscussionThread,
     CollectionPicker,
     BaseButton,
