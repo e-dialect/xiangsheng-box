@@ -175,16 +175,18 @@ export default {
     },
     onWechatH5() {
       trackThemeShare(this.target.kind, this.target.item, 'wechat');
-      copyThemeShareLink(this.target.kind, this.target.item);
-      notifySuccess('链接已复制');
+      copyThemeShareLink(this.target.kind, this.target.item, () => {
+        notifySuccess('链接已复制');
+      });
     },
     onMpShare() {
       trackThemeShare(this.target.kind, this.target.item, 'mp_share');
     },
     onCopy() {
       trackThemeShare(this.target.kind, this.target.item, 'copy_link');
-      copyThemeShareLink(this.target.kind, this.target.item);
-      notifySuccess('链接已复制');
+      copyThemeShareLink(this.target.kind, this.target.item, () => {
+        notifySuccess('链接已复制');
+      });
     },
     async onSavePoster() {
       trackThemeShare(this.target.kind, this.target.item, 'save_poster');
