@@ -262,10 +262,9 @@
               @click="goEntryDetail(section.entry.id)"
             />
             <BaseButton
-              v-if="!section.entry.recording_count"
               size="small"
               variant="ghost"
-              text="补录音"
+              text="录下我这边的说法"
               @click="recordFor(section.entry.id)"
             />
           </view>
@@ -383,6 +382,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
+import { requireAuth } from '@/services/authGuard';
 import {
   getCollection, updateCollection, deleteCollection, addCollectionEntry,
   addCollectionRecording, removeCollectionItem, orderCollection,
@@ -481,6 +481,7 @@ export default {
       // #endif
     },
     recordFor(id) {
+      if (!requireAuth('record_recording', { entryId: id })) return;
       goRecord({
         entry_id: id,
       });
