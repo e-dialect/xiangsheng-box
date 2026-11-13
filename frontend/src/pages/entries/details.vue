@@ -68,8 +68,18 @@
         >
           还没有录音，但它仍是一条有效词条。你可以补上第一段乡音。
         </view>
+        <BaseLoading
+          v-if="recordingsLoading && !recordingPage"
+          text="正在读取乡音…"
+        />
         <EmptyState
-          v-if="!recordings.length"
+          v-else-if="!recordingPage && recordingsError"
+          :title="recordingsError"
+          action-text="重新读取乡音"
+          @action="loadRecordings(1)"
+        />
+        <EmptyState
+          v-else-if="!recordings.length"
           title="还没有可听的录音"
           action-text="补第一段录音"
           @action="continueChain"
@@ -89,7 +99,7 @@
           />
         </view>
         <view
-          v-if="recordingsError"
+          v-if="recordingPage && recordingsError"
           class="detail-section__pending"
           role="status"
         >
@@ -372,7 +382,7 @@ export default {
       anchorRootId: null,
       entry: null,
       recordings: [],
-      recordingPage: 1,
+      recordingPage: 0,
       hasMoreRecordings: false,
       recordingsLoading: false,
       recordingsError: '',
@@ -471,47 +481,51 @@ export default {
       const version = this.loadVersion;
       this.loading = true;
       this.errorMessage = '';
+      this.recordings = [];
+      this.recordingPage = 0;
       this.recordingsLoading = false;
       this.recordingsError = '';
       this.hasMoreRecordings = false;
+      const recordings = this.loadRecordings(1);
       try {
-        const [entry, recordings] = await Promise.all([
-          getEntry(this.id),
-          listRecordings({ entry_id: this.id, page: 1, page_size: 50 }),
-        ]);
+        const entry = await getEntry(this.id);
         if (version !== this.loadVersion) return;
         this.entry = entry;
-        this.recordings = pageResults(recordings);
-        this.recordingPage = 1;
-        this.hasMoreRecordings = Boolean(recordings?.next);
       } catch (error) {
         if (version === this.loadVersion) this.errorMessage = '词条暂时无法读取';
       } finally {
         if (version === this.loadVersion) this.loading = false;
       }
+      await recordings;
     },
-    async loadMoreRecordings() {
-      if (this.loading || this.recordingsLoading || !this.hasMoreRecordings) return;
+    loadMoreRecordings() {
+      if (this.loading || !this.hasMoreRecordings) return undefined;
+      return this.loadRecordings(this.recordingPage + 1);
+    },
+    async loadRecordings(page) {
+      if (this.recordingsLoading) return;
       const version = this.loadVersion;
       const entryId = this.id;
-      const page = this.recordingPage + 1;
       this.recordingsLoading = true;
       this.recordingsError = '';
       try {
         const response = await listRecordings({ entry_id: entryId, page, page_size: 50 });
         if (version !== this.loadVersion || entryId !== this.id) return;
-        const seen = new Set(this.recordings.map((item) => item.id));
+        const existing = page === 1 ? [] : this.recordings;
+        const seen = new Set(existing.map((item) => item.id));
         const additions = pageResults(response).filter((item) => {
           if (seen.has(item.id)) return false;
           seen.add(item.id);
           return true;
         });
-        this.recordings = [...this.recordings, ...additions];
+        this.recordings = [...existing, ...additions];
         this.recordingPage = page;
         this.hasMoreRecordings = Boolean(response?.next);
       } catch (error) {
         if (version === this.loadVersion && entryId === this.id) {
-          this.recordingsError = '更多乡音暂时没加载出来，已显示的录音仍可播放。请重试。';
+          this.recordingsError = page === 1
+            ? '乡音暂时无法读取'
+            : '更多乡音暂时没加载出来，已显示的录音仍可播放。请重试。';
         }
       } finally {
         if (version === this.loadVersion && entryId === this.id) this.recordingsLoading = false;
