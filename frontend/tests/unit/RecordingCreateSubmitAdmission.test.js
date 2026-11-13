@@ -33,7 +33,7 @@ vi.mock('@/services/productAnalytics', () => ({
   PRODUCT_EVENTS: { RECORDING_SUBMIT: 'recording_submit' }, trackProductEvent: vi.fn(),
 }));
 
-const { draftOwner, saveRecordingDraft } = await import('@/services/recordingDrafts');
+const { draftOwner, saveRecordingDraft, restoreRecordingDraft } = await import('@/services/recordingDrafts');
 const { createRecording } = await import('@/services/entryRecording');
 const { uploadFile } = await import('@/services/file');
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
@@ -50,6 +50,7 @@ function pageContext() {
     ...RecordingCreate.data(),
     ...RecordingCreate.methods,
     ownerScope: 'user:1',
+    draftReady: true,
     audio: { path: 'blob:recording', durationMs: 1000 },
     form: { original_gloss: '家乡话', usage_dialect_id: 1 },
     $refs: { form: { validate: vi.fn().mockResolvedValue(true) } },
@@ -156,6 +157,125 @@ describe('recording submit admission', () => {
     await submission;
     expect(page.validatingSubmission).toBe(false);
     expect(uploadFile).not.toHaveBeenCalled();
+  });
+
+  it.each(['validation', 'upload'])('freezes audio, fields, dialect and entry during %s', async (stage) => {
+    const gate = deferred();
+    const page = pageContext();
+    page.selectEntry({ id: 10 });
+    page.dialectPickerVisible = true;
+    if (stage === 'validation') page.$refs.form.validate.mockReturnValue(gate.promise);
+    else uploadFile.mockReturnValue(gate.promise);
+    const pending = page.submit();
+    if (stage === 'upload') {
+      while (!uploadFile.mock.calls.length) await Promise.resolve();
+    }
+    expect(page.isSubmissionLocked()).toBe(true);
+    expect(page.dialectPickerVisible).toBe(false);
+    page.onAudioChange({ path: 'blob:B', durationMs: 9000 });
+    page.clearAudio();
+    page.updateFormField('original_gloss', 'meaning B');
+    page.updateFormField('rights_statement', 'other rights');
+    page.onDialectChange({ value: 2 });
+    page.selectEntry({ id: 20 });
+    page.clearEntry();
+    page.openDialectPicker();
+    expect(page.audio.path).toBe('blob:recording');
+    expect(page.form.original_gloss).toBe('家乡话');
+    expect(page.dialectPickerVisible).toBe(false);
+    gate.resolve(stage === 'validation' ? true : { url: 'https://example.com/A.mp3' });
+    await pending;
+    expect(uploadFile).toHaveBeenCalledWith('blob:recording');
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      original_gloss: '家乡话', usage_dialect_id: 1, primary_entry_id: 10,
+      duration_ms: 1000, rights_statement: '',
+    }));
+  });
+
+  it('uses an immutable payload even if reactive state changes during upload', async () => {
+    const gate = deferred();
+    const page = pageContext();
+    page.linkedEntryId = 10;
+    uploadFile.mockReturnValue(gate.promise);
+    const pending = page.submit();
+    while (!uploadFile.mock.calls.length) await Promise.resolve();
+    page.form.original_gloss = 'unexpected state';
+    page.audio.durationMs = 9000;
+    page.linkedEntryId = 20;
+    gate.resolve({ url: 'https://example.com/A.mp3' });
+    await pending;
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      original_gloss: '家乡话', duration_ms: 1000, primary_entry_id: 10,
+    }));
+  });
+
+  it('unlocks edits after upload failure while retaining the original recovery draft', async () => {
+    const page = pageContext();
+    uploadFile.mockRejectedValueOnce(new Error('offline'));
+    await page.submit();
+    expect(page.isSubmissionLocked()).toBe(false);
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(expect.objectContaining({
+      audio: expect.objectContaining({ path: 'blob:recording' }),
+      form: expect.objectContaining({ original_gloss: '家乡话' }),
+    }), 'user:1');
+    page.updateFormField('original_gloss', 'retry');
+    page.onAudioChange({ path: 'blob:B', durationMs: 2000 });
+    expect(page.form.original_gloss).toBe('retry');
+    expect(page.audio.path).toBe('blob:B');
+  });
+
+  it.each([false, true])('uploads the moved native file even when metadata storage fails: %s', async (fails) => {
+    const page = pageContext();
+    page.audio = { path: 'wxfile://temporary', durationMs: 2000 };
+    if (fails) {
+      const error = new Error('metadata storage failed');
+      error.persistedAudio = { path: 'wxfile://saved' };
+      saveRecordingDraft.mockRejectedValueOnce(error);
+    } else saveRecordingDraft.mockResolvedValueOnce({ id: 'draft-1', audio: { path: 'wxfile://saved' } });
+    await page.submit();
+    expect(uploadFile).toHaveBeenCalledWith('wxfile://saved');
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: 2000 }));
+  });
+
+  it('does not interrupt editing during a background draft save', () => {
+    const page = pageContext();
+    page.savingDraft = true;
+    page.updateFormField('original_gloss', 'still typing');
+    page.onAudioChange({ path: 'blob:B' });
+    expect(page.isSubmissionLocked()).toBe(false);
+    expect(page.form.original_gloss).toBe('still typing');
+    expect(page.audio.path).toBe('blob:B');
+  });
+
+  it('waits for draft restoration and keeps the entry association while metadata loads', async () => {
+    const restore = deferred();
+    const entry = deferred();
+    const page = pageContext();
+    page.draftReady = false;
+    page.loadDialects = vi.fn().mockResolvedValue();
+    page.loadEntry = vi.fn(async (id) => {
+      page.linkedEntryId = id;
+      await entry.promise;
+      page.selectedEntry = { id };
+    });
+    restoreRecordingDraft.mockReturnValue(restore.promise);
+    const loading = RecordingCreate.onLoad.call(page, { draft_id: 'draft-B' });
+    await Promise.resolve();
+    await page.submit();
+    expect(page.$refs.form.validate).not.toHaveBeenCalled();
+    expect(uploadFile).not.toHaveBeenCalled();
+    restore.resolve({ id: 'draft-B', entryId: 20,
+      form: { original_gloss: 'meaning B', usage_dialect_id: 2 },
+      audio: { path: 'blob:B', durationMs: 2000 } });
+    await loading;
+    expect(page.draftReady).toBe(true);
+    expect(page.selectedEntry).toBeNull();
+    await page.submit();
+    expect(uploadFile).toHaveBeenCalledWith('blob:B');
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      original_gloss: 'meaning B', usage_dialect_id: 2, primary_entry_id: 20, duration_ms: 2000,
+    }));
+    entry.resolve();
   });
 
 });

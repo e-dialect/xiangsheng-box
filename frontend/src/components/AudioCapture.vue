@@ -35,7 +35,7 @@
           class="record-action"
           variant="light"
           size="small"
-          :disabled="!fileSelectionSupported || selectingFile"
+          :disabled="disabled || !fileSelectionSupported || selectingFile"
           @click="chooseFile"
         >
           {{ audio.path ? '选择其他录音' : '选择本地录音' }}
@@ -44,7 +44,7 @@
       <BaseButton
         v-if="!audio.path || recording"
         class="record-primary"
-        :disabled="!supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
+        :disabled="disabled || !supported || selectingFile || (nativeBusy && !recording && !nativeStopFailed)"
         variant="light"
         shape="circle"
         :aria-label="primaryLabel"
@@ -69,7 +69,7 @@
           variant="ghost"
           size="large"
           icon="refresh"
-          :disabled="selectingFile || (nativeBusy && !nativeStopFailed)"
+          :disabled="disabled || selectingFile || (nativeBusy && !nativeStopFailed)"
           block
           @click="restartRecording"
         >
@@ -109,6 +109,7 @@ export default {
   name: 'AudioCapture',
   components: { BaseButton },
   props: {
+    disabled: { type: Boolean, default: false },
     audio: {
       type: Object,
       default: () => ({}),
@@ -121,6 +122,7 @@ export default {
   emits: ['change', 'clear', 'error'],
   data() {
     return {
+      selectionRequest: 0,
       recorder: null,
       recorderManager: null,
       nativeSession: null,
@@ -199,6 +201,9 @@ export default {
     },
   },
   watch: {
+    disabled(value) {
+      if (value) this.selectionRequest += 1;
+    },
     audio: {
       deep: true,
       handler() {
@@ -218,7 +223,7 @@ export default {
   },
   methods: {
     emitAudio(payload) {
-      this.$emit('change', payload);
+      if (!this.disabled) this.$emit('change', payload);
     },
     waveBarActive(index) {
       if (this.recording) return true;
@@ -377,7 +382,7 @@ export default {
       await this.startRecord();
     },
     async startRecord() {
-      if (this.disposed || this.starting || this.selectingFile) return;
+      if (this.disabled || this.disposed || this.starting || this.selectingFile) return;
       if (this.nativeBusy) {
         this.retryNativeStop();
         return;
@@ -494,13 +499,14 @@ export default {
       if (this.audio.path) playAudio(this.audio.path);
     },
     clearAudio() {
+      if (this.disabled) return;
       this.cancelNativeRecording();
       this.cancelH5Recording();
       this.stopPlayback();
       this.$emit('clear');
     },
     restartRecording() {
-      if (this.disposed || this.selectingFile) return;
+      if (this.disabled || this.disposed || this.selectingFile) return;
       if (this.nativeBusy) {
         this.retryNativeStop();
         return;
@@ -511,17 +517,20 @@ export default {
       this.$nextTick(() => this.startRecord());
     },
     async chooseFile() {
-      if (this.disposed || this.selectingFile) return;
+      if (this.disabled || this.disposed || this.selectingFile) return;
       this.selectingFile = true;
       this.cancelNativeRecording();
       this.cancelH5Recording();
+      this.selectionRequest += 1;
+      const request = this.selectionRequest;
       this.stopPlayback();
       try {
         const selected = await chooseAudioFile();
-        if (this.disposed || !selected) return;
+        if (this.disposed || !selected || this.disabled || request !== this.selectionRequest) return;
         this.emitAudio({ ...selected, origin: selected.origin || 'upload' });
       } catch (error) {
-        if (!this.disposed) notify({ title: error?.message || '选择录音失败', icon: 'none' });
+        if (this.disposed || this.disabled || request !== this.selectionRequest) return;
+        notify({ title: error?.message || '选择录音失败', icon: 'none' });
       } finally {
         this.selectingFile = false;
       }
