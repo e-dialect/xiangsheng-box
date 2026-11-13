@@ -136,6 +136,15 @@ test('public profile moves from recoverable error to an accessible contribution 
     await route.fulfill({ json: publicProfile });
   });
 
+  await page.route('**/entries/public-contributions/?*', async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    expect(params.get('creator_id')).toBe('9');
+    await route.fulfill({
+      json: {
+        count: 1, next: null, previous: null, results: [entry],
+      },
+    });
+  });
   await page.goto('/pages/users/details?id=9');
 
   await expect(page.getByText('正在读取用户档案…')).toBeVisible();
@@ -145,9 +154,9 @@ test('public profile moves from recoverable error to an accessible contribution 
   await expect(page.locator('.avatar--fallback')).toHaveText('阿');
   await expect(page.getByRole('tab', { name: '录音 3', selected: true })).toBeVisible();
 
-  await page.getByRole('tab', { name: '词条 2' }).press('Enter');
-  await expect(page.getByRole('tab', { name: '词条 2', selected: true })).toBeVisible();
-  await expect(page.getByText('参与 2 个词条')).toBeVisible();
+  await page.getByRole('tab', { name: '词条' }).press('Enter');
+  await expect(page.getByRole('tab', { name: '词条', selected: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看词条：行' })).toBeVisible();
 
   await page.getByRole('tab', { name: '义项 0' }).click();
   await expect(page.getByText('还没有公开义项', { exact: true })).toBeVisible();

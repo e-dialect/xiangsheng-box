@@ -182,7 +182,7 @@
             @tap="selectWorksTab('entries')"
             @keydown.enter="selectWorksTab('entries')"
           >
-            词条 {{ displayEntriesCount }}
+            词条 {{ isSelf ? displayEntriesCount : '' }}
           </view>
           <view
             class="works-tab pressable"
@@ -197,7 +197,7 @@
           </view>
         </view>
         <view
-          v-if="isSelf || !showPublicRecordings"
+          v-if="isSelf || (!showPublicRecordings && worksTab !== 'entries')"
           class="works-empty"
         >
           <view class="works-empty-title">
@@ -272,6 +272,59 @@
             @click="loadPublicRecordings(true)"
           />
         </view>
+        <view
+          v-if="worksTab === 'entries'"
+          class="profile-recordings"
+        >
+          <BaseLoading
+            v-if="entriesLoading && !publicEntries.length"
+            text="正在读取公开词条…"
+          />
+          <EmptyState
+            v-else-if="entriesError && !publicEntries.length"
+            title="暂时无法读取公开词条"
+            action-text="重新加载词条"
+            @action="loadPublicEntries()"
+          />
+          <EmptyState
+            v-else-if="!publicEntries.length"
+            title="还没有可查看的公开词条"
+          />
+          <view
+            v-for="entry in publicEntries"
+            :key="entry.id"
+            class="profile-entry"
+          >
+            <BaseButton
+              variant="ghost"
+              :text="entryTitle(entry)"
+              :aria-label="`查看词条：${entryTitle(entry)}`"
+              @click="goEntryDetail(entry.id)"
+            />
+            <text v-if="entry.summary && entry.summary !== entryTitle(entry)">
+              {{ entry.summary }}
+            </text>
+            <text
+              v-if="entry.usage_dialect"
+              class="profile-entry__dialect"
+            >
+              {{ dialectCardLabel(entry.usage_dialect) }}
+            </text>
+          </view>
+          <text
+            v-if="entriesError && publicEntries.length"
+            role="status"
+          >
+            更多词条暂时没加载出来，已显示的词条仍可查看。
+          </text>
+          <BaseButton
+            v-if="hasMoreEntries"
+            variant="ghost"
+            :loading="entriesLoading"
+            :text="entriesError ? '重试加载更多词条' : '查看更多词条'"
+            @click="loadPublicEntries(true)"
+          />
+        </view>
       </view>
     </template>
   </PageShell>
@@ -285,7 +338,9 @@ import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
 import { APP_NAME } from '@/const/branding';
 import { requireAuth } from '@/services/authGuard';
-import { listRecordings, pageResults } from '@/services/entryRecording';
+import {
+  entryTitle, listPublicCreatorEntries, listRecordings, pageResults,
+} from '@/services/entryRecording';
 import { followUser, unfollowUser } from '@/services/following';
 import {
   goContributionHistory,
@@ -336,6 +391,11 @@ export default {
       recordingsMoreError: false,
       recordingPage: 1,
       hasMoreRecordings: false,
+      publicEntries: [],
+      entriesLoading: false,
+      entriesError: false,
+      entryPage: 0,
+      hasMoreEntries: false,
     };
   },
   computed: {
@@ -435,6 +495,8 @@ export default {
     goMails,
     goHome,
     goEntryDetail,
+    dialectCardLabel,
+    entryTitle,
     goContributionHistory,
     handleLoadError() {
       if (this.id) {
@@ -445,6 +507,7 @@ export default {
     },
     selectWorksTab(tab) {
       this.worksTab = tab;
+      if (tab === 'entries' && !this.entryPage && !this.entriesError) this.loadPublicEntries();
       if (this.showPublicRecordings && !this.recordings.length && !this.recordingsError) {
         this.loadPublicRecordings();
       }
@@ -499,6 +562,26 @@ export default {
         this.recordingsLoading = false;
       }
     },
+    async loadPublicEntries(more = false) {
+      if (this.entriesLoading || (more && !this.hasMoreEntries)) return;
+      const page = more ? this.entryPage + 1 : 1;
+      this.entriesLoading = true;
+      this.entriesError = false;
+      try {
+        const response = await listPublicCreatorEntries(this.id, page);
+        const existing = more ? this.publicEntries : [];
+        const loadedIds = new Set(existing.map((entry) => entry.id));
+        this.publicEntries = [
+          ...existing, ...pageResults(response).filter((entry) => !loadedIds.has(entry.id)),
+        ];
+        this.entryPage = page;
+        this.hasMoreEntries = Boolean(response.next);
+      } catch {
+        this.entriesError = true;
+      } finally {
+        this.entriesLoading = false;
+      }
+    },
     async toggleFollow() {
       if (!requireAuth('follow', { page: 'user_detail', userId: this.id })) return;
       if (this.followingBusy) return;
@@ -530,6 +613,21 @@ export default {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-3);
+}
+
+.profile-entry {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
+}
+
+.profile-entry__dialect {
+  color: var(--muted-color);
+  font-size: var(--font-size-sm);
 }
 
 .profile-overview {
