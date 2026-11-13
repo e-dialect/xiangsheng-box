@@ -128,3 +128,28 @@ it('reloads a retained detail for a new account before enabling its membership b
   expect(detail.vm.circle.is_member).toBe(true);
   detail.unmount();
 });
+
+it('does not display recordings from the old account after switching', async () => {
+  const detail = shallowMount(Details);
+  const previousRecording = { id: 10, original_gloss: '旧账号可见录音' };
+  const currentRecording = { id: 20, original_gloss: '当前账号可见录音' };
+  await detail.setData({
+    circle, circleId: 1, membershipAccount: membershipSession(), recordings: [previousRecording],
+  });
+  let resolveOldRequest;
+  listCircleRecordings
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveOldRequest = resolve; }))
+    .mockResolvedValueOnce({ results: [currentRecording] });
+  const previousRequest = detail.vm.loadRecordings();
+  uni.getStorageSync.mockReturnValue('new account');
+  getCircle.mockResolvedValue(circle);
+  Details.onShow.call(detail.vm);
+  expect(detail.vm.recordings).toEqual([]);
+  await flushPromises();
+  expect(detail.vm.recordings).toEqual([currentRecording]);
+  resolveOldRequest({ results: [previousRecording], next: '/old-page' });
+  await previousRequest;
+  expect(detail.vm.recordings).toEqual([currentRecording]);
+  expect(detail.vm.hasMoreRecordings).toBe(false);
+  detail.unmount();
+});

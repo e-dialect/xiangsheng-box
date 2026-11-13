@@ -172,9 +172,17 @@ export default {
     this.loadCircle();
   },
   onShow() {
-    if (this.membershipAccount !== membershipSession()) {
-      this.membershipAccount = membershipSession();
+    const account = membershipSession();
+    if (this.membershipAccount !== account) {
+      this.membershipAccount = account;
+      this.stopRecordingPlayback();
       this.circle = null;
+      this.recordings = [];
+      this.recordingPage = 1;
+      this.hasMoreRecordings = false;
+      this.loadingRecordings = false;
+      this.recordingsError = '';
+      this.moreError = false;
       this.loadCircle();
     }
   },
@@ -211,6 +219,8 @@ export default {
     },
     async loadRecordings(more = false) {
       if (this.loadingRecordings || (more && !this.hasMoreRecordings)) return;
+      const account = membershipSession();
+      const isCurrent = () => !this.disposed && account === membershipSession();
       const page = more ? this.recordingPage + 1 : 1;
       this.loadingRecordings = true;
       this.recordingsError = '';
@@ -220,6 +230,7 @@ export default {
           page,
           page_size: 50,
         });
+        if (!isCurrent()) return;
         const existing = more ? this.recordings : [];
         const loadedIds = new Set(existing.map((recording) => recording.id));
         this.recordings = [
@@ -228,10 +239,11 @@ export default {
         this.recordingPage = page;
         this.hasMoreRecordings = Boolean(response.next);
       } catch (error) {
+        if (!isCurrent()) return;
         if (more) this.moreError = true;
         else this.recordingsError = error.message || '圈内录音暂时无法读取';
       } finally {
-        this.loadingRecordings = false;
+        if (isCurrent()) this.loadingRecordings = false;
       }
     },
     async toggleMembership() {
