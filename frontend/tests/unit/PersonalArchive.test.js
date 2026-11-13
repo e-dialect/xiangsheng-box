@@ -58,7 +58,12 @@ function mountPage(component) {
 describe('personal contribution and bookmark archives', () => {
   it('opens a contributed recording even when it has no linked entry', async () => {
     const wrapper = mountPage(ContributionsPage);
-    wrapper.vm.history = { summary: {}, recent_activity: [{ kind: 'recording', target_id: 55, label: '尚待整理的乡音', created_at: '2026-09-06' }] };
+    wrapper.vm.history = {
+      summary: {},
+      recent_activity: [{
+        kind: 'recording', target_id: 55, label: '尚待整理的乡音', created_at: '2026-09-06',
+      }],
+    };
     wrapper.vm.loading = false;
     await wrapper.vm.$nextTick();
     await wrapper.get('.activity-row button').trigger('click');
@@ -150,4 +155,89 @@ describe('personal contribution and bookmark archives', () => {
     expect(notify).toHaveBeenCalledWith({ title: '网络中断' });
     expect(wrapper.vm.removingId).toBeNull();
   });
+
+  it('restarts pagination after removing a bookmark from a partial list', async () => {
+    const remaining = { ...entry, id: 22 };
+    archive.listEntryBookmarks
+      .mockResolvedValueOnce({ count: 2, results: [entry], next: '/entries/bookmarks/?page=2' })
+      .mockResolvedValueOnce({ count: 1, results: [remaining], next: null });
+    const wrapper = mountPage(BookmarksPage);
+    await wrapper.vm.load();
+
+    await wrapper.vm.remove(entry.id);
+
+    expect(archive.listEntryBookmarks.mock.calls).toEqual([[{ page: 1 }], [{ page: 1 }]]);
+    expect(wrapper.vm.entries).toEqual([remaining]);
+    expect(wrapper.vm.total).toBe(1);
+  });
+
+  it('preserves remaining cards and freezes offsets until rebuilding succeeds', async () => {
+    const remaining = { ...entry, id: 22 };
+    archive.listEntryBookmarks
+      .mockResolvedValueOnce({ count: 3, results: [entry, remaining], next: 'page2' })
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ count: 2, results: [remaining, remaining], next: 'page2' })
+      .mockResolvedValueOnce({ count: 2, results: [{ ...entry, id: 23 }], next: null });
+    const wrapper = mountPage(BookmarksPage);
+    await wrapper.setData({ appliedSearch: '雨', keyword: '未提交' });
+    await wrapper.vm.load();
+    await wrapper.vm.remove(entry.id);
+    expect(wrapper.vm.entries).toEqual([remaining]);
+    expect(wrapper.findAll('.bookmark-card')).toHaveLength(1);
+    expect(wrapper.text()).toContain('重新加载收藏列表');
+    expect(wrapper.text()).toContain('列表暂时刷新失败');
+    expect(wrapper.vm.refreshRequired).toBe(true);
+    await wrapper.vm.load(true);
+    expect(archive.listEntryBookmarks).toHaveBeenCalledTimes(2);
+    await wrapper.vm.load(false, true);
+    expect(wrapper.vm.entries).toEqual([remaining]);
+    expect(wrapper.vm.refreshRequired).toBe(false);
+    await wrapper.vm.load(true);
+    expect(archive.listEntryBookmarks.mock.calls.map(([params]) => params)).toEqual([
+      { page: 1, search: '雨' }, { page: 1, search: '雨' },
+      { page: 1, search: '雨' }, { page: 2, search: '雨' },
+    ]);
+    expect(archive.unbookmarkEntry).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps rebuild recovery available after the last visible card is removed', async () => {
+    const remaining = { ...entry, id: 22 };
+    archive.listEntryBookmarks
+      .mockResolvedValueOnce({ count: 3, results: [entry, remaining], next: 'page2' })
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('still offline'));
+    const wrapper = mountPage(BookmarksPage);
+    await wrapper.vm.load();
+    await wrapper.vm.remove(entry.id);
+    await wrapper.vm.remove(remaining.id);
+    expect(wrapper.vm.entries).toEqual([]);
+    expect(wrapper.vm.refreshRequired).toBe(true);
+    expect(wrapper.text()).toContain('重新加载收藏列表');
+    expect(wrapper.text()).toContain('列表暂时刷新失败');
+    expect(wrapper.vm.next).toBe(false);
+    await wrapper.vm.load(true);
+    expect(archive.listEntryBookmarks).toHaveBeenCalledTimes(3);
+    expect(archive.unbookmarkEntry.mock.calls).toEqual([[21], [22]]);
+  });
+
+  it('serializes retries and removals while a rebuild is pending', async () => {
+    archive.listEntryBookmarks
+      .mockResolvedValueOnce({ count: 2, results: [entry], next: 'page2' });
+    const wrapper = mountPage(BookmarksPage);
+    await wrapper.vm.load();
+    let resolve;
+    archive.listEntryBookmarks.mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    const removal = wrapper.vm.remove(entry.id);
+    await Promise.resolve();
+    await wrapper.vm.load(false, true);
+    await wrapper.vm.remove(entry.id);
+    await wrapper.vm.submitSearch();
+    expect(archive.listEntryBookmarks).toHaveBeenCalledTimes(2);
+    expect(archive.unbookmarkEntry).toHaveBeenCalledTimes(1);
+    resolve({ count: 1, results: [{ ...entry, id: 22 }], next: null });
+    await removal;
+    expect(wrapper.vm.entries.map((item) => item.id)).toEqual([22]);
+    expect(wrapper.vm.refreshRequired).toBe(false);
+  });
+
 });
