@@ -141,9 +141,11 @@ export async function saveRecordingDraft({
 export async function restoreRecordingDraft(id, owner = draftOwner()) {
   const item = listRecordingDrafts(owner).find((draft) => draft.id === id);
   if (!item) throw new Error('草稿不存在或属于其他账号');
+  const audio = await restoreDraftAudio(item.audio);
   return {
     ...item,
-    audio: await restoreDraftAudio(item.audio),
+    audio,
+    audioInvalid: audio ? Boolean(audio.invalid) : Boolean(item.audioInvalid),
   };
 }
 
