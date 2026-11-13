@@ -133,6 +133,7 @@ describe('low-threshold recording flow', () => {
     const page = context(RecordingCreate, {
       $refs: { form: { validate: vi.fn(async () => true) } },
       ownerScope: 'user:1',
+      draftReady: true,
     });
     page.audio = { path: '/tmp/voice.mp3', durationMs: 2300 };
     page.form.usage_dialect_id = 11;
@@ -169,6 +170,7 @@ describe('low-threshold recording flow', () => {
     const page = context(RecordingCreate, {
       $refs: { form: { validate: vi.fn(async () => true) } },
       ownerScope: 'user:1',
+      draftReady: true,
     });
     page.audio = { path: '/tmp/voice.mp3', durationMs: 1200 };
     page.form.usage_dialect_id = 11;

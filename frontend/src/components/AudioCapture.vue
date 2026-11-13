@@ -32,7 +32,7 @@
     <BaseButton
       v-if="!audio.path || recording"
       class="record-primary"
-      :disabled="!supported"
+      :disabled="disabled || !supported"
       variant="light"
       shape="circle"
       :aria-label="primaryLabel"
@@ -58,6 +58,7 @@
         size="large"
         icon="refresh"
         block
+        :disabled="disabled"
         @click="restartRecording"
       >
         重新录制
@@ -78,7 +79,7 @@
         class="record-action"
         variant="light"
         size="small"
-        :disabled="!fileSelectionSupported"
+        :disabled="disabled || !fileSelectionSupported"
         @click="chooseFile"
       >
         {{ audio.path ? '选择其他录音' : '选择已有录音' }}
@@ -104,6 +105,7 @@ export default {
   name: 'AudioCapture',
   components: { BaseButton },
   props: {
+    disabled: { type: Boolean, default: false },
     audio: {
       type: Object,
       default: () => ({}),
@@ -116,6 +118,7 @@ export default {
   emits: ['change', 'clear', 'error'],
   data() {
     return {
+      selectionRequest: 0,
       recorder: null,
       recorderManager: null,
       stream: null,
@@ -177,6 +180,9 @@ export default {
     },
   },
   watch: {
+    disabled(value) {
+      if (value) this.selectionRequest += 1;
+    },
     audio: {
       deep: true,
       handler() {
@@ -204,7 +210,7 @@ export default {
   },
   methods: {
     emitAudio(payload) {
-      this.$emit('change', payload);
+      if (!this.disabled) this.$emit('change', payload);
     },
     waveBarActive(index) {
       if (this.recording) return true;
@@ -286,6 +292,7 @@ export default {
       await this.startRecord();
     },
     async startRecord() {
+      if (this.disabled) return;
       this.stopPlayback();
       if (!this.recordingSupported) {
         notify({ title: '请选择已有录音', icon: 'none' });
@@ -378,21 +385,27 @@ export default {
       if (this.audio.path) playAudio(this.audio.path);
     },
     clearAudio() {
+      if (this.disabled) return;
       this.stopPlayback();
       this.$emit('clear');
     },
     restartRecording() {
+      if (this.disabled) return;
       this.stopPlayback();
       this.$emit('clear');
       this.$nextTick(() => this.startRecord());
     },
     async chooseFile() {
+      if (this.disabled) return;
+      this.selectionRequest += 1;
+      const request = this.selectionRequest;
       this.stopPlayback();
       try {
         const selected = await chooseAudioFile();
-        if (!selected) return;
+        if (!selected || this.disabled || request !== this.selectionRequest) return;
         this.emitAudio({ ...selected, origin: selected.origin || 'upload' });
       } catch (error) {
+        if (this.disabled || request !== this.selectionRequest) return;
         notify({ title: error?.message || '选择录音失败', icon: 'none' });
       }
     },

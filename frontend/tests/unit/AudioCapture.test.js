@@ -79,6 +79,39 @@ describe('AudioCapture', () => {
     wrapper.unmount();
   });
 
+
+  it('blocks replacement controls and ignores a file selection opened before locking', async () => {
+    let resolve;
+    chooseAudioFile.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const wrapper = mountCapture({ path: 'blob:A' });
+    const pending = wrapper.vm.chooseFile();
+    await wrapper.setProps({ disabled: true });
+    wrapper.vm.clearAudio();
+    wrapper.vm.restartRecording();
+    await wrapper.vm.chooseFile();
+    expect(chooseAudioFile).toHaveBeenCalledTimes(1);
+    expect(wrapper.emitted('clear')).toBeUndefined();
+    await wrapper.setProps({ disabled: false });
+    resolve({ path: 'blob:B' });
+    await pending;
+    expect(wrapper.emitted('change')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+
+  it('suppresses stale file selection errors after submission invalidates the picker', async () => {
+    let reject;
+    chooseAudioFile.mockReturnValue(new Promise((resolve, fail) => { reject = fail; }));
+    const wrapper = mountCapture({ path: 'blob:A' });
+    const pending = wrapper.vm.chooseFile();
+    await wrapper.setProps({ disabled: true });
+    await wrapper.setProps({ disabled: false });
+    reject(new Error('stale picker'));
+    await pending;
+    expect(notify).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     playManaged.mockReturnValue({ destroy: vi.fn() });
