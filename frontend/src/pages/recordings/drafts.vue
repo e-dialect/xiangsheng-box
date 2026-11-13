@@ -1,5 +1,10 @@
 <template>
-  <PageShell title="录音草稿">
+  <PageShell
+    title="录音草稿"
+    refreshable
+    :refreshing="loading"
+    @refresh="refresh"
+  >
     <view class="box-stack">
       <view
         v-if="legacyWarnings.length"
@@ -43,6 +48,12 @@
       <BaseLoading
         v-if="loading"
         text="正在检查草稿音频…"
+      />
+      <EmptyState
+        v-else-if="loadFailed"
+        title="暂时读不到草稿"
+        description="下拉刷新即可重新读取，或使用右上角刷新。"
+        role="alert"
       />
       <EmptyState
         v-else-if="!items.length"
@@ -100,6 +111,7 @@ export default {
   data: () => ({
     items: [],
     loading: false,
+    loadFailed: false,
     owner: '',
     generation: 0,
     legacyWarnings: [],
@@ -116,14 +128,21 @@ export default {
   },
   methods: {
     goRecord,
+    refresh() {
+      if (this.loading || this.cleaningAudio || this.cleaningLegacy) return;
+      this.load();
+    },
     async load() {
       this.generation += 1;
       const { generation } = this;
-      const owner = draftOwner();
       this.loading = true;
+      this.loadFailed = false;
       this.items = [];
-      this.owner = owner;
+      this.legacyWarnings = [];
+      this.owner = '';
       try {
+        const owner = draftOwner();
+        this.owner = owner;
         await migrateLegacyRecordingDrafts(owner);
         const items = await listRecordingDraftsWithAudioStatus(owner);
         const legacyWarnings = listLegacyRecordingDrafts().filter(
@@ -133,6 +152,8 @@ export default {
           this.items = items;
           this.legacyWarnings = legacyWarnings;
         }
+      } catch (error) {
+        if (generation === this.generation) this.loadFailed = true;
       } finally { if (generation === this.generation) this.loading = false; }
     },
     async clearInvalidAudio() {

@@ -139,3 +139,54 @@ it('keeps a requested section below the current sticky toolbar height', async ()
   await PlatformScroll.methods.scrollToTarget.call(context);
   expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'auto' });
 });
+
+it('refreshes once only after a deliberate downward gesture at the top', async () => {
+  const wrapper = mount(PlatformScroll, { props: { refreshable: true } });
+  const touch = (x, y, top = 0) => ({ touches: [{ clientX: x, clientY: y }], currentTarget: { scrollTop: top } });
+  wrapper.vm.onPullStart(touch(20, 20));
+  wrapper.vm.onPullMove(touch(20, 100));
+  wrapper.vm.onPullEnd();
+  expect(wrapper.emitted('refresh')).toBeUndefined();
+  wrapper.vm.onPullStart(touch(20, 20));
+  wrapper.vm.onPullMove(touch(20, 160));
+  wrapper.vm.onPullEnd();
+  wrapper.vm.requestRefresh();
+  expect(wrapper.emitted('refresh')).toHaveLength(1);
+  await wrapper.setProps({ refreshing: true });
+  wrapper.vm.requestRefresh();
+  expect(wrapper.emitted('refresh')).toHaveLength(1);
+  await wrapper.setProps({ refreshing: false });
+  wrapper.vm.requestRefresh();
+  expect(wrapper.emitted('refresh')).toHaveLength(2);
+  wrapper.unmount();
+});
+
+it('does not hijack ordinary, horizontal, multi-touch, or cancelled scrolling', () => {
+  const wrapper = mount(PlatformScroll, { props: { refreshable: true } });
+  const touch = (x, y, top = 0) => ({ touches: [{ clientX: x, clientY: y }], currentTarget: { scrollTop: top } });
+  wrapper.vm.onPullStart(touch(0, 0, 50));
+  wrapper.vm.onPullMove(touch(0, 200));
+  wrapper.vm.onPullEnd();
+  wrapper.vm.onPullStart(touch(0, 0));
+  wrapper.vm.onPullMove(touch(200, 100));
+  wrapper.vm.onPullEnd();
+  wrapper.vm.onPullStart(touch(0, 0));
+  wrapper.vm.onPullMove({ touches: [{}, {}] });
+  wrapper.vm.onPullEnd();
+  wrapper.vm.onPullStart(touch(0, 0));
+  wrapper.vm.onPullMove(touch(0, 200));
+  wrapper.vm.resetPull();
+  wrapper.vm.onPullEnd();
+  expect(wrapper.emitted('refresh')).toBeUndefined();
+  wrapper.unmount();
+});
+
+it('keeps refresh opt-in and wires the native refresher state', async () => {
+  const wrapper = mount(PlatformScroll, { global: { stubs: { 'scroll-view': { template: '<div data-native-scroll><slot /></div>' } } } });
+  wrapper.vm.requestRefresh();
+  expect(wrapper.emitted('refresh')).toBeUndefined();
+  await wrapper.setProps({ refreshable: true, refreshing: true });
+  expect(wrapper.get('[data-native-scroll]').attributes('refresher-enabled')).toBe('true');
+  expect(wrapper.get('[data-native-scroll]').attributes('refresher-triggered')).toBe('true');
+  wrapper.unmount();
+});

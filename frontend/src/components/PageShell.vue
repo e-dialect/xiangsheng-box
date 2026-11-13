@@ -39,6 +39,17 @@
         :text="actionText"
         @click="$emit('action')"
       />
+      <BaseButton
+        v-else-if="refreshable"
+        class="shell-action"
+        size="small"
+        variant="ghost"
+        text="刷新"
+        aria-label="刷新当前页面"
+        :loading="refreshing"
+        :disabled="refreshing"
+        @click="$emit('refresh')"
+      />
       <view
         v-else
         class="shell-action-placeholder"
@@ -48,7 +59,10 @@
     <PlatformScroll
       v-if="scroll"
       variant="page-shell"
+      :refreshable="refreshable"
+      :refreshing="refreshing"
       :container-class="contentClass"
+      @refresh="$emit('refresh')"
       @scroll="onScroll"
       @scrolltolower="$emit('scrolltolower')"
     >
@@ -78,6 +92,8 @@ export default {
   name: 'PageShell',
   components: { BaseButton, FeedbackHost, PlatformScroll },
   props: {
+    refreshable: { type: Boolean, default: false },
+    refreshing: { type: Boolean, default: false },
     title: {
       type: String,
       required: true,
@@ -107,7 +123,7 @@ export default {
       default: false,
     },
   },
-  emits: ['action', 'back', 'scroll', 'scrolltolower'],
+  emits: ['action', 'back', 'scroll', 'scrolltolower', 'refresh'],
   data() {
     return {
       resolvedTheme: 'light',
