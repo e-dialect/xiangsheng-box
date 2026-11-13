@@ -75,8 +75,12 @@ export default {
       const container = ref?.$el || ref;
       const target = container?.querySelector?.(`#${id}`);
       if (!target || typeof container.scrollTo !== 'function') return;
+      // The page can mark its sticky header; measure it on every jump so wrapping
+      // or a viewport change does not leave the requested field behind the header.
+      const header = container.querySelector('[data-scroll-offset]');
+      const offset = Math.max(0, Number(header?.getBoundingClientRect().height) || 0);
       const top = target.getBoundingClientRect().top
-        - container.getBoundingClientRect().top + container.scrollTop;
+        - container.getBoundingClientRect().top + container.scrollTop - offset;
       container.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
       // #endif
     },

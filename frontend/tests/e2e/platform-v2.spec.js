@@ -78,7 +78,7 @@ test('a remotely disabled recording flow explains the degradation', async ({ pag
 
   await expect(page.getByText('录音提交正在维护')).toBeVisible();
   await expect(page.getByText('应用不会读取或保存设备位置')).toBeVisible();
-  await expect(page.getByText('保存这段乡音')).toHaveCount(0);
+  await expect(page.getByText('提交并公开')).toHaveCount(0);
 });
 
 test('entry search reports only a result bucket and filter count', async ({ page }) => {

@@ -651,6 +651,9 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
                         relation_type=EntryWriting.RelationType.PRIMARY,
                         created_by=request.user,
                     )
+            # Submitted evidence is public before review (ADR-0006). Keep the
+            # model default private for imports and preserve explicit hiding.
+            validated_data.setdefault("visibility", True)
             recording = Recording.objects.create(
                 original_gloss=raw_gloss.strip(),
                 recorder=request.user,

@@ -119,15 +119,6 @@
                 {{ unreadMailsCount > 0 ? `消息 ${unreadMailsCount}` : '消息' }}
               </BaseButton>
             </view>
-            <view class="action-slot">
-              <BaseButton
-                size="small"
-                block
-                @click="toCreate"
-              >
-                录乡音
-              </BaseButton>
-            </view>
           </view>
 
           <view
@@ -150,72 +141,28 @@
 
           <view class="works">
             <view
-              class="works-tabs"
-              role="tablist"
-              aria-label="贡献类型"
+              class="contribution-stats"
+              aria-label="贡献概览"
             >
               <view
-                class="works-tab pressable"
-                :class="{ active: worksTab === 'recordings' }"
-                role="tab"
-                tabindex="0"
-                :aria-selected="worksTab === 'recordings' ? 'true' : 'false'"
-                @tap="selectWorksTab('recordings')"
-                @keydown.enter="selectWorksTab('recordings')"
-                @keydown.space.prevent="selectWorksTab('recordings')"
+                v-for="item in contributionMetrics"
+                :key="item.label"
+                class="contribution-stat"
               >
-                录音 {{ recordingsCount }}
-              </view>
-              <view
-                class="works-tab pressable"
-                :class="{ active: worksTab === 'entries' }"
-                role="tab"
-                tabindex="0"
-                :aria-selected="worksTab === 'entries' ? 'true' : 'false'"
-                @tap="selectWorksTab('entries')"
-                @keydown.enter="selectWorksTab('entries')"
-                @keydown.space.prevent="selectWorksTab('entries')"
-              >
-                词条 {{ entriesCount }}
-              </view>
-              <view
-                class="works-tab pressable"
-                :class="{ active: worksTab === 'senses' }"
-                role="tab"
-                tabindex="0"
-                :aria-selected="worksTab === 'senses' ? 'true' : 'false'"
-                @tap="selectWorksTab('senses')"
-                @keydown.enter="selectWorksTab('senses')"
-                @keydown.space.prevent="selectWorksTab('senses')"
-              >
-                义项 {{ sensesCount }}
+                <text class="number">
+                  {{ item.value }}
+                </text>
+                <text class="label">
+                  {{ item.label }}
+                </text>
               </view>
             </view>
-            <view class="works-empty">
-              <view class="works-empty-title">
-                {{ worksPanelTitle }}
-              </view>
-              <view class="works-empty-copy">
-                {{ worksPanelCopy }}
-              </view>
-              <BaseButton
-                v-if="worksCount === 0 && worksTab === 'recordings'"
-                class="works-empty-action"
-                block
-                @click="toCreate"
-              >
-                去录乡音
-              </BaseButton>
-              <BaseButton
-                v-else
-                class="works-empty-action"
-                variant="ghost"
-                block
-                @click="toContributionHistory"
-              >
-                查看既有贡献
-              </BaseButton>
-            </view>
+            <BaseButton
+              block
+              variant="ghost"
+              text="查看贡献履历"
+              @click="toContributionHistory"
+            />
           </view>
 
           <view class="archive-menu">
@@ -495,7 +442,6 @@ export default {
       loading: Boolean(uni.getStorageSync('token')),
       loadError: '',
       loggedIn: Boolean(uni.getStorageSync('token')),
-      worksTab: 'recordings',
       curationSummary: null,
     };
   },
@@ -512,32 +458,12 @@ export default {
       const dialect = this.locationText;
       return `在「${dialect}」记录乡音`;
     },
-    worksCount() {
-      if (this.worksTab === 'entries') return this.entriesCount;
-      if (this.worksTab === 'senses') return this.sensesCount;
-      return this.recordingsCount;
-    },
-    worksPanelTitle() {
-      if (this.worksCount > 0) {
-        if (this.worksTab === 'entries') return `参与 ${this.worksCount} 个词条`;
-        if (this.worksTab === 'senses') return `补充 ${this.worksCount} 个义项`;
-        return `留下 ${this.worksCount} 段录音`;
-      }
-      if (this.worksTab === 'entries') return '还没有参与词条整理';
-      if (this.worksTab === 'senses') return '还没有补充义项';
-      return '还没有录音贡献';
-    },
-    worksPanelCopy() {
-      if (this.worksCount > 0) {
-        return '既有贡献仍可查看；新录音会按词条和地区建立可追溯关联，并形成地区足迹。';
-      }
-      if (this.worksTab === 'entries') {
-        return '不会写汉字也没关系，先录音和说明大意，之后再逐步完善词条。';
-      }
-      if (this.worksTab === 'senses') {
-        return '义项记录同一个词条下相关的编号义、用法和例句。';
-      }
-      return '录下一个你会说的词或短语，只需标明地区并说明大意。';
+    contributionMetrics() {
+      return [
+        { label: '录音', value: this.recordingsCount },
+        { label: '词条', value: this.entriesCount },
+        { label: '义项', value: this.sensesCount },
+      ];
     },
     showWechatMenu() {
       return this.canUseWechatAuth || this.wechatBound;
@@ -601,9 +527,6 @@ export default {
     goRecordingDrafts,
     toBookmarks() { goEntryBookmarks(); },
     toCircleList() { goCircleList(); },
-    selectWorksTab(tab) {
-      this.worksTab = tab;
-    },
     toContributionHistory() {
       goContributionHistory();
     },
@@ -911,8 +834,8 @@ export default {
 }
 
 .avatar {
-  width: 168rpx;
-  height: 168rpx;
+  width: 120rpx;
+  height: 120rpx;
   border-radius: var(--radius-pill);
   background: var(--surface-subtle-color);
   color: var(--dress-avatar-frame-color, inherit);
@@ -1046,45 +969,6 @@ export default {
   margin-top: var(--space-3);
 }
 
-.works-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.works-tab {
-  flex: 1;
-  padding: var(--space-3) 0;
-  text-align: center;
-  color: var(--muted-color);
-  font-size: var(--font-size-sm);
-}
-
-.works-tab.active {
-  color: var(--text-color);
-  font-weight: 700;
-  box-shadow: inset 0 -4rpx 0 var(--accent-color);
-}
-
-.works-empty {
-  padding: var(--space-5) var(--space-3);
-  text-align: center;
-}
-
-.works-empty-title {
-  font-weight: 700;
-}
-
-.works-empty-copy {
-  margin-top: var(--space-2);
-  color: var(--muted-color);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-}
-
-.works-empty-action {
-  margin-top: var(--space-3);
-}
-
 .menu-item {
   min-height: 92rpx;
   display: flex;
@@ -1133,4 +1017,20 @@ export default {
     transform: none;
   }
 }
+.hero-copy {
+  min-width: 0;
+}
+.name,
+.bio {
+  overflow-wrap: anywhere;
+}
+.contribution-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.contribution-stat { display: grid; gap: var(--space-1); text-align: center; }
+.profile-actions .action-slot { flex: 1; }
+.works > .base-button { margin-top: var(--space-2); }
 </style>

@@ -159,7 +159,7 @@ test('a disabled search flow leads back to the working listening surface', async
   await expect(page).toHaveURL(/\/(?:pages\/index)?$/);
 });
 
-test('entry detail keeps evidence and actions after pronunciation and recordings', async ({ page }) => {
+test('entry detail presents recordings before pronunciation, evidence and actions', async ({ page }) => {
   await routeCapabilities(page);
   await routeBackgroundRequests(page);
   await page.route('**/entries/21/**', async (route) => {
@@ -175,7 +175,7 @@ test('entry detail keeps evidence and actions after pronunciation and recordings
   await expect(sections).toHaveCount(5);
   expect(await sections.evaluateAll(
     (nodes) => nodes.map((node) => node.dataset.detailSection),
-  )).toEqual(['meaning', 'pronunciation', 'recordings', 'evidence', 'actions']);
+  )).toEqual(['meaning', 'recordings', 'pronunciation', 'evidence', 'actions']);
   await expect(page.getByText('整理状态与证据')).toBeVisible();
   await expect(page.getByText('本条只收录“步行”义，不与金融机构用字合并。')).toBeVisible();
   await expect(page.getByRole('button', { name: '录下我这边的说法' })).toBeVisible();

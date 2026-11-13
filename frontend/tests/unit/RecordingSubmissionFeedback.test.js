@@ -56,7 +56,17 @@ beforeEach(() => {
   uploadFile.mockRejectedValue(new Error('音频格式不支持'));
 });
 
-describe('recording submission failure feedback', () => {
+describe('recording submission feedback', () => {
+  it('uses shared submission wording after the recording is created', async () => {
+    uploadFile.mockResolvedValue({ url: '/files/voice.mp3', duration_ms: 2300 });
+    createRecording.mockResolvedValue({ id: 12, status: 'draft', visibility: true });
+    const page = pageContext();
+    await page.submit();
+    expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
+    expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
+    expect(page.submitted).toBe(true);
+  });
+
   it('retains the upload error while confirming a complete draft can be retried', async () => {
     const page = pageContext();
     await page.submit();

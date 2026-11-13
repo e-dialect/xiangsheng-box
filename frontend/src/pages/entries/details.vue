@@ -19,8 +19,12 @@
         data-detail-section="meaning"
       >
         <view class="entry-hero__eyebrow">
-          词条释义
+          词条释义 · {{ statusLabel(entry.status) }}
         </view>
+        <DialectLabel
+          :dialect="entry.usage_dialect"
+          mode="detail"
+        />
         <view class="entry-hero__title">
           {{ entryTitle(entry) }}
         </view>
@@ -36,6 +40,76 @@
             @click="shareEntry"
           />
         </view>
+      </view>
+
+      <view
+        class="detail-section detail-section--recordings"
+        data-detail-section="recordings"
+      >
+        <view class="detail-section__heading">
+          <view>
+            <view class="detail-section__eyebrow">
+              真实乡音
+            </view>
+            <view class="detail-section__title">
+              关联录音
+            </view>
+            <view class="detail-section__copy">
+              同一词条可有多个地区读音和多段录音。
+            </view>
+          </view>
+          <view class="recording-count">
+            {{ entry.recording_count }} 段
+          </view>
+        </view>
+        <view
+          v-if="entry.needs_audio"
+          class="needs-audio"
+        >
+          还没有录音，但它仍是一条有效词条。你可以补上第一段乡音。
+        </view>
+        <EmptyState
+          v-if="!recordings.length"
+          title="还没有可听的录音"
+          action-text="补第一段录音"
+          @action="continueChain"
+        />
+        <view
+          v-else
+          class="recording-list"
+        >
+          <EntryRecordingCard
+            v-for="recording in recordings"
+            ref="recordingCards"
+            :key="recording.id"
+            :recording="recording"
+            :attested="attestedDialects.has(recording.usage_dialect?.id)"
+            @attest="attest"
+            @continue="continueChain"
+          />
+        </view>
+        <view
+          v-if="recordingsError"
+          class="detail-section__pending"
+          role="status"
+        >
+          {{ recordingsError }}
+        </view>
+        <BaseButton
+          v-if="hasMoreRecordings"
+          data-testid="load-more-recordings"
+          :text="recordingsError ? '重试加载更多乡音' : '听更多乡音'"
+          :loading="recordingsLoading"
+          :disabled="recordingsLoading"
+          variant="ghost"
+          @click="loadMoreRecordings"
+        />
+      </view>
+
+      <view
+        v-if="entry.senses?.length || entry.writings?.length"
+        class="detail-section"
+      >
         <view
           v-if="entry.senses?.length"
           class="meaning-block"
@@ -138,72 +212,8 @@
           v-else
           class="detail-section__pending"
         >
-          这个地区的读音还没整理出来，可以先听下面的乡音。
+          这个地区的读音还没整理出来，可以先听上面的乡音。
         </view>
-      </view>
-
-      <view
-        class="detail-section detail-section--recordings"
-        data-detail-section="recordings"
-      >
-        <view class="detail-section__heading">
-          <view>
-            <view class="detail-section__eyebrow">
-              真实乡音
-            </view>
-            <view class="detail-section__title">
-              关联录音
-            </view>
-            <view class="detail-section__copy">
-              同一词条可有多个地区读音和多段录音。
-            </view>
-          </view>
-          <view class="recording-count">
-            {{ entry.recording_count }} 段
-          </view>
-        </view>
-        <view
-          v-if="entry.needs_audio"
-          class="needs-audio"
-        >
-          还没有录音，但它仍是一条有效词条。你可以补上第一段乡音。
-        </view>
-        <EmptyState
-          v-if="!recordings.length"
-          title="还没有可听的录音"
-          action-text="补第一段录音"
-          @action="continueChain"
-        />
-        <view
-          v-else
-          class="recording-list"
-        >
-          <EntryRecordingCard
-            v-for="recording in recordings"
-            ref="recordingCards"
-            :key="recording.id"
-            :recording="recording"
-            :attested="attestedDialects.has(recording.usage_dialect?.id)"
-            @attest="attest"
-            @continue="continueChain"
-          />
-        </view>
-        <view
-          v-if="recordingsError"
-          class="detail-section__pending"
-          role="status"
-        >
-          {{ recordingsError }}
-        </view>
-        <BaseButton
-          v-if="hasMoreRecordings"
-          data-testid="load-more-recordings"
-          :text="recordingsError ? '重试加载更多乡音' : '听更多乡音'"
-          :loading="recordingsLoading"
-          :disabled="recordingsLoading"
-          variant="ghost"
-          @click="loadMoreRecordings"
-        />
       </view>
 
       <view
@@ -612,7 +622,7 @@ export default {
 .entry-hero__summary {
   margin-top: 14rpx;
   color: var(--text-secondary-color);
-  font-size: 30rpx;
+  font-size: var(--font-size-lg);
   line-height: 1.65;
 }
 
@@ -639,7 +649,7 @@ export default {
 .detail-section__title {
   margin-top: 6rpx;
   font-family: STSong, SimSun, serif;
-  font-size: 30rpx;
+  font-size: var(--font-size-lg);
   font-weight: 800;
 }
 
@@ -691,7 +701,7 @@ export default {
 
 .pronunciation-row {
   display: grid;
-  grid-template-columns: minmax(120rpx, auto) 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
 }
 
 .pronunciation-row__value {
@@ -770,7 +780,7 @@ export default {
 .evidence-metric__value {
   color: var(--text-color);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 30rpx;
+  font-size: var(--font-size-lg);
   font-weight: 800;
 }
 
@@ -783,5 +793,11 @@ export default {
 .detail-actions__buttons {
   display: grid;
   gap: 14rpx;
+}
+.sense-row > view,
+.pronunciation-row > view,
+.entry-hero__summary {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 </style>
