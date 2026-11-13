@@ -1,5 +1,5 @@
 import { runInNewContext } from 'node:vm';
-import { markRaw, reactive } from 'vue';
+import { markRaw, reactive, toRaw } from 'vue';
 import {
   describe, expect, it, vi,
 } from 'vitest';
@@ -43,10 +43,10 @@ function setup(platform) {
     if (line.includes('// #ifndef H5')) { active = platform !== 'H5'; return false; }
     if (line.includes('// #endif')) { active = true; return false; }
     return active;
-  }).join('\n').replace("import { markRaw } from 'vue';", '')
+  }).join('\n').replace(/import .* from 'vue';/g, '')
     .replaceAll('export function ', 'function ');
   const api = runInNewContext(`${compiled}\n({ playAudio, playManaged, stopAudio, onExternalStop });`, {
-    uni, Audio, URL, markRaw, window: { location: { href: 'https://example.test/', origin: 'https://example.test' } },
+    uni, Audio, URL, markRaw, toRaw, window: { location: { href: 'https://example.test/', origin: 'https://example.test' } },
   });
   return { api, contexts, uni };
 }

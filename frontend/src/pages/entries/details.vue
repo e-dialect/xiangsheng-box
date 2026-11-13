@@ -179,6 +179,7 @@
         >
           <EntryRecordingCard
             v-for="recording in recordings"
+            ref="recordingCards"
             :key="recording.id"
             :recording="recording"
             :attested="attestedDialects.has(recording.usage_dialect?.id)"
@@ -395,6 +396,7 @@ export default {
     if (this.id && this.entry) this.$nextTick(this.load);
   },
   onUnload() {
+    this.stopRecordingPlayback();
     this.loadVersion += 1;
   },
   // #ifdef MP-WEIXIN || MP-QQ
@@ -410,7 +412,15 @@ export default {
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
   // #endif
+  onHide() {
+    this.stopRecordingPlayback();
+  },
   methods: {
+    stopRecordingPlayback() {
+      [this.$refs.recordingCards].flat().forEach((card) => {
+        card?.stopPlayback();
+      });
+    },
     entryTitle,
     shareEntry() {
       // #ifdef H5 || APP-PLUS

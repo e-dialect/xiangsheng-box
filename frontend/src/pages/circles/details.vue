@@ -97,6 +97,7 @@
         >
           <EntryRecordingCard
             v-for="recording in recordings"
+            ref="recordingCards"
             :key="recording.id"
             :recording="recording"
             @open-entry="goEntryDetail"
@@ -141,7 +142,18 @@ export default {
     this.circleId = Number(options.id);
     this.loadCircle();
   },
+  onHide() {
+    this.stopRecordingPlayback();
+  },
+  onUnload() {
+    this.stopRecordingPlayback();
+  },
   methods: {
+    stopRecordingPlayback() {
+      [this.$refs.recordingCards].flat().forEach((card) => {
+        card?.stopPlayback();
+      });
+    },
     async loadCircle() {
       this.loadingCircle = true;
       this.error = '';

@@ -9,7 +9,7 @@ import { playManaged } from '@/utils/audio';
 vi.mock('@/utils/audio', () => ({
   onExternalStop: vi.fn(() => vi.fn()),
   playManaged: vi.fn(),
-  stopAudio: vi.fn(),
+  stopManagedAudio: vi.fn(),
 }));
 
 function mountCard(audioUrl) {
