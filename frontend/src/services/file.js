@@ -38,6 +38,11 @@ export function chooseAudioFile() {
       });
     };
     const fail = (error) => {
+      const message = String(error?.errMsg || error?.message || '').trim();
+      if (/^(?:choose(?:Message)?File:fail\s*)?(?:user\s+)?cancel(?:led|ed)?$/i.test(message)) {
+        resolve(null);
+        return;
+      }
       reject(error);
     };
 

@@ -58,6 +58,31 @@ describe('file upload helpers', () => {
     await expect(fileService.chooseAndUploadAnImage()).resolves.toBe('https://example.test/one.png');
   });
 
+  it.each([
+    'chooseFile:fail cancel',
+    'chooseMessageFile:fail cancel',
+    'chooseFile:fail user cancel',
+  ])('chooseAudioFile treats %s as dismissal', async (errMsg) => {
+    uni.chooseFile.mockImplementation(({ fail }) => fail({ errMsg }));
+    await expect(fileService.chooseAudioFile()).resolves.toBeNull();
+    expect(uni.showToast).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'chooseFile:fail permission denied',
+    'chooseMessageFile:fail file not found',
+    'failed to cancel upload',
+  ])('chooseAudioFile preserves actual failure: %s', async (errMsg) => {
+    const error = { errMsg };
+    uni.chooseFile.mockImplementation(({ fail }) => fail(error));
+    await expect(fileService.chooseAudioFile()).rejects.toBe(error);
+  });
+
+  it('chooseAudioFile still rejects a malformed successful selection', async () => {
+    uni.chooseFile.mockImplementation(({ success }) => success({ tempFiles: [] }));
+    await expect(fileService.chooseAudioFile()).rejects.toThrow('未选择音频文件');
+  });
+
   it('chooseAudioFile returns a selected local audio path', async () => {
     uni.chooseFile.mockImplementation(({ success }) => {
       success({
