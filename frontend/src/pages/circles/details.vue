@@ -127,6 +127,9 @@
 </template>
 
 <script>
+import {
+  membershipSession, membershipRevision, acquireMembership, publishMembership, reconcileMembership,
+} from '@/services/circleMembership';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -146,6 +149,8 @@ export default {
   data() {
     return {
       circle: null,
+      membershipAccount: null,
+      disposed: false,
       circleId: null,
       error: '',
       loadingCircle: true,
@@ -158,14 +163,26 @@ export default {
       moreError: false,
     };
   },
+  beforeUnmount() {
+    this.disposed = true;
+  },
   onLoad(options) {
+    this.membershipAccount = membershipSession();
     this.circleId = Number(options.id);
     this.loadCircle();
+  },
+  onShow() {
+    if (this.membershipAccount !== membershipSession()) {
+      this.membershipAccount = membershipSession();
+      this.circle = null;
+      this.loadCircle();
+    }
   },
   onHide() {
     this.stopRecordingPlayback();
   },
   onUnload() {
+    this.disposed = true;
     this.stopRecordingPlayback();
   },
   methods: {
@@ -175,16 +192,21 @@ export default {
       });
     },
     async loadCircle() {
+      const account = membershipSession();
+      const version = membershipRevision();
       this.loadingCircle = true;
       this.error = '';
       try {
-        this.circle = await getCircle(this.circleId);
+        const result = await getCircle(this.circleId);
+        if (this.disposed || account !== membershipSession()) return;
+        this.circle = reconcileMembership(result, version);
         this.loadingCircle = false;
         await this.loadRecordings();
       } catch (error) {
+        if (this.disposed || account !== membershipSession()) return;
         this.error = error.message || '方言圈加载失败';
       } finally {
-        this.loadingCircle = false;
+        if (!this.disposed && account === membershipSession()) this.loadingCircle = false;
       }
     },
     async loadRecordings(more = false) {
@@ -216,13 +238,19 @@ export default {
       if (!this.circle) return;
       if (!requireAuth('circle_join', { page: 'circle_detail', circleId: this.circle.id })) return;
       if (this.membershipBusy) return;
+      const release = acquireMembership(this.circle.id);
+      if (!release) return;
+      const account = membershipSession();
+      const { id } = this.circle;
       this.membershipBusy = true;
       try {
         const result = this.circle.is_member
           ? await leaveCircle(this.circle.id)
           : await joinCircle(this.circle.id);
+        if (!publishMembership(account, id, result) || this.disposed) return;
         this.circle = { ...this.circle, ...result };
       } finally {
+        release();
         this.membershipBusy = false;
       }
     },

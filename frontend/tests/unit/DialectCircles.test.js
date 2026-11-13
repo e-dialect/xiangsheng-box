@@ -1,5 +1,14 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
+
+import CircleDetails from '@/pages/circles/details.vue';
+import CircleIndex from '@/pages/circles/index.vue';
+import { requireAuth } from '@/services/authGuard';
+import {
+  getCircle, joinCircle, listCircleRecordings, listCircles,
+} from '@/services/guantou';
 
 vi.mock('@/services/guantou', () => ({
   getCircle: vi.fn(),
@@ -9,13 +18,6 @@ vi.mock('@/services/guantou', () => ({
   listCircles: vi.fn(),
 }));
 vi.mock('@/services/authGuard', () => ({ requireAuth: vi.fn(() => true) }));
-
-import CircleDetails from '@/pages/circles/details.vue';
-import CircleIndex from '@/pages/circles/index.vue';
-import { requireAuth } from '@/services/authGuard';
-import {
-  getCircle, joinCircle, listCircleRecordings, listCircles,
-} from '@/services/guantou';
 
 const circle = {
   id: 4,
@@ -46,7 +48,7 @@ describe('dialect circles', () => {
     listCircles.mockResolvedValue({ results: [circle] });
     listCircleRecordings.mockResolvedValue({ results: [], next: null });
     requireAuth.mockReturnValue(true);
-    globalThis.uni = { navigateTo: vi.fn() };
+    globalThis.uni = { navigateTo: vi.fn(), getStorageSync: vi.fn(() => 'circle-test') };
   });
 
   it('lists circles and updates membership without mutating the source item', async () => {

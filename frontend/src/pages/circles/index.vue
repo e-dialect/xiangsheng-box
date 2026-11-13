@@ -135,6 +135,10 @@
 </template>
 
 <script>
+import {
+  membershipSession, membershipRevision, acquireMembership, publishMembership, reconcileMembership,
+  subscribeMembership,
+} from '@/services/circleMembership';
 import EmptyState from '@/components/EmptyState.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
@@ -154,6 +158,10 @@ export default {
   data() {
     return {
       circles: [],
+      membershipAccount: membershipSession(),
+      membershipVersion: membershipRevision(),
+      disposed: false,
+      loadGeneration: 0,
       error: '',
       loading: false,
       membershipBusyId: null,
@@ -165,10 +173,37 @@ export default {
       moreError: false,
     };
   },
+  created() {
+    this.unsubscribeMembership = subscribeMembership(() => this.syncMembership());
+  },
+  beforeUnmount() {
+    this.disposed = true;
+    this.unsubscribeMembership?.();
+  },
   onLoad() {
     this.refresh();
   },
+  onShow() {
+    if (this.membershipAccount !== membershipSession()) {
+      this.membershipAccount = membershipSession();
+      this.loadGeneration += 1;
+      this.loading = false;
+      this.refresh();
+      return;
+    }
+    this.syncMembership();
+  },
+  onUnload() {
+    this.disposed = true;
+    this.unsubscribeMembership?.();
+  },
   methods: {
+    syncMembership() {
+      this.circles = this.circles.map(
+        (circle) => reconcileMembership(circle, this.membershipVersion),
+      );
+      this.membershipVersion = membershipRevision();
+    },
     captureSearch(event) {
       const value = typeof event === 'string' ? event : event?.value;
       if (typeof value === 'string') this.search = value;
@@ -188,38 +223,52 @@ export default {
     },
     async load(page) {
       if (this.loading) return;
+      this.loadGeneration += 1;
+      const generation = this.loadGeneration;
+      const account = membershipSession();
+      const version = membershipRevision();
       const more = page > 1;
       this.loading = true;
       this.error = '';
       this.moreError = false;
       try {
         const response = await listCircles({ page, search: this.appliedSearch }, true);
+        if (this.disposed || generation !== this.loadGeneration
+          || account !== membershipSession()) return;
         const loadedIds = new Set(this.circles.map((circle) => circle.id));
         this.circles = [
-          ...this.circles, ...pageResults(response).filter((circle) => !loadedIds.has(circle.id)),
+          ...this.circles, ...pageResults(response)
+            .map((circle) => reconcileMembership(circle, version))
+            .filter((circle) => !loadedIds.has(circle.id)),
         ];
         this.total = Number(response.count ?? this.circles.length);
         this.page = page;
         this.next = Boolean(response.next);
       } catch (error) {
+        if (generation !== this.loadGeneration || account !== membershipSession()) return;
         if (more) this.moreError = true;
         else this.error = error.message || '方言圈加载失败';
       } finally {
-        this.loading = false;
+        if (generation === this.loadGeneration) this.loading = false;
       }
     },
     async toggleMembership(circle) {
       if (!requireAuth('circle_join', { page: 'circle_index', circleId: circle.id })) return;
-      if (this.membershipBusyId === circle.id) return;
+      if (this.membershipBusyId !== null) return;
+      const release = acquireMembership(circle.id);
+      if (!release) return;
+      const account = membershipSession();
       this.membershipBusyId = circle.id;
       try {
         const result = circle.is_member
           ? await leaveCircle(circle.id)
           : await joinCircle(circle.id);
+        if (!publishMembership(account, circle.id, result) || this.disposed) return;
         this.circles = this.circles.map((item) => (item.id === circle.id
           ? { ...item, ...result }
           : item));
       } finally {
+        release();
         this.membershipBusyId = null;
       }
     },
