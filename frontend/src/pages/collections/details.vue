@@ -204,6 +204,7 @@
                 关联已变化，请重新确认这段录音的归属。
               </text>
               <EntryRecordingCard
+                ref="recordingCards"
                 :compact="true"
                 :community="false"
                 :recording="item.recording"
@@ -288,6 +289,7 @@
               class="box-recording"
             >
               <EntryRecordingCard
+                ref="candidateRecordingCards"
                 :community="false"
                 :recording="recording"
                 @open-entry="goEntryDetail"
@@ -341,6 +343,7 @@
             class="box-recording"
           >
             <EntryRecordingCard
+              ref="pendingRecordingCards"
               :community="false"
               :recording="item.recording"
               @open-entry="goEntryDetail"
@@ -472,7 +475,22 @@ export default {
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
   // #endif
+  onHide() {
+    this.stopRecordingPlayback();
+  },
+  onUnload() {
+    this.stopRecordingPlayback();
+  },
   methods: {
+    stopRecordingPlayback() {
+      [
+        this.$refs.recordingCards,
+        this.$refs.candidateRecordingCards,
+        this.$refs.pendingRecordingCards,
+      ].flat().forEach((card) => {
+        card?.stopPlayback();
+      });
+    },
     entryTitle,
     goEntryDetail,
     shareCollection() {

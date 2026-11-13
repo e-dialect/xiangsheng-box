@@ -121,7 +121,9 @@ import {
   entryTitle,
   primaryEntryLink,
 } from '@/services/entryRecording';
-import { onExternalStop, playManaged, stopAudio } from '@/utils/audio';
+import {
+  onExternalStop, playManaged, stopManagedAudio,
+} from '@/utils/audio';
 
 const TYPE_LABELS = {
   word: '词',
@@ -186,7 +188,7 @@ export default {
   },
   watch: {
     audioSource() {
-      if (this.playbackHandle) stopAudio();
+      this.stopPlayback();
       this.playbackFailed = false;
     },
   },
@@ -197,11 +199,16 @@ export default {
     });
   },
   beforeUnmount() {
-    if (this.playbackHandle) stopAudio();
+    this.stopPlayback();
     this.unsubscribeAudio?.();
   },
   methods: {
     goRecordingDetail,
+    stopPlayback() {
+      const handle = this.playbackHandle;
+      this.resetPlayback();
+      if (handle) stopManagedAudio(handle);
+    },
     resetPlayback() {
       this.playing = false;
       this.playbackHandle = null;
@@ -212,8 +219,7 @@ export default {
     },
     toggleAudio() {
       if (this.playing) {
-        stopAudio();
-        this.resetPlayback();
+        this.stopPlayback();
         return;
       }
       if (!this.hasAudio) return;

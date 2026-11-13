@@ -1,4 +1,4 @@
-import { markRaw } from 'vue';
+import { markRaw, toRaw } from 'vue';
 
 let currentAudioContext = null;
 let managedHandle = null;
@@ -163,6 +163,12 @@ export function playAudio(src, warn = true) {
   innerAudioContext.src = src;
   innerAudioContext.play();
   // #endif
+}
+
+/** Stop only the managed playback owned by this caller, without touching preload. */
+export function stopManagedAudio(expectedHandle) {
+  if (!expectedHandle || toRaw(expectedHandle) !== managedHandle) return;
+  disposeManagedHandle();
 }
 
 export function stopAudio() {
