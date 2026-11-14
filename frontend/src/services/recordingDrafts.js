@@ -142,9 +142,11 @@ export async function saveRecordingDraft({
 export async function restoreRecordingDraft(id, owner = draftOwner()) {
   const item = listRecordingDrafts(owner).find((draft) => draft.id === id);
   if (!item) throw new Error('草稿不存在或属于其他账号');
+  const audio = await restoreDraftAudio(item.audio);
   return {
     ...item,
-    audio: await restoreDraftAudio(item.audio),
+    audio,
+    audioInvalid: audio ? Boolean(audio.invalid) : Boolean(item.audioInvalid),
   };
 }
 
@@ -175,20 +177,26 @@ export async function clearInvalidRecordingDraftAudio(owner = draftOwner()) {
   const invalid = items.filter((item, index) => item.audio && !availability[index]);
   if (!invalid.length) return 0;
 
-  const invalidIds = new Set(invalid.map((item) => item.id));
+  // Availability checks yield to other pages/tabs saving or deleting drafts.
+  // Apply their results only to the same audio in the latest stored draft list.
+  const invalidAudio = new Map(invalid.map((item) => [item.id, item.audio]));
+  const cleared = [];
   const updatedAt = Date.now();
-  const next = items.map((item) => (invalidIds.has(item.id)
-    ? {
+  const next = listRecordingDrafts(owner).map((item) => {
+    if (!sameAudio(item.audio, invalidAudio.get(item.id))) return item;
+    cleared.push(item.audio);
+    return {
       ...item,
       audio: null,
       audioError: false,
       audioInvalid: true,
       updatedAt,
-    }
-    : item));
+    };
+  });
+  if (!cleared.length) return 0;
   uni.setStorageSync(key(owner), JSON.stringify(next));
-  await Promise.all(invalid.map((item) => removeDraftAudio(item.audio)));
-  return invalid.length;
+  await Promise.all(cleared.map((audio) => removeDraftAudio(audio)));
+  return cleared.length;
 }
 
 function storageKeys() {

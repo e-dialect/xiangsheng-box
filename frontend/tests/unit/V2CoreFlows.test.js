@@ -65,7 +65,7 @@ const entryRecording = await import('@/services/entryRecording');
 const { requireAuth } = await import('@/services/authGuard');
 const { uploadFile } = await import('@/services/file');
 const { notifySuccess } = await import('@/services/feedback');
-const { goRecordingDetail, goEntryDetail, goRecord } = await import('@/services/navigation');
+const { goRecordingDetail, goRecord } = await import('@/services/navigation');
 const { trackProductEvent } = await import('@/services/productAnalytics');
 const RecordingFeed = (await import('@/components/home/RecordingFeed.vue')).default;
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
@@ -133,6 +133,7 @@ describe('low-threshold recording flow', () => {
     const page = context(RecordingCreate, {
       $refs: { form: { validate: vi.fn(async () => true) } },
       ownerScope: 'user:1',
+      draftReady: true,
     });
     page.audio = { path: '/tmp/voice.mp3', durationMs: 2300 };
     page.form.usage_dialect_id = 11;
@@ -169,6 +170,7 @@ describe('low-threshold recording flow', () => {
     const page = context(RecordingCreate, {
       $refs: { form: { validate: vi.fn(async () => true) } },
       ownerScope: 'user:1',
+      draftReady: true,
     });
     page.audio = { path: '/tmp/voice.mp3', durationMs: 1200 };
     page.form.usage_dialect_id = 11;

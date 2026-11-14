@@ -13,13 +13,14 @@
           <BaseButton
             variant="ghost"
             text="草稿箱"
+            :disabled="isSubmissionLocked()"
             @click="goRecordingDrafts"
           />
           <BaseButton
             variant="ghost"
             text="保存草稿"
             :loading="savingDraft"
-            :disabled="submitting || savingDraft || !capabilityAvailable"
+            :disabled="isSubmissionLocked() || savingDraft || !capabilityAvailable"
             @click="saveDraft"
           />
         </view>
@@ -74,7 +75,7 @@
         scroll-to-first-error=""
       >
         <view
-          v-if="selectedEntry"
+          v-if="linkedEntryId"
           class="record-entry-context"
         >
           <view class="record-entry-context__label">
@@ -85,16 +86,26 @@
           >
             <view>
               <view class="selected-entry__title">
-                {{ entryTitle(selectedEntry) }}
+                {{ selectedEntry ? entryTitle(selectedEntry) : '已保留原词条关联' }}
               </view>
               <view class="selected-entry__summary">
-                {{ selectedEntry.summary }}
+                {{ selectedEntry ? selectedEntry.summary : '词条信息暂时无法读取，保存草稿或提交不会取消关联。' }}
               </view>
             </view>
+            <BaseButton
+              v-if="!selectedEntry"
+              size="small"
+              variant="ghost"
+              :loading="entryLoading"
+              :disabled="entryLoading || isSubmissionLocked()"
+              text="重试读取词条"
+              @click="loadEntry(linkedEntryId)"
+            />
             <BaseButton
               size="small"
               variant="ghost"
               text="取消选词"
+              :disabled="isSubmissionLocked()"
               @click="clearEntry"
             />
           </view>
@@ -131,6 +142,7 @@
             <view class="record-section__capture">
               <AudioCapture
                 :audio="audio"
+                :disabled="isSubmissionLocked()"
                 :invalid="Boolean(audio.invalid || (audio.path && fieldErrors.audio_url))"
                 @change="onAudioChange"
                 @clear="clearAudio"
@@ -179,9 +191,22 @@
               :note="selectedDialectLabel"
               arrow
               hover
-              @click="dialectPickerVisible = true"
-              @keydown.enter="dialectPickerVisible = true"
-              @keydown.space.prevent="dialectPickerVisible = true"
+              :aria-disabled="isSubmissionLocked()"
+              @click="openDialectPicker"
+              @keydown.enter="openDialectPicker"
+              @keydown.space.prevent="openDialectPicker"
+            />
+            <BaseLoading
+              v-if="dialectsLoading"
+              text="正在读取地区列表"
+            />
+            <EmptyState
+              v-else-if="dialectsError"
+              title="暂时读不到地区列表"
+              :description="dialectsError"
+              :action-text="isSubmissionLocked() ? '' : '重新加载地区'"
+              role="alert"
+              @action="loadDialects"
             />
             <view
               v-if="fieldErrors.usage_dialect_id"
@@ -220,13 +245,15 @@
               </text>
             </view>
             <BaseField
-              v-model="form.original_gloss"
+              :model-value="form.original_gloss"
+              :disabled="isSubmissionLocked()"
               name="original_gloss"
               type="textarea"
               label="大意"
               required
               :maxlength="300"
               placeholder="例如：表示害怕的意思；看到危险时会说"
+              @update:model-value="updateFormField('original_gloss', $event)"
               @change="clearFieldError('original_gloss')"
             />
             <view
@@ -251,32 +278,38 @@
           >
             <view class="optional-fields">
               <BaseField
-                v-model="form.original_writing"
+                :model-value="form.original_writing"
+                :disabled="isSubmissionLocked()"
                 name="original_writing"
                 label="我猜的写法"
                 :maxlength="160"
                 placeholder="不确定也可以写，系统会标成待考"
+                @update:model-value="updateFormField('original_writing', $event)"
               />
               <BaseField
-                v-model="form.original_pronunciation"
+                :model-value="form.original_pronunciation"
+                :disabled="isSubmissionLocked()"
                 name="original_pronunciation"
                 label="我熟悉的读音记法"
                 :maxlength="240"
                 placeholder="IPA、罗马字或自己的记法都可以"
+                @update:model-value="updateFormField('original_pronunciation', $event)"
               />
 
               <view
-                v-if="!selectedEntry"
+                v-if="!linkedEntryId"
                 class="entry-linker"
               >
                 <view class="entry-linker__heading">
                   关联已有词条
                 </view>
                 <BaseField
-                  v-model="entryKeyword"
+                  :model-value="entryKeyword"
+                  :disabled="isSubmissionLocked()"
                   name="entry_keyword"
                   label="查找词条"
                   placeholder="按写法或大意搜索"
+                  @update:model-value="updateEntryKeyword"
                   @confirm="searchEntries"
                 />
                 <BaseButton
@@ -284,6 +317,7 @@
                   variant="ghost"
                   :loading="entrySearching"
                   text="查找可关联词条"
+                  :disabled="isSubmissionLocked()"
                   @click="searchEntries"
                 />
                 <view
@@ -292,6 +326,7 @@
                   class="entry-candidate"
                   role="button"
                   :aria-label="`关联词条：${entryTitle(entry)}`"
+                  :aria-disabled="isSubmissionLocked()"
                   @tap="selectEntry(entry)"
                 >
                   <view class="entry-candidate__title">
@@ -307,19 +342,23 @@
               </view>
 
               <BaseField
-                v-model="form.citation"
+                :model-value="form.citation"
+                :disabled="isSubmissionLocked()"
                 name="citation"
                 label="来源补充"
                 :maxlength="500"
                 placeholder="谁教你这样说，或记录在哪本资料里"
+                @update:model-value="updateFormField('citation', $event)"
               />
               <BaseField
-                v-model="form.rights_statement"
+                :model-value="form.rights_statement"
+                :disabled="isSubmissionLocked()"
                 name="rights_statement"
                 type="textarea"
                 label="录音授权说明"
                 :maxlength="300"
                 placeholder="例如：允许乡声集盒展示与非商业研究引用，请注明录制者"
+                @update:model-value="updateFormField('rights_statement', $event)"
               />
             </view>
           </t-collapse-panel>
@@ -341,8 +380,8 @@
           <BaseButton
             block
             size="large"
-            :loading="submitting"
-            :disabled="submitting || savingDraft"
+            :loading="submitting || validatingSubmission"
+            :disabled="!draftReady || isSubmissionLocked() || savingDraft"
             text="提交并公开"
             @click="submit"
           />
@@ -353,7 +392,7 @@
       </BaseForm>
 
       <DialectSelector
-        v-if="capabilityAvailable"
+        v-if="capabilityAvailable && !isSubmissionLocked()"
         v-model:visible="dialectPickerVisible"
         :value="form.usage_dialect_id"
         :dialects="dialects"
@@ -375,7 +414,9 @@ import AudioCapture from '@/components/AudioCapture.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
+import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
   createRecording,
@@ -411,7 +452,9 @@ export default {
     BaseButton,
     BaseField,
     BaseForm,
+    BaseLoading,
     DialectSelector,
+    EmptyState,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -435,12 +478,18 @@ export default {
       validationTarget: '',
       optionalSections: [],
       dialects: [],
+      dialectsLoading: false,
+      dialectsError: '',
       dialectPickerVisible: false,
       entryKeyword: '',
       entryCandidates: [],
       entrySearching: false,
       selectedEntry: null,
+      linkedEntryId: null,
+      entryLoading: false,
+      entryLoadVersion: 0,
       submitting: false,
+      validatingSubmission: false,
       draftId: '',
       ownerScope: '',
       savingDraft: false,
@@ -500,14 +549,14 @@ export default {
   watch: {
     form: { deep: true, handler() { this.scheduleDraft(); } },
     audio: { deep: true, handler() { this.scheduleDraft(); } },
-    selectedEntry() { this.scheduleDraft(); },
+    linkedEntryId() { this.scheduleDraft(); },
   },
   async onLoad(options = {}) {
     if (!requireAuth('record_recording', { page: 'record' })) return;
     this.capabilityAvailable = ensureCapability(CAPABILITIES.RECORDING, 'record');
     if (!this.capabilityAvailable) return;
     this.ownerScope = draftOwner();
-    await this.loadDialects();
+    await this.loadDialects({ applyDefault: true });
     if (options.draft_id) {
       try {
         const draft = await restoreRecordingDraft(options.draft_id, this.ownerScope);
@@ -515,14 +564,15 @@ export default {
         this.form = { ...this.form, ...draft.form };
         this.audio = draft.audio || emptyAudio();
         if (!this.audio.path) this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
-        if (draft.entryId) await this.loadEntry(draft.entryId);
+        this.clearEntry();
+        if (draft.entryId) this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
     } else if (options.entry_id) {
       const matchingDraft = listRecordingDrafts(this.ownerScope)
         .filter((draft) => String(draft.entryId) === String(options.entry_id))
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0))[0];
       if (matchingDraft) await this.restoreDraft(matchingDraft.id);
-      else await this.loadEntry(options.entry_id);
+      else this.loadEntry(options.entry_id);
     } else {
       const [latestDraft] = listRecordingDrafts(this.ownerScope)
         .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
@@ -555,17 +605,30 @@ export default {
     releaseDraftAudioUrl(this.audio);
     this.audio = emptyAudio();
     this.form = Object.fromEntries(Object.keys(this.form).map((key) => [key, '']));
-    this.selectedEntry = null;
+    this.resetEntrySelection();
     this.draftId = '';
     this.draftMessage = '账号已切换，请重新打开录音页';
-    this.goRecordingDrafts();
+    goRecordingDrafts();
   },
   onHide() { this.persistDirtyDraft(); },
   onUnload() {
+    this.entryLoadVersion += 1;
     clearTimeout(this.draftTimer);
     this.persistDirtyDraft().finally(() => { releaseDraftAudioUrl(this.audio); });
   },
   methods: {
+    isSubmissionLocked() {
+      return this.validatingSubmission || this.submitting;
+    },
+    updateFormField(field, value) {
+      if (!this.isSubmissionLocked()) this.form[field] = value;
+    },
+    updateEntryKeyword(value) {
+      if (!this.isSubmissionLocked()) this.entryKeyword = value;
+    },
+    openDialectPicker() {
+      if (!this.isSubmissionLocked()) this.dialectPickerVisible = true;
+    },
     async restoreDraft(id) {
       try {
         const draft = await restoreRecordingDraft(id, this.ownerScope);
@@ -575,15 +638,17 @@ export default {
         if (!this.audio.path || draft.audioInvalid) {
           this.draftMessage = '文字已恢复，音频不可用，请重新选择或录制';
         }
-        if (draft.entryId) await this.loadEntry(draft.entryId);
+        this.clearEntry();
+        if (draft.entryId) this.loadEntry(draft.entryId);
       } catch (error) { notify({ title: error.message }); }
     },
     async goRecordingDrafts() {
+      if (this.isSubmissionLocked()) return;
       await this.persistDirtyDraft();
       goRecordingDrafts();
     },
     draftSignature() {
-      return JSON.stringify([this.form, this.audio.path, this.selectedEntry?.id || null]);
+      return JSON.stringify([this.form, this.audio.path, this.linkedEntryId || null]);
     },
     scheduleDraft() {
       clearTimeout(this.draftTimer);
@@ -621,7 +686,7 @@ export default {
           id: this.draftId,
           form: { ...this.form },
           audio: { ...this.audio },
-          entryId: this.selectedEntry?.id,
+          entryId: this.linkedEntryId,
         }, this.ownerScope);
         if (draftOwner() !== this.ownerScope) {
           return { restorable: false, message: '账号已切换，请重新打开录音页' };
@@ -639,44 +704,75 @@ export default {
         if (!silent || draft.audioError) {
           notify({ title: this.draftMessage || '草稿已保存，可稍后继续' });
         }
-        return { restorable: unchanged && !draft.audioError, message: this.draftMessage };
+        return {
+          restorable: unchanged && !draft.audioError,
+          message: this.draftMessage,
+          audioPath: draft.audio?.path || audioPath,
+        };
       } catch (error) {
         if (error.persistedAudio && this.audio.path === audioPath) {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
         this.draftMessage = error.message;
         if (!silent) notify({ title: error.message });
-        return { restorable: false, message: this.draftMessage };
+        return {
+          restorable: false,
+          message: this.draftMessage,
+          audioPath: error.persistedAudio?.path || audioPath,
+        };
       } finally { this.savingDraft = false; }
     },
     dialectLabel,
     entryTitle,
-    async loadDialects() {
+    async loadDialects({ applyDefault = false } = {}) {
+      if (this.dialectsLoading || this.isSubmissionLocked()) return;
+      this.dialectsLoading = true;
       try {
-        this.dialects = await listAllDialects();
-        if (this.primaryDialect?.id) this.form.usage_dialect_id = this.primaryDialect.id;
+        const dialects = await listAllDialects();
+        if (!dialects.length) throw new Error('地区列表为空');
+        this.dialects = dialects;
+        this.dialectsError = '';
+        if (applyDefault && !this.form.usage_dialect_id && this.primaryDialect?.id) {
+          this.form.usage_dialect_id = this.primaryDialect.id;
+        }
       } catch (error) {
-        this.dialects = [];
+        this.dialectsError = '地区列表暂时无法读取，请重试。已填写的内容会保留。';
+      } finally {
+        this.dialectsLoading = false;
       }
     },
     async loadEntry(id) {
+      if (!id || this.isSubmissionLocked()) return;
+      this.entryLoadVersion += 1;
+      const version = this.entryLoadVersion;
+      this.linkedEntryId = id;
+      this.selectedEntry = null;
+      this.entryLoading = true;
       try {
-        this.selectedEntry = await getEntry(id);
+        const entry = await getEntry(id);
+        if (version === this.entryLoadVersion) this.selectedEntry = entry;
       } catch (error) {
-        notify({ title: '原词条暂时无法读取', icon: 'none' });
+        if (version === this.entryLoadVersion) {
+          notify({ title: '原词条暂时无法读取，关联已保留', icon: 'none' });
+        }
+      } finally {
+        if (version === this.entryLoadVersion) this.entryLoading = false;
       }
     },
     onAudioChange(audio) {
+      if (this.isSubmissionLocked()) return;
       this.audio = { ...emptyAudio(), ...audio };
       this.clearFieldError('audio_url');
     },
     clearAudio() {
+      if (this.isSubmissionLocked()) return;
       this.audio = emptyAudio();
     },
     onAudioError(error) {
       notify({ title: error?.message || error?.errMsg || '录音失败，请重试', icon: 'none' });
     },
     onDialectChange(context = {}) {
+      if (this.isSubmissionLocked()) return;
       this.form.usage_dialect_id = context.value || '';
       this.clearFieldError('usage_dialect_id');
     },
@@ -684,6 +780,7 @@ export default {
       if (this.fieldErrors[field]) delete this.fieldErrors[field];
     },
     async searchEntries() {
+      if (this.isSubmissionLocked()) return;
       const keyword = String(this.entryKeyword || '').trim();
       if (!keyword) {
         notify({ title: '先输入写法或大意', icon: 'none' });
@@ -700,10 +797,21 @@ export default {
       }
     },
     selectEntry(entry) {
+      if (this.isSubmissionLocked()) return;
+      this.entryLoadVersion += 1;
+      this.entryLoading = false;
+      this.linkedEntryId = entry.id;
       this.selectedEntry = entry;
       this.entryCandidates = [];
     },
     clearEntry() {
+      if (this.isSubmissionLocked()) return;
+      this.resetEntrySelection();
+    },
+    resetEntrySelection() {
+      this.entryLoadVersion += 1;
+      this.entryLoading = false;
+      this.linkedEntryId = null;
       this.selectedEntry = null;
       this.entryCandidates = [];
     },
@@ -733,31 +841,52 @@ export default {
       return true;
     },
     async submit() {
-      if (this.submitting || this.savingDraft || !await this.validateForm()) return;
+      if (!this.draftReady || this.submitting || this.savingDraft
+        || this.validatingSubmission) return;
+      // Block repeated taps without suppressing draft persistence while validating.
+      this.validatingSubmission = true;
+      this.dialectPickerVisible = false;
+      // Keep the audio, meaning, authorization and entry from one submission.
+      const submission = {
+        form: { ...this.form },
+        audio: { ...this.audio },
+        entryId: this.linkedEntryId,
+        owner: this.ownerScope,
+      };
+      try {
+        if (!await this.validateForm()) return;
+      } finally {
+        this.validatingSubmission = false;
+      }
       if (draftOwner() !== this.ownerScope) { notify({ title: '账号已切换，请重新打开录音页' }); return; }
       this.submitting = true;
       clearTimeout(this.draftTimer);
-      await this.saveDraft({ silent: true });
       try {
-        const uploaded = await uploadFile(this.audio.path);
-        if (draftOwner() !== this.ownerScope) throw new Error('账号已切换，请重新打开录音页');
+        const savedDraft = await this.saveDraft({ silent: true });
+        if (!this.draftReady) return;
+        if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
+        // Native saveFile moves the temporary file; use its persisted location.
+        const uploaded = await uploadFile(savedDraft?.audioPath || submission.audio.path);
+        if (!this.draftReady) return;
+        if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
         const payload = {
           audio_url: uploaded.url,
-          usage_dialect_id: Number(this.form.usage_dialect_id),
-          recording_type: this.form.recording_type || 'word',
-          original_gloss: String(this.form.original_gloss).trim(),
-          duration_ms: Number(uploaded.duration_ms ?? this.audio.durationMs ?? 0),
-          rights_statement: String(this.form.rights_statement || '').trim(),
-          original_writing: String(this.form.original_writing || '').trim(),
-          original_pronunciation: String(this.form.original_pronunciation || '').trim(),
-          citation: String(this.form.citation || '').trim(),
+          usage_dialect_id: Number(submission.form.usage_dialect_id),
+          recording_type: submission.form.recording_type || 'word',
+          original_gloss: String(submission.form.original_gloss).trim(),
+          duration_ms: Number(uploaded.duration_ms ?? submission.audio.durationMs ?? 0),
+          rights_statement: String(submission.form.rights_statement || '').trim(),
+          original_writing: String(submission.form.original_writing || '').trim(),
+          original_pronunciation: String(submission.form.original_pronunciation || '').trim(),
+          citation: String(submission.form.citation || '').trim(),
         };
-        if (this.selectedEntry?.id) payload.primary_entry_id = this.selectedEntry.id;
+        if (submission.entryId) payload.primary_entry_id = submission.entryId;
         const recording = await createRecording(payload);
+        if (!this.draftReady || draftOwner() !== submission.owner) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'success',
-          metadata: { has_linked_entry: Boolean(this.selectedEntry?.id) },
+          metadata: { has_linked_entry: Boolean(submission.entryId) },
         });
         this.submitted = true;
         clearTimeout(this.draftTimer);
@@ -767,10 +896,11 @@ export default {
         }
         goRecordingDetail(recording.id, { replace: true });
       } catch (error) {
+        if (!this.draftReady) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'error',
-          metadata: { has_linked_entry: Boolean(this.selectedEntry?.id) },
+          metadata: { has_linked_entry: Boolean(submission.entryId) },
         });
         this.fieldErrors = {
           ...this.fieldErrors,

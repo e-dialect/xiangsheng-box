@@ -36,8 +36,10 @@ vi.mock('@/services/productAnalytics', () => ({
 const {
   listRecordingDrafts, restoreRecordingDraft, draftOwner, saveRecordingDraft,
 } = await import('@/services/recordingDrafts');
-const { getEntry } = await import('@/services/entryRecording');
+const { getEntry, createRecording } = await import('@/services/entryRecording');
+const { uploadFile } = await import('@/services/file');
 const { notify } = await import('@/services/feedback');
+const { listAllDialects } = await import('@/services/guantou');
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
 
 function pageContext() {
@@ -105,5 +107,150 @@ describe('recording page draft reuse by entry', () => {
     await page.performSaveDraft();
     expect(notify).toHaveBeenCalledTimes(1);
     expect(notify).toHaveBeenCalledWith({ title: '草稿箱已满，请清理后重试' });
+  });
+});
+
+describe('recording entry association survives unavailable metadata', () => {
+  beforeEach(() => {
+    getEntry.mockRejectedValue(new Error('offline'));
+    restoreRecordingDraft.mockResolvedValue({
+      id: 'existing',
+      entryId: 17,
+      form: { original_gloss: '原大意', usage_dialect_id: 11 },
+      audio: { path: 'blob:saved', invalid: false },
+    });
+    saveRecordingDraft.mockResolvedValue({ id: 'existing', audioError: false });
+  });
+
+  it('keeps the restored association when editing and saving, then submitting', async () => {
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, { draft_id: 'existing' });
+    expect(page.selectedEntry).toBeNull();
+    expect(page.linkedEntryId).toBe(17);
+    page.form.original_gloss = '修改的大意';
+    await page.persistDirtyDraft();
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(
+      expect.objectContaining({ entryId: 17, form: expect.objectContaining({ original_gloss: '修改的大意' }) }),
+      'user:1',
+    );
+    page.$refs = { form: { validate: vi.fn(async () => true) } };
+    uploadFile.mockResolvedValue({ url: '/recording.wav' });
+    createRecording.mockResolvedValue({ id: 90 });
+    await page.submit();
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({ primary_entry_id: 17 }));
+  });
+
+  it('keeps an entry route association and restores a matching draft even if lookup fails', async () => {
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, { entry_id: '17' });
+    expect(page.linkedEntryId).toBe('17');
+    await page.saveDraft();
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(expect.objectContaining({ entryId: '17' }), 'user:1');
+    listRecordingDrafts.mockReturnValue([{ id: 'existing', entryId: 17, updatedAt: 1 }]);
+    const restored = pageContext();
+    await RecordingCreate.onLoad.call(restored, { entry_id: '17' });
+    expect(restored.draftId).toBe('existing');
+    expect(restored.linkedEntryId).toBe(17);
+  });
+
+  it('retries metadata without changing the draft signature or restored fields', async () => {
+    const page = pageContext();
+    await page.restoreDraft('existing');
+    const signature = page.draftSignature();
+    getEntry.mockResolvedValue({ id: 17, summary: '已恢复词条信息' });
+    await page.loadEntry(page.linkedEntryId);
+    expect(page.selectedEntry.summary).toBe('已恢复词条信息');
+    expect(page.draftSignature()).toBe(signature);
+  });
+
+  it('only removes the association on explicit unlink and ignores a late lookup', async () => {
+    const page = pageContext();
+    let resolveEntry;
+    getEntry.mockImplementation(() => new Promise((resolve) => { resolveEntry = resolve; }));
+    const loading = page.loadEntry(17);
+    page.clearEntry();
+    resolveEntry({ id: 17 });
+    await loading;
+    await page.saveDraft();
+    expect(page.selectedEntry).toBeNull();
+    expect(page.linkedEntryId).toBeNull();
+    expect(page.entryLoading).toBe(false);
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(expect.objectContaining({ entryId: null }), 'user:1');
+  });
+
+  it('does not overwrite an explicit replacement with an older lookup', async () => {
+    const page = pageContext();
+    let resolveEntry;
+    getEntry.mockImplementation(() => new Promise((resolve) => { resolveEntry = resolve; }));
+    const loading = page.loadEntry(17);
+    page.selectEntry({ id: 18, summary: '替换词条' });
+    resolveEntry({ id: 17 });
+    await loading;
+    await page.saveDraft();
+    expect(page.selectedEntry.id).toBe(18);
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(expect.objectContaining({ entryId: 18 }), 'user:1');
+  });
+});
+
+describe('pending entry lookup does not block draft persistence', () => {
+  it('saves explicit unlink on unload before metadata resolves', async () => {
+    let resolveEntry;
+    getEntry.mockImplementation(() => new Promise((resolve) => { resolveEntry = resolve; }));
+    restoreRecordingDraft.mockResolvedValue({
+      id: 'existing', entryId: 17, form: {}, audio: null,
+    });
+    saveRecordingDraft.mockResolvedValue({ id: 'existing', audioError: false });
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, { draft_id: 'existing' });
+    expect(page.draftReady).toBe(true);
+    page.clearEntry();
+    RecordingCreate.onUnload.call(page);
+    await page.draftSavePromise;
+    expect(saveRecordingDraft).toHaveBeenLastCalledWith(expect.objectContaining({ entryId: null }), 'user:1');
+    resolveEntry({ id: 17 });
+    await Promise.resolve();
+    expect(page.selectedEntry).toBeNull();
+    const [savedDraft] = saveRecordingDraft.mock.calls.at(-1);
+    restoreRecordingDraft.mockResolvedValue(savedDraft);
+    const reopened = pageContext();
+    await RecordingCreate.onLoad.call(reopened, { draft_id: 'existing' });
+    expect(reopened.linkedEntryId).toBeNull();
+    expect(reopened.selectedEntry).toBeNull();
+  });
+});
+
+describe('recording page continues initialization after a region load failure', () => {
+  it.each([
+    [{ draft_id: 'saved' }, false],
+    [{ entry_id: '17' }, true],
+  ])('restores the draft and its selected region for %j', async (options, matchingEntry) => {
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    if (matchingEntry) listRecordingDrafts.mockReturnValue([{ id: 'saved', entryId: 17 }]);
+    restoreRecordingDraft.mockResolvedValue({
+      id: 'saved',
+      entryId: 17,
+      form: { usage_dialect_id: 3, original_gloss: '草稿大意' },
+      audio: { path: 'blob:saved' },
+    });
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, options);
+    expect(page.draftReady).toBe(true);
+    expect(page.dialectsError).toContain('请重试');
+    expect(page.audio.path).toBe('blob:saved');
+    expect(page.form.usage_dialect_id).toBe(3);
+    listAllDialects.mockResolvedValueOnce([{ id: 3, name: '城里' }]);
+    await page.loadDialects();
+    expect(page.form.usage_dialect_id).toBe(3);
+    expect(page.form.original_gloss).toBe('草稿大意');
+    expect(page.selectedEntry.id).toBe(17);
+  });
+
+  it('initializes a new contribution even when the region catalog is unavailable', async () => {
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    const page = pageContext();
+    await RecordingCreate.onLoad.call(page, {});
+    expect(page.draftReady).toBe(true);
+    expect(page.dialectsError).toContain('请重试');
+    expect(page.form.usage_dialect_id).toBe('');
   });
 });
