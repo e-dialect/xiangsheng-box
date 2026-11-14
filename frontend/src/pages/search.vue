@@ -581,7 +581,7 @@ export default {
   },
   computed: {
     interpretedTerm() {
-      const term = entryQuestionTerm(this.submittedKeyword);
+      const term = this.appliedFilters?.keyword;
       return term !== this.submittedKeyword ? term : '';
     },
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
@@ -646,7 +646,7 @@ export default {
       if (!String(value || '').trim() || String(value).trim() === this.submittedKeyword) return;
       this.suggestTimer = setTimeout(async () => {
         try {
-          const items = await suggestEntries(entryQuestionTerm(value));
+          const items = await suggestEntries(entryQuestionTerm(value, this.dialects));
           if (sequence === this.suggestSequence) this.suggestions = pageResults(items);
         } catch (error) {
           if (sequence === this.suggestSequence) this.suggestions = [];
@@ -723,12 +723,7 @@ export default {
       }[status] || '待整理';
     },
     requestParams(page, filters = this.filters) {
-      return buildEntrySearchParams({
-        ...filters,
-        keyword: entryQuestionTerm(filters.keyword),
-        page,
-        pageSize: 20,
-      });
+      return buildEntrySearchParams({ ...filters, page, pageSize: 20 });
     },
     quickSearch(keyword) {
       this.filters.keyword = keyword;
@@ -755,7 +750,8 @@ export default {
       const requestId = this.searchRequestId + 1;
       this.searchRequestId = requestId;
       this.loadingMore = false;
-      this.submittedKeyword = String(this.filters.keyword || '').trim();
+      this.submittedKeyword = String(filters.keyword || '').trim();
+      filters.keyword = entryQuestionTerm(this.submittedKeyword, this.dialects);
       rememberSearch(this.filters.keyword);
       this.history = searchHistory();
       this.suggestions = [];
