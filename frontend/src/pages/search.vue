@@ -13,7 +13,7 @@
           aria-role="searchbox"
           aria-label="写法、意思或读音"
           clearable
-          placeholder="例如：行、害怕、hiŋ"
+          placeholder="例如：行怎么读、害怕、hiŋ"
           @confirm="search"
         />
         <BaseButton
@@ -79,6 +79,13 @@
         <t-picker-item :options="sourceTypes" />
       </t-picker>
 
+      <text
+        v-if="searched && !loading && !errorMessage && interpretedTerm"
+        class="entry-search__query-note"
+        role="status"
+      >
+        按「{{ interpretedTerm }}」查找词条
+      </text>
       <view
         v-if="loading && !entries.length"
         class="entry-search__state"
@@ -438,6 +445,7 @@ import {
 import {
   suggestEntries, popularEntries, searchHistory, rememberSearch, clearSearchHistory,
 } from '@/services/entrySearchAssist';
+import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
   goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
@@ -572,6 +580,10 @@ export default {
     };
   },
   computed: {
+    interpretedTerm() {
+      const term = entryQuestionTerm(this.submittedKeyword);
+      return term !== this.submittedKeyword ? term : '';
+    },
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
@@ -634,7 +646,7 @@ export default {
       if (!String(value || '').trim() || String(value).trim() === this.submittedKeyword) return;
       this.suggestTimer = setTimeout(async () => {
         try {
-          const items = await suggestEntries(value);
+          const items = await suggestEntries(entryQuestionTerm(value));
           if (sequence === this.suggestSequence) this.suggestions = pageResults(items);
         } catch (error) {
           if (sequence === this.suggestSequence) this.suggestions = [];
@@ -711,7 +723,12 @@ export default {
       }[status] || '待整理';
     },
     requestParams(page, filters = this.filters) {
-      return buildEntrySearchParams({ ...filters, page, pageSize: 20 });
+      return buildEntrySearchParams({
+        ...filters,
+        keyword: entryQuestionTerm(filters.keyword),
+        page,
+        pageSize: 20,
+      });
     },
     quickSearch(keyword) {
       this.filters.keyword = keyword;
@@ -1057,6 +1074,12 @@ export default {
   font-size: 23rpx;
   font-weight: 800;
 }
+.entry-search__query-note {
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
 .entry-search__scope {
   display: flex;
   flex-wrap: wrap;

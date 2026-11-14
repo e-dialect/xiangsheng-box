@@ -182,6 +182,39 @@ describe('entry-first search page orchestration', () => {
     expect(JSON.stringify(analyticsRequest.mock.calls[0])).not.toContain('银行用字');
   });
 
+  it('uses the extracted term when paging without replacing the question or selected region', async () => {
+    const page = pageContext();
+    Object.assign(page.filters, { keyword: '「行」怎么读？', dialectId: 23, dialectMatch: 'exact' });
+    request.get.mockResolvedValueOnce({ results: [{ id: 1 }], next: '/entries/?page=2' })
+      .mockResolvedValueOnce({ results: [{ id: 2 }], next: null });
+
+    await page.search();
+    page.filters.keyword = '正在编辑的下一句';
+    await page.loadMore();
+
+    const calls = request.get.mock.calls.map(([, params]) => params);
+    expect(calls).toEqual([1, 2].map((number) => expect.objectContaining({
+      search: '行', dialect_id: 23, dialect_scope: 'exact', page: number,
+    })));
+    expect(page.submittedKeyword).toBe('「行」怎么读？');
+    expect(page.filters.keyword).toBe('正在编辑的下一句');
+    expect(page.entries.map(({ id }) => id)).toEqual([1, 2]);
+  });
+
+  it.each([
+    ['害怕什么意思？', '害怕'],
+    ['“银行 行业”是什么意思？', '银行 行业'],
+    ['行哪里这样说', '行'],
+    [' hiŋ ', 'hiŋ'],
+    ['害怕莆田话怎么说？', '害怕莆田话怎么说？'],
+    ['行在莆田怎么读？', '行在莆田怎么读？'],
+    ['怎么读？', '怎么读？'],
+  ])('uses %s as a question or a literal keyword', (input, expected) => {
+    const page = pageContext();
+    page.filters.keyword = input;
+    expect(page.requestParams(1).search).toBe(expected);
+  });
+
   it('preserves false and exact values in advanced filters', () => {
     const page = pageContext();
     page.filters.dialectId = 23;
