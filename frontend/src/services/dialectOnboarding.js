@@ -58,12 +58,27 @@ export async function loadDialectSample(dialectId) {
 }
 
 export async function saveDialectProfile(userId, { nickname, primaryDialectId }) {
-  const response = await request.put(`/users/${userId}`, {
-    user: {
-      nickname: String(nickname || '').trim(),
-      primary_dialect_id: primaryDialectId,
-    },
-  });
+  const token = uni.getStorageSync('token');
+  const sameSession = () => Boolean(token)
+    && uni.getStorageSync('token') === token
+    && String(uni.getStorageSync('id')) === String(userId);
+  if (!sameSession()) return null;
+
+  let response;
+  try {
+    // The page owns failure feedback so a late response cannot redirect a new session.
+    response = await request.put(`/users/${userId}`, {
+      user: {
+        nickname: String(nickname || '').trim(),
+        primary_dialect_id: primaryDialectId,
+      },
+    }, true);
+  } catch (error) {
+    if (!sameSession()) return null;
+    throw error;
+  }
+  // Logout, account replacement and a fresh login invalidate the initiating session.
+  if (!sameSession()) return null;
   if (response.token) uni.setStorageSync('token', response.token);
   const app = getApp();
   app.globalData.userInfo = response.user;
