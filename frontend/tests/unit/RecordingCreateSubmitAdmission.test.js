@@ -33,8 +33,11 @@ vi.mock('@/services/productAnalytics', () => ({
   PRODUCT_EVENTS: { RECORDING_SUBMIT: 'recording_submit' }, trackProductEvent: vi.fn(),
 }));
 
-const { draftOwner, saveRecordingDraft, restoreRecordingDraft } = await import('@/services/recordingDrafts');
+const {
+  draftOwner, saveRecordingDraft, restoreRecordingDraft, deleteRecordingDraft,
+} = await import('@/services/recordingDrafts');
 const { createRecording } = await import('@/services/entryRecording');
+const { notify, notifySuccess } = await import('@/services/feedback');
 const { uploadFile } = await import('@/services/file');
 const { goRecordingDrafts, goRecordingDetail } = await import('@/services/navigation');
 const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
@@ -154,7 +157,7 @@ describe('recording submit admission', () => {
     RecordingCreate.onHide.call(page);
     await page.draftSavePromise;
     expect(saveRecordingDraft).toHaveBeenCalledTimes(1);
-    validation.resolve(false);
+    validation.resolve(true);
     await submission;
     expect(page.validatingSubmission).toBe(false);
     expect(uploadFile).not.toHaveBeenCalled();
@@ -186,14 +189,14 @@ describe('recording submit admission', () => {
     expect(page.dialectPickerVisible).toBe(false);
     gate.resolve(stage === 'validation' ? true : { url: 'https://example.com/A.mp3' });
     await pending;
-    expect(uploadFile).toHaveBeenCalledWith('blob:recording');
+    expect(uploadFile.mock.calls[0][0]).toBe('blob:recording');
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       original_gloss: '家乡话',
       usage_dialect_id: 1,
       primary_entry_id: 10,
       duration_ms: 1000,
       rights_statement: '',
-    }));
+    }), expect.any(Object));
   });
 
   it('uses an immutable payload even if reactive state changes during upload', async () => {
@@ -210,7 +213,7 @@ describe('recording submit admission', () => {
     await pending;
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       original_gloss: '家乡话', duration_ms: 1000, primary_entry_id: 10,
-    }));
+    }), expect.any(Object));
   });
 
   it('unlocks edits after upload failure while retaining the original recovery draft', async () => {
@@ -267,8 +270,11 @@ describe('recording submit admission', () => {
       saveRecordingDraft.mockRejectedValueOnce(error);
     } else saveRecordingDraft.mockResolvedValueOnce({ id: 'draft-1', audio: { path: 'wxfile://saved' } });
     await page.submit();
-    expect(uploadFile).toHaveBeenCalledWith('wxfile://saved');
-    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: 2000 }));
+    expect(uploadFile.mock.calls[0][0]).toBe('wxfile://saved');
+    expect(createRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ duration_ms: 2000 }),
+      expect.any(Object),
+    );
   });
 
   it('does not interrupt editing during a background draft save', () => {
@@ -308,10 +314,106 @@ describe('recording submit admission', () => {
     expect(page.draftReady).toBe(true);
     expect(page.selectedEntry).toBeNull();
     await page.submit();
-    expect(uploadFile).toHaveBeenCalledWith('blob:B');
+    expect(uploadFile.mock.calls[0][0]).toBe('blob:B');
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       original_gloss: 'meaning B', usage_dialect_id: 2, primary_entry_id: 20, duration_ms: 2000,
-    }));
+    }), expect.any(Object));
     entry.resolve();
+  });
+});
+
+describe('recording submission after leaving the page', () => {
+  it.each([
+    ['upload', 'onUnload'],
+    ['create', 'onHide'],
+  ])('finishes submission after leaving during %s without updating navigation or repeating the submission', async (stage, lifecycle) => {
+    const response = deferred();
+    const request = stage === 'upload' ? uploadFile : createRecording;
+    request.mockReturnValueOnce(response.promise);
+    const page = pageContext();
+    const submit = page.submit();
+    await vi.waitFor(() => expect(request).toHaveBeenCalled());
+    const { canPresent } = request.mock.calls[0][1];
+    expect(canPresent()).toBe(true);
+
+    RecordingCreate[lifecycle].call(page);
+    if (lifecycle === 'onHide') RecordingCreate.onShow.call(page);
+    expect(canPresent()).toBe(false);
+    response.resolve(stage === 'upload' ? { url: 'https://example.com/audio.mp3' } : { id: 23 });
+    await submit;
+
+    expect(page.submitting).toBe(false);
+    expect(page.submitted).toBe(true);
+    expect(deleteRecordingDraft).toHaveBeenCalledTimes(1);
+    expect(deleteRecordingDraft).toHaveBeenCalledWith('draft-1', 'user:1');
+    expect(goRecordingDetail).not.toHaveBeenCalled();
+    expect(notifySuccess).not.toHaveBeenCalled();
+    await page.submit();
+    expect(createRecording).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['upload', 'create'])('retains a retryable draft without stale feedback on late %s failure', async (stage) => {
+    const response = deferred();
+    const request = stage === 'upload' ? uploadFile : createRecording;
+    request.mockReturnValueOnce(response.promise);
+    const page = pageContext();
+    const submit = page.submit();
+    await vi.waitFor(() => expect(request).toHaveBeenCalled());
+    saveRecordingDraft.mockResolvedValueOnce({ id: 'draft-1', audioError: true });
+
+    RecordingCreate.onHide.call(page);
+    RecordingCreate.onShow.call(page);
+    response.reject(Object.assign(new Error('offline'), { data: { audio_url: 'old error' } }));
+    await submit;
+
+    expect(page.submitting).toBe(false);
+    expect(page.submitted).toBe(false);
+    expect(saveRecordingDraft).toHaveBeenCalledTimes(2);
+    expect(page.draftId).toBe('draft-1');
+    expect(page.draftMessage).toBe('');
+    expect(page.fieldErrors).toEqual({});
+    expect(deleteRecordingDraft).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(notifySuccess).not.toHaveBeenCalled();
+    expect(goRecordingDetail).not.toHaveBeenCalled();
+    await page.submit();
+    expect(page.submitted).toBe(true);
+    expect(goRecordingDetail).toHaveBeenCalledWith(23, { replace: true });
+  });
+
+  it('suppresses completion feedback if the user leaves during draft cleanup', async () => {
+    const cleanup = deferred();
+    deleteRecordingDraft.mockReturnValueOnce(cleanup.promise);
+    const page = pageContext();
+    const submit = page.submit();
+    await vi.waitFor(() => expect(deleteRecordingDraft).toHaveBeenCalled());
+
+    RecordingCreate.onHide.call(page);
+    cleanup.reject(new Error('storage unavailable'));
+    await submit;
+
+    expect(page.submitted).toBe(true);
+    expect(goRecordingDetail).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
+    expect(notifySuccess).not.toHaveBeenCalled();
+  });
+
+  it('cleans only the original account draft if creation already succeeded after switching accounts', async () => {
+    const response = deferred();
+    createRecording.mockReturnValueOnce(response.promise);
+    const page = pageContext();
+    const submit = page.submit();
+    await vi.waitFor(() => expect(createRecording).toHaveBeenCalled());
+
+    draftOwner.mockReturnValue('user:2');
+    RecordingCreate.onShow.call(page);
+    response.resolve({ id: 23 });
+    await submit;
+
+    expect(goRecordingDrafts).toHaveBeenCalledTimes(1);
+    expect(deleteRecordingDraft).toHaveBeenCalledTimes(1);
+    expect(deleteRecordingDraft).toHaveBeenCalledWith('draft-1', 'user:1');
+    expect(goRecordingDetail).not.toHaveBeenCalled();
+    expect(notifySuccess).not.toHaveBeenCalled();
   });
 });

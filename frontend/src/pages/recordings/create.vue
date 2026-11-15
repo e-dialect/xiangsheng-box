@@ -20,7 +20,7 @@
             variant="ghost"
             text="保存草稿"
             :loading="savingDraft"
-            :disabled="isSubmissionLocked() || savingDraft || !capabilityAvailable"
+            :disabled="submitted || isSubmissionLocked() || savingDraft || !capabilityAvailable"
             @click="saveDraft"
           />
         </view>
@@ -381,8 +381,8 @@
             block
             size="large"
             :loading="submitting || validatingSubmission"
-            :disabled="!draftReady || isSubmissionLocked() || savingDraft"
-            text="提交并公开"
+            :disabled="!draftReady || submitted || isSubmissionLocked() || savingDraft"
+            :text="submitted ? '已提交' : '提交并公开'"
             @click="submit"
           />
           <text class="record-section__help">
@@ -495,6 +495,7 @@ export default {
       savingDraft: false,
       draftMessage: '',
       draftReady: false,
+      submissionViewVersion: 0,
       draftTimer: null,
       draftSavePromise: null,
       savedDraftSignature: '',
@@ -610,11 +611,16 @@ export default {
     this.draftMessage = '账号已切换，请重新打开录音页';
     goRecordingDrafts();
   },
-  onHide() { this.persistDirtyDraft(); },
+  onHide() {
+    this.submissionViewVersion += 1;
+    this.persistDirtyDraft({ canPresent: () => false });
+  },
   onUnload() {
+    this.submissionViewVersion += 1;
     this.entryLoadVersion += 1;
     clearTimeout(this.draftTimer);
-    this.persistDirtyDraft().finally(() => { releaseDraftAudioUrl(this.audio); });
+    this.persistDirtyDraft({ canPresent: () => false })
+      .finally(() => { releaseDraftAudioUrl(this.audio); });
   },
   methods: {
     isSubmissionLocked() {
@@ -655,7 +661,7 @@ export default {
       if (!this.draftReady || this.submitted || this.submitting) return;
       this.draftTimer = setTimeout(() => { this.persistDirtyDraft(); }, 700);
     },
-    async persistDirtyDraft() {
+    async persistDirtyDraft({ canPresent } = {}) {
       clearTimeout(this.draftTimer);
       if (!this.draftReady || this.submitted || this.submitting
         || this.savedDraftSignature === this.draftSignature()) return;
@@ -663,7 +669,7 @@ export default {
         !['usage_dialect_id', 'recording_type'].includes(key) && String(value || '').trim()
       ));
       if (!this.draftId && !this.audio.path && !hasText) return;
-      await this.saveDraft({ silent: true });
+      await this.saveDraft({ silent: true, canPresent });
     },
     saveDraft(options = {}) {
       const pending = (this.draftSavePromise || Promise.resolve()).catch(() => {})
@@ -671,11 +677,11 @@ export default {
       this.draftSavePromise = pending;
       return pending;
     },
-    async performSaveDraft({ silent = false } = {}) {
+    async performSaveDraft({ silent = false, canPresent = () => true } = {}) {
       if (this.submitted) return { restorable: false, message: '录音已提交' };
       if (draftOwner() !== this.ownerScope) {
         const message = '账号已切换，请重新打开录音页';
-        notify({ title: message });
+        if (canPresent()) notify({ title: message });
         return { restorable: false, message };
       }
       this.savingDraft = true;
@@ -699,25 +705,28 @@ export default {
         if (unchanged && !draft.audioError) {
           this.savedDraftSignature = this.draftSignature();
         }
-        if (draft.audioError) this.draftMessage = '仅文字已保存，音频保存失败，请保留本页重试';
-        else this.draftMessage = unchanged ? '' : '上一版已保存，新修改仍待保存';
-        if (!silent || draft.audioError) {
-          notify({ title: this.draftMessage || '草稿已保存，可稍后继续' });
+        let message = unchanged ? '' : '上一版已保存，新修改仍待保存';
+        if (draft.audioError) message = '仅文字已保存，音频保存失败，请保留本页重试';
+        if (canPresent()) {
+          this.draftMessage = message;
+          if (!silent || draft.audioError) notify({ title: message || '草稿已保存，可稍后继续' });
         }
         return {
           restorable: unchanged && !draft.audioError,
-          message: this.draftMessage,
+          message,
           audioPath: draft.audio?.path || audioPath,
         };
       } catch (error) {
         if (error.persistedAudio && this.audio.path === audioPath) {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
-        this.draftMessage = error.message;
-        if (!silent) notify({ title: error.message });
+        if (canPresent()) {
+          this.draftMessage = error.message;
+          if (!silent) notify({ title: error.message });
+        }
         return {
           restorable: false,
-          message: this.draftMessage,
+          message: error.message,
           audioPath: error.persistedAudio?.path || audioPath,
         };
       } finally { this.savingDraft = false; }
@@ -815,8 +824,9 @@ export default {
       this.selectedEntry = null;
       this.entryCandidates = [];
     },
-    async validateForm() {
+    async validateForm(canPresent = () => true) {
       const baseValid = await this.$refs.form.validate();
+      if (!canPresent()) return false;
       const errors = {};
       if (!this.audio.path || this.audio.invalid) errors.audio_url = '请先录音或选择一段音频';
       if (!this.form.usage_dialect_id) errors.usage_dialect_id = '请选择这段话的使用地区';
@@ -835,13 +845,13 @@ export default {
         // Clear first so repeated submissions can revisit the same missing step.
         this.validationTarget = '';
         await this.$nextTick();
-        this.validationTarget = targets[firstMissing] || '';
+        if (canPresent()) this.validationTarget = targets[firstMissing] || '';
         return false;
       }
       return true;
     },
     async submit() {
-      if (!this.draftReady || this.submitting || this.savingDraft
+      if (!this.draftReady || this.submitted || this.submitting || this.savingDraft
         || this.validatingSubmission) return;
       // Block repeated taps without suppressing draft persistence while validating.
       this.validatingSubmission = true;
@@ -853,22 +863,28 @@ export default {
         entryId: this.linkedEntryId,
         owner: this.ownerScope,
       };
+      const viewVersion = this.submissionViewVersion;
+      const hasCurrentOwner = () => this.draftReady && draftOwner() === submission.owner;
+      // Leaving the page invalidates its feedback even if the user returns before completion.
+      const canPresent = () => this.submissionViewVersion === viewVersion && hasCurrentOwner();
       try {
-        if (!await this.validateForm()) return;
+        if (!await this.validateForm(canPresent)) return;
       } finally {
         this.validatingSubmission = false;
       }
-      if (draftOwner() !== this.ownerScope) { notify({ title: '账号已切换，请重新打开录音页' }); return; }
+      if (!canPresent()) return;
       this.submitting = true;
       clearTimeout(this.draftTimer);
+      const requestOptions = { canPresent, loading: false };
       try {
-        const savedDraft = await this.saveDraft({ silent: true });
-        if (!this.draftReady) return;
-        if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
+        const savedDraft = await this.saveDraft({ silent: true, canPresent });
+        if (!hasCurrentOwner()) return;
         // Native saveFile moves the temporary file; use its persisted location.
-        const uploaded = await uploadFile(savedDraft?.audioPath || submission.audio.path);
-        if (!this.draftReady) return;
-        if (draftOwner() !== submission.owner) throw new Error('账号已切换，请重新打开录音页');
+        const uploaded = await uploadFile(
+          savedDraft?.audioPath || submission.audio.path,
+          requestOptions,
+        );
+        if (!hasCurrentOwner()) return;
         const payload = {
           audio_url: uploaded.url,
           usage_dialect_id: Number(submission.form.usage_dialect_id),
@@ -881,33 +897,40 @@ export default {
           citation: String(submission.form.citation || '').trim(),
         };
         if (submission.entryId) payload.primary_entry_id = submission.entryId;
-        const recording = await createRecording(payload);
-        if (!this.draftReady || draftOwner() !== submission.owner) return;
-        trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
-          surface: 'record',
-          result: 'success',
-          metadata: { has_linked_entry: Boolean(submission.entryId) },
-        });
+        const submittedDraftId = this.draftId;
+        const recording = await createRecording(payload, requestOptions);
         this.submitted = true;
         clearTimeout(this.draftTimer);
-        notifySuccess(contributionSuccessMessage());
-        if (this.draftId) {
-          try { await deleteRecordingDraft(this.draftId, this.ownerScope); } catch (error) { notify({ title: '乡音已提交，请手动清理旧草稿' }); }
+        if (hasCurrentOwner()) {
+          trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
+            surface: 'record',
+            result: 'success',
+            metadata: { has_linked_entry: Boolean(submission.entryId) },
+          });
         }
+        let cleanupFailed = false;
+        if (submittedDraftId) {
+          try {
+            await deleteRecordingDraft(submittedDraftId, submission.owner);
+          } catch (error) {
+            cleanupFailed = true;
+          }
+        }
+        if (!canPresent()) return;
+        if (cleanupFailed) notify({ title: '乡音已提交，请手动清理旧草稿' });
+        else notifySuccess(contributionSuccessMessage());
         goRecordingDetail(recording.id, { replace: true });
       } catch (error) {
-        if (!this.draftReady) return;
+        if (!hasCurrentOwner()) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'error',
           metadata: { has_linked_entry: Boolean(submission.entryId) },
         });
-        this.fieldErrors = {
-          ...this.fieldErrors,
-          ...(error?.data || {}),
-        };
         const failureMessage = error?.message || error?.errMsg || '请检查网络后重试';
-        const draftResult = await this.saveDraft({ silent: true });
+        const draftResult = await this.saveDraft({ silent: true, canPresent });
+        if (!canPresent()) return;
+        this.fieldErrors = { ...this.fieldErrors, ...(error?.data || {}) };
         const draftFailureMessage = String(draftResult?.message || '草稿未完整保存').replace(/[。\s]+$/, '');
         const recoveryMessage = draftResult?.restorable
           ? '草稿已保存，可从草稿箱重试。'

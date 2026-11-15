@@ -147,7 +147,7 @@ describe('low-threshold recording flow', () => {
       original_gloss: '表示害怕的意思',
       original_writing: '',
       original_pronunciation: '',
-    }));
+    }), expect.any(Object));
     expect(notifySuccess).toHaveBeenCalled();
     expect(goRecordingDetail).toHaveBeenCalledWith(9, { replace: true });
     expect(trackProductEvent).toHaveBeenCalledWith('recording_submit', {

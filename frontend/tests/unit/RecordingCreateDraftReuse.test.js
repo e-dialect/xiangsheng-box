@@ -137,7 +137,10 @@ describe('recording entry association survives unavailable metadata', () => {
     uploadFile.mockResolvedValue({ url: '/recording.wav' });
     createRecording.mockResolvedValue({ id: 90 });
     await page.submit();
-    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({ primary_entry_id: 17 }));
+    expect(createRecording).toHaveBeenCalledWith(
+      expect.objectContaining({ primary_entry_id: 17 }),
+      expect.any(Object),
+    );
   });
 
   it('keeps an entry route association and restores a matching draft even if lookup fails', async () => {
