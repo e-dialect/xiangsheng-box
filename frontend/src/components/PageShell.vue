@@ -48,7 +48,8 @@
         aria-label="刷新当前页面"
         :loading="refreshing"
         :disabled="refreshing"
-        @click="$emit('refresh')"
+        @click="requestRefresh"
+        @keydown.enter.space.prevent="requestRefresh"
       />
       <view
         v-else
@@ -140,6 +141,9 @@ export default {
     uni.$off('theme-change', this.handleThemeChange);
   },
   methods: {
+    requestRefresh() {
+      if (this.refreshable && !this.refreshing) this.$emit('refresh');
+    },
     syncOutfitVars() {
       this.outfitVars = getAppliedOutfitVars();
     },
