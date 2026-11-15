@@ -41,6 +41,8 @@ make api-contract-check
 - `POST /collections/{id}/recordings/`：`{recording_id, entry_id}` 指定盒内归属；仅未关联录音允许 `entry_id:null`。
 - `DELETE /collections/{id}/entries/{item_id}/`、`recordings/{item_id}/`：移出目录／录音，不删除原始资料。
 - `POST /collections/{id}/order/`：`{ids:[...]}` 排词条目录；加 `section_id` 排该目录内录音（null 为待整理区）；需完整、无重复的可见条目 ID；不可见条目的相对位置保留。
+- 时间字段只读：集盒 `updated_at` 在盒签修改、成员添加/移除或实际排序变化时更新；重复添加及不变排序不改时间。`sections[].created_at` 和各录音成员 `created_at` 表示加入该层级的时间，不是原始词条或录音创建时间。迁移前无法还原的历史时间为 `null`，不以迁移时间伪造；移出后重新加入为新成员时间。
+- 实际结构是 Collection → CollectionEntry 词条目录 → CollectionRecording 选定录音，未关联录音置于 pending，不是扁平 CollectionItem。
 - 目录响应含 `sections:[{id,entry,recordings:[{id,recording,needs_review}],recording_count}]`、`pending`、`entry_count` 和去重的 `recording_count`。
 - `GET /recordings/?following=true`：关注作者的公开录音；游客返回空列表。
 - `GET /recordings/daily/`、`random/`：公开每日精选／随机录音；没有候选时返回 204。
