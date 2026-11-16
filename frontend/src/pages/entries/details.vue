@@ -146,12 +146,7 @@
                 {{ sense.usage_note }}
               </view>
               <SenseExamples :examples="Array.isArray(sense.examples) ? sense.examples : []" />
-              <view
-                v-if="sense.concepts?.length"
-                class="sense-row__concepts"
-              >
-                关联概念：{{ sense.concepts.map((item) => item.label || item.code).join('、') }}
-              </view>
+              <SenseConcepts :concepts="Array.isArray(sense.concepts) ? sense.concepts : []" />
             </view>
           </view>
         </view>
@@ -207,15 +202,7 @@
                 mode="detail"
               />
             </view>
-            <view class="pronunciation-row__value">
-              {{ variant.surface_romanization || variant.base_romanization || variant.ipa }}
-            </view>
-            <view
-              v-if="variant.ipa"
-              class="pronunciation-row__ipa"
-            >
-              IPA {{ variant.ipa }}
-            </view>
+            <PronunciationForms :variant="variant" />
           </view>
         </view>
         <view
@@ -332,6 +319,8 @@
 </template>
 
 <script>
+import PronunciationForms from '@/components/PronunciationForms.vue';
+import SenseConcepts from '@/components/SenseConcepts.vue';
 import SenseExamples from '@/components/SenseExamples.vue';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
@@ -366,6 +355,8 @@ import {
 export default {
   components: {
     SenseExamples,
+    PronunciationForms,
+    SenseConcepts,
     DiscussionThread,
     CollectionPicker,
     BaseButton,
@@ -686,14 +677,11 @@ export default {
   font-weight: 900;
 }
 
-.sense-row__gloss,
-.pronunciation-row__value {
+.sense-row__gloss {
   font-weight: 700;
 }
 
-.sense-row__note,
-.sense-row__concepts,
-.pronunciation-row__ipa {
+.sense-row__note {
   margin-top: 8rpx;
   line-height: 1.5;
 }
@@ -716,14 +704,6 @@ export default {
 .pronunciation-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-}
-
-.pronunciation-row__value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.pronunciation-row__ipa {
-  grid-column: 2;
 }
 
 .detail-section__pending,
