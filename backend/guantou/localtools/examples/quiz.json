@@ -1,0 +1,45 @@
+{
+  "dialect": "闽.莆仙",
+  "kind": "quiz",
+  "version": "putian-reading-practice-1",
+  "title": "聪明花开 · 莆田城里拼音练习",
+  "accent": "莆田城里口音",
+  "source": "本资料包新编练习，依据莆仙乡音社旧版拼音方案",
+  "source_url": "https://github.com/e-dialect/hinghwa-dict-web/blob/a84cbd7eabacfd31ad1727fc77ca96c5f471ecf7/src/views/Pinyin.vue",
+  "rights": "题干、选项和解析为本次新编；仅利用公开教学中个别音系事实，未导出旧聪明花开题库、题目图片、录音、账号或成绩。地方编辑需确认首发题集与口音适用性。",
+  "payload": {
+    "schema": 1,
+    "questions": [
+      {
+        "prompt": "「灯」的拼音 deng1 里，哪一段是韵母？",
+        "options": [
+          "eng",
+          "d",
+          "1"
+        ],
+        "answer": 0,
+        "explanation": "d 是声母，eng 是韵母，1 是阴平的编号。"
+      },
+      {
+        "prompt": "按这套方案，「布」的声母写法是什么？",
+        "options": [
+          "p",
+          "b",
+          "m"
+        ],
+        "answer": 1,
+        "explanation": "旧版把「布」拼作 bou4。这个声母写 b，国际音标为 [p]。"
+      },
+      {
+        "prompt": "在 bih6 中，末尾数字 6 表示哪一调？",
+        "options": [
+          "阳入",
+          "阴去",
+          "阴入"
+        ],
+        "answer": 2,
+        "explanation": "6 是阴入调号。例字「笔」的城里拼写是 bih6。"
+      }
+    ]
+  }
+}

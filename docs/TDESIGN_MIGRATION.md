@@ -257,3 +257,7 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 概念关联仍按义项消费现有 relation_type，区分对应、较宽、较窄和相关；未知关系不默认为对应，无数据明确待标注。此切片不新增词性字段、分类树、自动标注或未经核验的方言事实，也不代表整个 #403 已完成。
 
 验证：Node 22.23.4、冻结 yarn.lock 离线安装；lint 通过；全量单测 913 通过、3 跳过；H5/微信 checked build 通过。构建仅通过 Node 的 warning code 选项屏蔽运行器注入的 UNDICI-EHPA 代理实验警告，未改项目警告审计。新增 EntryReadingRelations 11 项单测覆盖同值/不同/缺项/文读、四类关系、未知关系与义项切换。H5 使用明确标为演示的拦截响应，在 390×844 浅/深色检查；未连接真实后端或执行微信真机验收。
+
+## 地方工具（#675、#700、#701）
+
+地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。

@@ -81,7 +81,7 @@ jobs:
         run: python manage.py test config guantou announcements user siteconfig files inbox audit themes productanalytics
 
       - name: Check backend formatting
-        run: black --check announcements guantou user siteconfig files inbox audit utils config themes productanalytics
+        run: black --check announcements guantou user siteconfig files inbox audit utils config themes productanalytics localtools
 
       - name: Run material tool tests
         working-directory: .
