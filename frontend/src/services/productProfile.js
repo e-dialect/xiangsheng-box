@@ -128,21 +128,24 @@ export async function loadProductProfile() {
 
 export const LOCAL_TOOLS_ROUTE = '/pages/tools/local';
 
-const publicQueryKeys = {
-  [ROUTES.search]: [
-    'keywords', 'key', 'q', 'dialect', 'usage_dialect_id', 'dialect_scope', 'scope',
-    'recorded', 'has_recording', 'has_evidence', 'status', 'sort',
-    'writing_type', 'source_type', 'ipa', 'romanization', 'source', 'concept',
-  ],
-  [ROUTES.entryDetail]: ['id'],
-  [ROUTES.recordingDetail]: ['id'],
-  [ROUTES.collectionDetail]: ['id'],
-  [ROUTES.record]: ['entry_id', 'sense_id'],
-  [ROUTES.collections]: ['search'],
-  [ROUTES.circleDetail]: ['id'],
-  [ROUTES.userDetail]: ['id'],
-  [LOCAL_TOOLS_ROUTE]: ['dialect', 'tool'],
-};
+function publicQueryKeys(path) {
+  const keys = {
+    [ROUTES.search]: [
+      'keywords', 'key', 'q', 'dialect', 'usage_dialect_id', 'dialect_scope', 'scope',
+      'recorded', 'has_recording', 'has_evidence', 'status', 'sort',
+      'writing_type', 'source_type', 'ipa', 'romanization', 'source', 'concept',
+    ],
+    [ROUTES.entryDetail]: ['id'],
+    [ROUTES.recordingDetail]: ['id'],
+    [ROUTES.collectionDetail]: ['id'],
+    [ROUTES.record]: ['entry_id', 'sense_id'],
+    [ROUTES.collections]: ['search'],
+    [ROUTES.circleDetail]: ['id'],
+    [ROUTES.userDetail]: ['id'],
+    [LOCAL_TOOLS_ROUTE]: ['dialect', 'tool'],
+  };
+  return keys[path] || [];
+}
 
 export function productSwitchUrl(target, location, base = '/', params = null) {
   if (!validTarget(target)) return null;
@@ -157,7 +160,7 @@ export function productSwitchUrl(target, location, base = '/', params = null) {
       value !== undefined && value !== null && value !== ''
     )))
     : new URLSearchParams(location.search);
-  (publicQueryKeys[safePath] || []).forEach((key) => {
+  publicQueryKeys(safePath).forEach((key) => {
     query.getAll(key).forEach((value) => url.searchParams.append(key, value));
   });
   return url.href;
