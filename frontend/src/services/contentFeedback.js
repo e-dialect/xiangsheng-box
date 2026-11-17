@@ -1,0 +1,29 @@
+const LABELS = Object.freeze({ entry: '词条', recording: '录音', collection: '集盒' });
+
+export function contentFeedbackParams(type, id) {
+  if (!Object.prototype.hasOwnProperty.call(LABELS, type)) return null;
+  const value = String(id ?? '');
+  return {
+    id: '-1',
+    object_type: type,
+    object_id: /^[1-9]\d{0,18}$/.test(value) ? value : '',
+  };
+}
+
+export function contentFeedbackDraft(options = {}) {
+  if (String(options.id) !== '-1') return null;
+  const params = contentFeedbackParams(options.object_type, options.object_id);
+  if (!params) return null;
+  const label = LABELS[params.object_type];
+  const site = typeof window !== 'undefined' && window.location?.hostname;
+  const version = typeof uni !== 'undefined' && uni.getAppBaseInfo?.()?.appVersion;
+  return {
+    title: `${label}链接反馈`,
+    content: [
+      `站点：${site || '乡声集盒客户端'}`,
+      `对象：${label} ${params.object_id || '编号缺失'}`,
+      ...(version ? [`客户端版本：${version}`] : []),
+      '遇到的问题：',
+    ].join('\n'),
+  };
+}
