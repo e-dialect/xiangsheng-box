@@ -78,7 +78,7 @@ async function routeBackgroundRequests(page) {
   });
 }
 
-for (const width of [390, 1440]) {
+[390, 1440].forEach((width) => {
   test(`entry examples remain readable on Web at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await routeCapabilities(page);
@@ -97,7 +97,7 @@ for (const width of [390, 1440]) {
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: `/tmp/xsb-web-examples-${width}.png`, fullPage: true });
   });
-}
+});
 
 test('search moves from one clue to separate same-writing results', async ({ page }) => {
   await routeCapabilities(page);
@@ -147,6 +147,32 @@ test('search failures and empty results each provide a clear next step', async (
   await page.getByRole('button', { name: '重新查询' }).click();
   await expect(page.locator('[data-search-state="empty"]')).toBeVisible();
   await expect(page.getByRole('button', { name: '录一段，让大家帮忙整理' })).toBeVisible();
+});
+
+test('the search box looks up a question and opens a sourced entry', async ({ page }, testInfo) => {
+  await routeCapabilities(page);
+  await routeBackgroundRequests(page);
+  await page.route(/\/entries\/(?:\?.*)?$/, async (route) => {
+    const query = new URL(route.request().url()).searchParams.get('search');
+    const results = query === '行' ? entries : [];
+    await route.fulfill({ json: { count: results.length, next: null, results } });
+  });
+  await page.route('**/entries/21/**', (route) => route.fulfill({ json: entry }));
+  await page.route(/\/recordings\/(?:\?.*)?$/, (route) => route.fulfill({
+    json: { count: 0, next: null, results: [] },
+  }));
+
+  await page.goto('/pages/search');
+  const input = page.locator('.entry-search__bar input');
+  await input.fill('行怎么读？');
+  await input.press('Enter');
+  await expect(input).toHaveValue('行怎么读？');
+  await expect(page.getByText('按「行」查找词条')).toBeVisible();
+  const results = page.getByRole('button', { name: '查看词条：行' });
+  await expect(results).toHaveCount(2);
+  await page.screenshot({ path: testInfo.outputPath('question-results.png') });
+  await page.getByText('走；步行', { exact: true }).click();
+  await expect(page.locator('.sense-examples')).toContainText('有出处的原文例句');
 });
 
 test('a disabled search flow leads back to the working listening surface', async ({ page }) => {

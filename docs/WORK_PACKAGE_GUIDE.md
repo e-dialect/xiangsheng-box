@@ -91,13 +91,16 @@ Dialect Experience / Dialect Commons
 3. 若已有 Assignee，不并行改同一组核心文件；
 4. 7 天无提交、PR 或状态评论时可先询问再释放。
 
-## 5. Ready 标准
+## 5. 当前状态与优先级
 
-- `status:needs-spec`：缺少产品或架构决策，必须先澄清规格。
-- `status:blocked`：规格已经清楚，但存在必须等待的明确前置依赖。
-- `status:ready`：规格和依赖都已满足，contributor 无需再次等待即可开始。
+[Project #7](https://github.com/orgs/e-dialect/projects/7) 的 Status / Priority 是本轮当前状态和优先级的唯一真源；Issue 原生父子关系、依赖和 Assignee 分别记录归属、前置与认领。2027 春节承诺范围以里程碑 #10（2027-02-05）为准。长期总单 #423、UI 计划 #339 和旧能力矩阵 #584 不重复充当本轮执行清单。
 
-不要把规格歧义标为 `status:blocked`，也不要把仍在等待依赖的任务标为 `status:ready`。
+- Status 使用 Backlog、Ready、Doing、Verify、Gate、Done、Parked、Blocked。规格不清放 Backlog；规格清楚但等待具体前置依赖放 Blocked；规格和依赖均已满足才放 Ready。
+- Priority 的 P0 是上线阻塞，P1 是春节计划，P2 是非本轮必需。它们不同于 [产品路线](PRODUCT_ROADMAP.md) 的长期 P0–P4 层。
+- 开放 Issue 不再用 `status:*`、`priority:*` 或 `ready for contributor` 标签表达当前状态；历史标签可以保留。类型、skill、size 标签仍可使用。
+- 原生关闭为 completed 才进入 Done；not planned 是归档，不计完成。PR 合并不等于生产上线。
+
+保留现有认领；新建且尚无人认领的春节工作包默认先 assign 给 @aB0T-bupt。每人默认最多一个主任务和一个辅任务。
 
 ## 6. 非代码贡献
 

@@ -13,7 +13,7 @@
           aria-role="searchbox"
           aria-label="写法、意思或读音"
           clearable
-          placeholder="例如：行、害怕、hiŋ"
+          placeholder="例如：行怎么读、害怕、hiŋ"
           @confirm="search"
         />
         <BaseButton
@@ -79,6 +79,13 @@
         <t-picker-item :options="sourceTypes" />
       </t-picker>
 
+      <text
+        v-if="searched && !loading && !errorMessage && interpretedTerm"
+        class="entry-search__query-note"
+        role="status"
+      >
+        按「{{ interpretedTerm }}」查找词条
+      </text>
       <view
         v-if="loading && !entries.length"
         class="entry-search__state"
@@ -236,6 +243,17 @@
               arrow
               hover
               @click="dialectPickerVisible = true"
+            />
+            <BaseLoading
+              v-if="dialectsLoading"
+              text="正在读取地区列表…"
+            />
+            <EmptyState
+              v-else-if="dialectsError"
+              :title="dialectsError"
+              description="仍可先按写法、意思或读音查词；已选的筛选条件会保留。"
+              action-text="重新加载地区"
+              @action="loadDialects"
             />
             <view
               v-if="filters.dialectId"
@@ -427,6 +445,7 @@ import {
 import {
   suggestEntries, popularEntries, searchHistory, rememberSearch, clearSearchHistory,
 } from '@/services/entrySearchAssist';
+import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
   goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
@@ -533,6 +552,8 @@ export default {
       searchUnavailable: false,
       searchRequestId: 0,
       dialects: [],
+      dialectsLoading: false,
+      dialectsError: '',
       dialectPickerVisible: false,
       writingPickerVisible: false,
       sourcePickerVisible: false,
@@ -559,6 +580,10 @@ export default {
     };
   },
   computed: {
+    interpretedTerm() {
+      const term = this.appliedFilters?.keyword;
+      return term !== this.submittedKeyword ? term : '';
+    },
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
@@ -621,7 +646,7 @@ export default {
       if (!String(value || '').trim() || String(value).trim() === this.submittedKeyword) return;
       this.suggestTimer = setTimeout(async () => {
         try {
-          const items = await suggestEntries(value);
+          const items = await suggestEntries(entryQuestionTerm(value, this.dialects));
           if (sequence === this.suggestSequence) this.suggestions = pageResults(items);
         } catch (error) {
           if (sequence === this.suggestSequence) this.suggestions = [];
@@ -649,11 +674,7 @@ export default {
       }
     }
     // #endif
-    try {
-      this.dialects = await listAllDialects();
-    } catch (error) {
-      this.dialects = [];
-    }
+    this.loadDialects();
     if (this.filters.keyword) await this.search();
   },
   // #ifdef MP-WEIXIN
@@ -668,6 +689,20 @@ export default {
   },
   // #endif
   methods: {
+    async loadDialects() {
+      if (this.dialectsLoading) return;
+      this.dialectsLoading = true;
+      this.dialectsError = '';
+      try {
+        const dialects = await listAllDialects();
+        if (dialects.length) this.dialects = dialects;
+        else this.dialectsError = '暂时没有可选地区';
+      } catch (error) {
+        this.dialectsError = '地区列表暂时无法读取';
+      } finally {
+        this.dialectsLoading = false;
+      }
+    },
     goCollections,
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
@@ -715,7 +750,8 @@ export default {
       const requestId = this.searchRequestId + 1;
       this.searchRequestId = requestId;
       this.loadingMore = false;
-      this.submittedKeyword = String(this.filters.keyword || '').trim();
+      this.submittedKeyword = String(filters.keyword || '').trim();
+      filters.keyword = entryQuestionTerm(this.submittedKeyword, this.dialects);
       rememberSearch(this.filters.keyword);
       this.history = searchHistory();
       this.suggestions = [];
@@ -1034,6 +1070,12 @@ export default {
   font-size: 23rpx;
   font-weight: 800;
 }
+.entry-search__query-note {
+  color: var(--text-secondary-color);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
 .entry-search__scope {
   display: flex;
   flex-wrap: wrap;

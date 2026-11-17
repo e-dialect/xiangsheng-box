@@ -1,6 +1,6 @@
 # 乡声万语 · 2027 春节冲刺
 
-> 本文是春节阶段的 Sprint charter 与一级路网，不替代[乡声集盒长期产品路线](PRODUCT_ROADMAP.md)，也不把所有 Epic 预拆为 Leaf。
+> 本文是春节阶段的 Sprint charter 与一级路网，不替代[乡声集盒长期产品路线](PRODUCT_ROADMAP.md)，也不维护第二份执行清单。2026-11-14 分级上线及任务治理决策取代本文此前相冲突的双 Wow 硬门槛、H5 定位与状态标签规则。
 
 ## 1. Sprint 目标
 
@@ -8,12 +8,12 @@
 
 - **产品**：用户愿不愿意使用、分享并回来；
 - **数据**：是否产生真正有训练或资料价值的地方语言数据；
-- **技术**：ASR / TTS 是否可证明改善并产生 Wow Moment；
+- **技术**：分别验证带声调 IPA 参考发音与自然莆仙 ASR / TTS 的实际能力、限制和开放级别；
 - **商业**：B/G 客户真正愿意购买什么，以及不购买的原因。
 
 这不是 migration sprint，也不是 contributor governance sprint。迁移和治理只为真实产品、数据、技术与商业验证服务。
 
-春节阶段的 [Project #7 · 乡声万语 · 2027 春节冲刺](https://github.com/orgs/e-dialect/projects/7) 是 Sprint execution cockpit，只收录直接服务本轮 Gate、Demo 或 Journey 的执行项。乡声集盒长期 Roadmap 与技术债继续保留在仓库及 #423，不需要进入 Project #7；春节 X/W 分别使用独立 Sprint Tracking。
+春节阶段的 [Project #7 · 乡声万语 · 2027 春节冲刺](https://github.com/orgs/e-dialect/projects/7) 是执行看板；乡声集盒 [#439](https://github.com/e-dialect/xiangsheng-box/issues/439) 与里程碑 #10「2027 春节上线」（2027-02-05）界定本轮承诺。状态、优先级、认领和依赖按 [Work Package 规则](WORK_PACKAGE_GUIDE.md) 维护；长期 #423、#339 与旧能力矩阵 #584 不重复作为执行清单。春节 X/W 分别使用独立 Sprint Tracking。
 
 ### 阶段交付定义（2026-10-08 Steering Directive）
 
@@ -111,32 +111,25 @@ Spring v0 必须与现有乡声集盒 Web 服务共存于当前 4GB 主机，不
 
 ### SF-X-E5 · 兴化语记 Distribution
 
-#424 是本 Epic 的核心 tracking。Spring P0 覆盖品牌连续性、旧 URL/deep link、旧 ID/内容映射、Puxian Language Space、Distribution Profile、migration rehearsal、生产副本数据质量检查和 rollback plan。只做 Legacy → X 单向迁移，不建设第三套后端或双向同步。
+#424 是本 Epic 的核心 tracking。兴化语记网站和微信小程序直接是地方站：复用同一前端、AppShell、Profile、内容与账户，全程使用「兴化语记」品牌并以小字标注「powered by 乡声集盒」，不复制 API 或另建业务壳。主站切换须由用户显式操作；深链、分享和登录返回保持地方站语境，跨域 / AppID 会话另行验收。#670 / #671 承接品牌导航及旧链接；#428 / #429 是已完成的设计和映射文档，不代表运行时已经实现。只做 Legacy → X 单向迁移，不建设第三套后端或双向同步。
 
 真实账号或真实生产数据的 destructive cutover 是 Conditional：只有 rehearsal、数据质量、rollback、@aB0T-bupt R2 验收和必要 Steering Decision 全部通过后才执行。生产 cutover 本身不作为春节 Sprint 成功的硬性必要条件。
 
 **Demo Moment**：从一个高频旧链接进入保留“兴化语记”心智的新莆仙页面，并可继续查、听或贡献；未 cutover 时，以生产副本 rehearsal 演示同一旅程与回滚。
 
-### SF-X-E6 · ASR / TTS Wow Moment
+### SF-X-E6 · 分级语音能力
 
-春节把 ASR/TTS 作为 P0/P1 产品能力，而非长期 P4 研究清单。
+CPU 带声调 IPA 合成参考发音（#679）和自然莆仙 ASR / TTS 可行性（#680）分别验收；前者必须验证不同声调确实产生可辨别差异，清楚标注参考合成，不能称作自然 TTS 或真人声音。自然 ASR 与自然 TTS 各自给出有证据的 go / no-go；不再以双 Wow 同时成功作为公开上线硬门槛。质量、授权或资源不足时关闭相关入口，或按证据进入 Teach / 受控 Showcase；普通查、听、录仍可用。
 
-```text
-Wow A：用户说莆仙话 → ASR → 莆仙正字 → 普通话含义
-Wow B：用户输入一句话 → 莆仙表达 → 莆仙正字 → TTS → AI 说莆仙话
-```
+在线能力须在现有共享 4GB CPU 主机验证资源、延迟与降级；离线 GPU 训练可有限安排，但不假定线上 GPU。Gold 仅用于评估，语音合成必须独立授权。模型搜索保持有限，不能以 IPA 参考试读冒充自然莆仙 TTS。
 
-Prototype Gate 只要求 Wow A / Wow B 至少一条形成可复现实验；Pre-SF / Release Gate 要求两条都形成用户可理解、可复现的真机产品旅程，不能用单 Wow 冒充最终双 Wow。效果不足时进入 Teach AI，足够可靠时才进入 Showcase。
+**Demo Moment**：展示带来源和版本的参考发音及声调差异；自然 ASR / TTS 仅展示各自通过验收的范围与限制。
 
-本 Epic 不在规划阶段预先穷举全部模型训练 Leaf。Gold、baseline、adapter contract 和预算明确后，由 @aB0T-bupt 按必要性拆解有限模型实验；禁止无限扩展模型搜索、训练次数和工程范围。
+### SF-X-E7 · H5 与微信发布
 
-**Demo Moment**：打开小程序 → 说一句莆仙话 → 看到正字和含义；并且输入一句话 → 莆仙表达/正字 → 听到带版本与来源说明的莆仙 AI Voice。
+公开 H5 和微信小程序都是春节交付；微信仍是主要真机验收目标。覆盖麦克风权限、录音/上传、分享、登录、elder mode、Parent Test、Feature Freeze、分阶段放量和 on-call。生产升级与恢复由 #681 承接：保留真实用户、录音、授权和媒体，不以可重置 Demo 刷新代替生产升级，备份和回滚须演练。
 
-### SF-X-E7 · WeChat Release
-
-微信小程序是春节 Primary Target；H5 只用于辅助开发与 debug。覆盖真机、麦克风权限、录音/上传、分享、登录、elder mode、Parent Test、Feature Freeze、分阶段放量和 on-call。
-
-**Demo Moment**：一位未参加开发的中老年莆仙用户无需开发者讲解即可在真机完成查、听、录音或代理录音并分享。
+**Demo Moment**：一位未参加开发的中老年莆仙用户无需开发者讲解即可在微信真机完成查、听、录音或代理录音并分享；H5 完成对应核心旅程。
 
 ### SF-X-E8 · Minimum Evidence Layer / Analytics
 
@@ -239,9 +232,9 @@ Active Learning 复用通用 ContributionTask Engine，首版仅使用规则：A
 
 B/G Discovery Kit 至少包含一页介绍、3 分钟线上 Demo、能力图、合作菜单、访谈问题和可分享链接；优先微信或在线沟通，GitHub 不保存不必要的个人信息。
 
-按 `30 → 200 → 1000 → public` 分阶段放量，每一级检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio：
+按 `30 → 200 → 1000 → public` 分阶段放量，每一级根据实际证据决定继续、暂停或回滚；人数是阶段用户规模，不代表并发容量。检查 journey completion、recording success、share rate、AI feedback、elder proxy completion 和 valid data ratio：
 
-- **2027-01-15 前**：reference speaker / Gold / TTS pilot 资源进入可用状态，核心 P0 contract 基本冻结；
+- **2027-01-15 前**：核心 P0 contract 基本冻结；语音资源按各能力的可行性和授权情况准备，不作为双 Wow 上线硬前置；
 - **2027-01-16 ～ 2027-01-23**：30 人 internal / close-friend test、Parent Test、微信真机核心旅程；
 - **2027-01-24**：Feature Freeze target；
 - **2027-01-25 ～ 2027-01-29**：约 200 人 seed test；

@@ -7,16 +7,31 @@
     class="platform-scroll platform-scroll--h5"
     :class="resolvedClasses"
     @scroll="onH5Scroll"
+    @touchstart="onPullStart"
+    @touchmove="onPullMove"
+    @touchend="onPullEnd"
+    @touchcancel="resetPull"
   >
+    <view
+      v-if="refreshable && (pullDistance || refreshing)"
+      class="refresh-status"
+      role="status"
+      aria-live="polite"
+    >
+      {{ refreshing ? '正在刷新…' : pullDistance >= 64 ? '松开刷新' : '下拉刷新' }}
+    </view>
     <slot />
   </view>
   <!-- #endif -->
   <!-- #ifndef H5 -->
   <scroll-view
     scroll-y
+    :refresher-enabled="refreshable"
+    :refresher-triggered="refreshing"
     :scroll-into-view="scrollIntoView"
     class="platform-scroll"
     :class="resolvedClasses"
+    @refresherrefresh="requestRefresh"
     @scroll="onNativeScroll"
     @scrolltolower="onNativeScrollToLower"
   >
@@ -29,6 +44,8 @@
 export default {
   name: 'PlatformScroll',
   props: {
+    refreshable: { type: Boolean, default: false },
+    refreshing: { type: Boolean, default: false },
     scrollIntoView: {
       type: String,
       default: '',
@@ -44,10 +61,13 @@ export default {
       default: '',
     },
   },
-  emits: ['scroll', 'scrolltolower'],
+  emits: ['scroll', 'scrolltolower', 'refresh'],
   data() {
     return {
       reachedLowerBoundary: false,
+      pullStart: null,
+      pullDistance: 0,
+      refreshRequested: false,
     };
   },
   computed: {
@@ -61,11 +81,51 @@ export default {
     },
   },
   watch: {
+    refreshing(value) {
+      if (!value) this.refreshRequested = false;
+      this.resetPull();
+    },
+    refreshable() { this.resetPull(); },
     scrollIntoView() {
       this.scrollToTarget();
     },
   },
   methods: {
+    resetPull() { this.pullStart = null; this.pullDistance = 0; },
+    requestRefresh() {
+      if (!this.refreshable || this.refreshing || this.refreshRequested) return;
+      this.refreshRequested = true;
+      this.$emit('refresh');
+      // If the consumer has no async work, allow another gesture after its update.
+      this.$nextTick(() => { if (!this.refreshing) this.refreshRequested = false; });
+    },
+    onPullStart(event) {
+      this.resetPull();
+      if (!this.refreshable || this.refreshing || event.touches?.length !== 1) return;
+      const target = event.currentTarget;
+      if ((target?.scrollTop || 0) > 0) return;
+      const origin = event.target;
+      if (origin?.closest?.('input, textarea, button, [role="button"], [contenteditable="true"]')) return;
+      const touch = event.touches[0];
+      this.pullStart = { x: touch.clientX, y: touch.clientY };
+    },
+    onPullMove(event) {
+      if (!this.pullStart) return;
+      if (event.touches?.length !== 1 || (event.currentTarget?.scrollTop || 0) > 0) {
+        this.resetPull(); return;
+      }
+      const touch = event.touches[0];
+      const dy = touch.clientY - this.pullStart.y;
+      if (dy < 0 || Math.abs(touch.clientX - this.pullStart.x) > Math.abs(dy)) {
+        this.resetPull(); return;
+      }
+      this.pullDistance = Math.min(96, dy * 0.5);
+    },
+    onPullEnd() {
+      const ready = this.pullDistance >= 64;
+      this.resetPull();
+      if (ready) this.requestRefresh();
+    },
     async scrollToTarget() {
       // #ifdef H5
       await this.$nextTick();
@@ -115,6 +175,7 @@ export default {
 </script>
 
 <style scoped>
+.refresh-status { text-align: center; padding: 12px; color: var(--text-secondary-color); }
 .platform-scroll {
   display: block;
   box-sizing: border-box;

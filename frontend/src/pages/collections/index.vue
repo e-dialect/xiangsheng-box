@@ -1,5 +1,10 @@
 <template>
-  <PageShell :title="mine ? '我的集盒' : '主题集盒'">
+  <PageShell
+    :title="mine ? '我的集盒' : '主题集盒'"
+    :refreshable="!mine"
+    :refreshing="refreshing"
+    @refresh="refresh"
+  >
     <view class="box-stack">
       <view class="box-cover">
         <text class="box-kicker">
@@ -60,6 +65,14 @@
           @click="create"
         />
       </BaseForm>
+      <text
+        v-if="refreshError"
+        class="box-note"
+        role="status"
+        aria-live="polite"
+      >
+        {{ refreshError }}
+      </text>
       <BaseLoading
         v-if="loading && !boxes.length"
         text="正在打开集盒…"
@@ -109,7 +122,7 @@
           variant="ghost"
           :text="loadMoreError ? '重试加载更多' : '更多集盒'"
           :loading="loading"
-          @click="load(true)"
+          @click="load('append')"
         />
       </template>
     </view>
@@ -143,9 +156,11 @@ export default {
     next: null,
     page: 1,
     loading: false,
+    refreshing: false,
     busy: false,
     error: '',
     loadMoreError: '',
+    refreshError: '',
     searchInput: '',
     searchTerm: '',
     loadRequest: 0,
@@ -191,16 +206,22 @@ export default {
       this.searchInput = '';
       this.searchCollections();
     },
-    async load(more = false) {
-      const append = more === true;
+    async refresh() {
+      if (this.mine || this.loading) return;
+      await this.load('refresh');
+    },
+    async load(mode = 'replace') {
+      const append = mode === 'append';
       if (append && (this.loading || !this.next)) return;
       this.loadRequest += 1;
       const requestId = this.loadRequest;
       this.loading = true;
+      this.refreshing = mode === 'refresh';
       this.error = '';
       this.loadMoreError = '';
+      this.refreshError = '';
       const page = append ? this.page + 1 : 1;
-      if (!append) {
+      if (mode === 'replace') {
         this.boxes = [];
         this.next = null;
       }
@@ -217,9 +238,14 @@ export default {
       } catch (error) {
         if (requestId !== this.loadRequest) return;
         if (append) this.loadMoreError = '更多集盒暂时没加载出来，请重试。';
-        else this.error = '集盒暂时无法读取';
+        else if (mode === 'refresh' && this.boxes.length) {
+          this.refreshError = '刷新失败，仍显示上次加载的集盒。';
+        } else this.error = '集盒暂时无法读取';
       } finally {
-        if (requestId === this.loadRequest) this.loading = false;
+        if (requestId === this.loadRequest) {
+          this.loading = false;
+          this.refreshing = false;
+        }
       }
     },
     async create() {

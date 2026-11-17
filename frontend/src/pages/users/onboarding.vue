@@ -209,6 +209,7 @@ export default {
       samplePlayback: null,
       pageActive: true,
       saving: false,
+      saveGeneration: 0,
       selectedDialectId: user.primary_dialect?.id || null,
       step: 1,
       userId: user.id || uni.getStorageSync('id'),
@@ -335,6 +336,7 @@ export default {
       stopAudio();
     },
     leaveSample() {
+      this.saveGeneration += 1;
       this.pageActive = false;
       this.sampleRequestId += 1;
       this.loadingSample = false;
@@ -403,6 +405,7 @@ export default {
       }
     },
     async finish() {
+      if (this.saving || !this.pageActive) return;
       if (!this.selectedDialectId) {
         this.error = '请选择主方言';
         return;
@@ -410,13 +413,19 @@ export default {
       this.stopSample();
       this.error = '';
       this.saving = true;
+      const generation = this.saveGeneration;
       try {
-        await saveDialectProfile(this.userId, {
+        const user = await saveDialectProfile(this.userId, {
           nickname: this.nickname,
           primaryDialectId: this.selectedDialectId,
         });
+        if (!user || generation !== this.saveGeneration || !this.pageActive) return;
         uni.showToast({ title: '方言身份已设置', icon: 'success' });
         if (!resumeInterruptedPageAfterLogin(this.userId)) toFollowRecommendations(true);
+      } catch (error) {
+        if (generation === this.saveGeneration && this.pageActive) {
+          this.error = error.message || '暂时无法保存，请重试';
+        }
       } finally {
         this.saving = false;
       }

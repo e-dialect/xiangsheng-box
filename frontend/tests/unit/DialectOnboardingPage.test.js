@@ -1,5 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
+
+import { playManaged, stopAudio, onExternalStop } from '@/utils/audio';
+import { listAllDialects } from '@/services/guantou';
+import { loadDialectSample, saveDialectProfile } from '@/services/dialectOnboarding';
+import { resumeInterruptedPageAfterLogin } from '@/services/login';
+import { toFollowRecommendations } from '@/routers/user';
 
 vi.mock('@/services/guantou', () => ({
   listAllDialects: vi.fn(),
@@ -35,15 +43,11 @@ vi.mock('@/utils/audio', () => ({
 
 globalThis.getApp = vi.fn(() => ({
   globalData: {
-    userInfo: { id: 7, username: 'collector', nickname: '采集者', primary_dialect: null },
+    userInfo: {
+      id: 7, username: 'collector', nickname: '采集者', primary_dialect: null,
+    },
   },
 }));
-
-import { playManaged, stopAudio, onExternalStop } from '@/utils/audio';
-import { listAllDialects } from '@/services/guantou';
-import { loadDialectSample, saveDialectProfile } from '@/services/dialectOnboarding';
-import { resumeInterruptedPageAfterLogin } from '@/services/login';
-import { toFollowRecommendations } from '@/routers/user';
 
 const { default: DialectOnboardingPage } = await import('@/pages/users/onboarding.vue');
 
@@ -71,7 +75,9 @@ describe('dialect onboarding page', () => {
       showToast: vi.fn(),
     };
     listAllDialects.mockResolvedValue([
-      { id: 3, name: '四川话', qualified_code: '西南官话.四川', depth: 1 },
+      {
+        id: 3, name: '四川话', qualified_code: '西南官话.四川', depth: 1,
+      },
     ]);
     loadDialectSample.mockResolvedValue({
       id: 8,
@@ -147,6 +153,74 @@ describe('dialect onboarding page', () => {
     });
     expect(resumeInterruptedPageAfterLogin).toHaveBeenCalledWith(7);
     expect(toFollowRecommendations).toHaveBeenCalledWith(true);
+  });
+
+  it.each(['abandon', 'onHide', 'onUnload', 'beforeUnmount'])(
+    'does not complete an old save after %s',
+    async (action) => {
+      let resolveSave;
+      saveDialectProfile.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+      const wrapper = mountPage();
+      wrapper.vm.selectedDialectId = 3;
+      const saving = wrapper.vm.finish();
+      if (action === 'abandon') wrapper.vm.abandon();
+      else wrapper.vm.$options[action].call(wrapper.vm);
+      // Returning must not make the abandoned continuation current again.
+      wrapper.vm.$options.onShow.call(wrapper.vm);
+      resolveSave({ id: 7 });
+      await saving;
+      expect(resumeInterruptedPageAfterLogin).not.toHaveBeenCalled();
+      expect(toFollowRecommendations).not.toHaveBeenCalled();
+      expect(uni.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ icon: 'success' }));
+      expect(wrapper.vm.saving).toBe(false);
+      wrapper.unmount();
+    },
+  );
+
+  it('ignores a service-cancelled save and prevents duplicate pending saves', async () => {
+    let resolveSave;
+    saveDialectProfile.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+    const wrapper = mountPage();
+    wrapper.vm.selectedDialectId = 3;
+    const saving = wrapper.vm.finish();
+    await wrapper.vm.finish();
+    expect(saveDialectProfile).toHaveBeenCalledOnce();
+    resolveSave(null);
+    await saving;
+    expect(resumeInterruptedPageAfterLogin).not.toHaveBeenCalled();
+    expect(toFollowRecommendations).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('shows the save failure in place and allows a successful retry', async () => {
+    saveDialectProfile.mockRejectedValueOnce(new Error('网络暂时中断'));
+    const wrapper = mountPage();
+    wrapper.vm.step = 2;
+    wrapper.vm.selectedDialectId = 3;
+    await wrapper.vm.finish();
+    expect(wrapper.vm.error).toBe('网络暂时中断');
+    expect(wrapper.vm.saving).toBe(false);
+    expect(toFollowRecommendations).not.toHaveBeenCalled();
+    await wrapper.vm.finish();
+    expect(wrapper.vm.error).toBe('');
+    expect(toFollowRecommendations).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
+  it('does not show a late failure after leaving', async () => {
+    let rejectSave;
+    saveDialectProfile.mockReturnValueOnce(new Promise((resolve, reject) => {
+      rejectSave = reject;
+    }));
+    const wrapper = mountPage();
+    wrapper.vm.selectedDialectId = 3;
+    const saving = wrapper.vm.finish();
+    wrapper.vm.abandon();
+    rejectSave(new Error('旧请求失败'));
+    await saving;
+    expect(wrapper.vm.error).toBe('');
+    expect(toFollowRecommendations).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it('offers a retry when the dialect tree fails to load', async () => {

@@ -87,6 +87,7 @@ function mountPage() {
       loading: false,
       errorMessage: '',
       entry,
+      recordingPage: 1,
       recordings: [{ id: 11, usage_dialect: entry.usage_dialect }],
     }),
   });
@@ -145,6 +146,27 @@ describe('entry detail information hierarchy', () => {
 });
 
 describe('entry recordings pagination', () => {
+  it('keeps the definition readable when the first recording page fails and retries just audio', async () => {
+    const wrapper = mountPage();
+    await wrapper.setData({ id: 21, entry: null, recordings: [] });
+    getEntry.mockClear();
+    getEntry.mockResolvedValue(entry);
+    listRecordings.mockRejectedValueOnce(new Error('network'));
+    await wrapper.vm.load();
+
+    expect(wrapper.text()).toContain('本义项的原文例句');
+    const section = wrapper.get('[data-detail-section="recordings"]');
+    const retry = section.getComponent({ name: 'EmptyState' });
+    expect(retry.props('title')).toBe('乡音暂时无法读取');
+    listRecordings.mockResolvedValueOnce({ results: [{ id: 12 }], next: '/recordings/?page=2' });
+    retry.vm.$emit('action');
+    await vi.waitFor(() => expect(wrapper.vm.recordings.map((item) => item.id)).toEqual([12]));
+    expect(getEntry).toHaveBeenCalledTimes(1);
+    expect(listRecordings).toHaveBeenLastCalledWith({ entry_id: 21, page: 1, page_size: 50 });
+    expect(section.find('[data-testid="load-more-recordings"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it('keeps additional regional recordings accessible after the first page', async () => {
     getEntry.mockResolvedValue(entry);
     listRecordings.mockResolvedValueOnce({ results: [{ id: 11 }], next: '/recordings/?page=2' });

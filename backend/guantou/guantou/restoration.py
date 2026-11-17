@@ -62,8 +62,16 @@ def recording_data(recording, request):
 class CollectionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Collection
-        fields = ["id", "title", "description", "is_public", "owner_id", "created_at"]
-        read_only_fields = ["owner_id", "created_at"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "is_public",
+            "owner_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["owner_id", "created_at", "updated_at"]
 
 
 class SectionInput(serializers.Serializer):
@@ -191,6 +199,13 @@ class CollectionViewSet(viewsets.ModelViewSet):
                 items.append(
                     {
                         "id": item.id,
+                        "created_at": (
+                            serializers.DateTimeField().to_representation(
+                                item.created_at
+                            )
+                            if item.created_at
+                            else None
+                        ),
                         "needs_review": not valid,
                         "recording": recording_map[item.recording_id],
                     }
@@ -199,6 +214,13 @@ class CollectionViewSet(viewsets.ModelViewSet):
             sections.append(
                 {
                     "id": section.id,
+                    "created_at": (
+                        serializers.DateTimeField().to_representation(
+                            section.created_at
+                        )
+                        if section.created_at
+                        else None
+                    ),
                     "entry": entry_map[section.entry_id],
                     "recordings": items,
                     "recording_count": len(items),
@@ -209,7 +231,15 @@ class CollectionViewSet(viewsets.ModelViewSet):
             if item.recording_id not in recording_map:
                 continue
             pending.append(
-                {"id": item.id, "recording": recording_map[item.recording_id]}
+                {
+                    "id": item.id,
+                    "created_at": (
+                        serializers.DateTimeField().to_representation(item.created_at)
+                        if item.created_at
+                        else None
+                    ),
+                    "recording": recording_map[item.recording_id],
+                }
             )
             seen.add(item.recording_id)
         if data["editable"]:
@@ -235,16 +265,22 @@ class CollectionViewSet(viewsets.ModelViewSet):
         entry = get_object_or_404(
             visible_entries_for_user(request.user), pk=values.validated_data["entry_id"]
         )
-        section, _ = CollectionEntry.objects.get_or_create(
+        section, section_created = CollectionEntry.objects.get_or_create(
             collection=box,
             entry=entry,
             defaults={"sort_order": append_order(box.sections)},
         )
+        if section_created:
+            box.save(update_fields=["updated_at"])
         return Response({"id": section.id})
 
     @action(detail=True, methods=["delete"], url_path=r"entries/(?P<item_id>[0-9]+)")
+    @transaction.atomic
     def remove_entry(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().sections, pk=item_id).delete()
+        box = self.owned()
+        Collection.objects.select_for_update().get(pk=box.pk)
+        get_object_or_404(box.sections, pk=item_id).delete()
+        box.save(update_fields=["updated_at"])
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -260,17 +296,18 @@ class CollectionViewSet(viewsets.ModelViewSet):
         )
         links = active_links(request.user).filter(recording=recording)
         section = None
+        section_created = False
         if values.get("entry_id"):
             if not links.filter(entry_id=values["entry_id"]).exists():
                 raise ValidationError("请选择录音当前关联的词条")
-            section, _ = CollectionEntry.objects.get_or_create(
+            section, section_created = CollectionEntry.objects.get_or_create(
                 collection=box,
                 entry_id=values["entry_id"],
                 defaults={"sort_order": append_order(box.sections)},
             )
         elif links.exists():
             raise ValidationError("这段录音已有词条，请选择盒内归属")
-        item, _ = CollectionRecording.objects.get_or_create(
+        item, item_created = CollectionRecording.objects.get_or_create(
             collection=box,
             section=section,
             recording=recording,
@@ -279,13 +316,22 @@ class CollectionViewSet(viewsets.ModelViewSet):
             },
         )
         # Explicitly assigning a linked entry confirms organization of a pending item.
+        removed = 0
         if section:
-            box.recording_items.filter(section=None, recording=recording).delete()
+            removed, _ = box.recording_items.filter(
+                section=None, recording=recording
+            ).delete()
+        if section_created or item_created or removed:
+            box.save(update_fields=["updated_at"])
         return Response({"id": item.id})
 
     @action(detail=True, methods=["delete"], url_path=r"recordings/(?P<item_id>[0-9]+)")
+    @transaction.atomic
     def remove_recording(self, request, pk=None, item_id=None):
-        get_object_or_404(self.owned().recording_items, pk=item_id).delete()
+        box = self.owned()
+        Collection.objects.select_for_update().get(pk=box.pk)
+        get_object_or_404(box.recording_items, pk=item_id).delete()
+        box.save(update_fields=["updated_at"])
         return Response(status=204)
 
     @action(detail=True, methods=["post"])
@@ -313,13 +359,17 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if len(ids) != len(set(ids)) or set(ids) != expected:
             raise ValidationError("排序必须包含该目录全部可见条目且不能重复")
         ordered = list(rows)
+        original_ids = [row.id for row in ordered]
         by_id = {row.id: row for row in ordered}
         positions = [index for index, row in enumerate(ordered) if row.id in expected]
         for position, item_id in zip(positions, ids):
             ordered[position] = by_id[item_id]
-        for index, row in enumerate(ordered):
-            row.sort_order = index
-        rows.model.objects.bulk_update(ordered, ["sort_order"])
+        changed = [row.id for row in ordered] != original_ids
+        if changed:
+            for index, row in enumerate(ordered):
+                row.sort_order = index
+            rows.model.objects.bulk_update(ordered, ["sort_order"])
+            box.save(update_fields=["updated_at"])
         return Response({"ordered": True})
 
 

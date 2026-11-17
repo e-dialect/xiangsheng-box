@@ -137,7 +137,9 @@ describe.each(cases)('%s detail lifecycle', (_name, component, data) => {
 // Exercise both unload responsibilities together with real recording cards.
 it.each([false, true])('invalidates pending pagination while cleaning owned audio, destination=%s', async (destinationPlaying) => {
   const page = mounted(EntryDetails);
-  await page.setData({ id: 7, loading: false, entry, recordings: [recording(1)], hasMoreRecordings: true });
+  await page.setData({
+    id: 7, loading: false, entry, recordings: [recording(1)], recordingPage: 1, hasMoreRecordings: true,
+  });
   const ownAudio = start(page.findAllComponents(EntryRecordingCard)[0]);
   let resolvePage;
   listRecordings.mockImplementationOnce(() => new Promise((resolve) => { resolvePage = resolve; }));
