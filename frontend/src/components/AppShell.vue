@@ -6,20 +6,27 @@
   >
     <view class="app-shell__header">
       <view class="app-shell__heading">
-        <view class="app-shell__brand">
-          乡声集盒
-        </view>
+        <ProductBrand
+          class="app-shell__brand"
+          immersive
+        />
         <view class="app-shell__title">
           {{ title }}
         </view>
       </view>
-      <BaseButton
-        v-if="actionText"
-        size="small"
-        variant="light"
-        :text="actionText"
-        @click="$emit('action')"
-      />
+      <view class="app-shell__header-actions">
+        <BaseButton
+          v-if="actionText"
+          size="small"
+          variant="light"
+          :text="actionText"
+          @click="$emit('action')"
+        />
+        <ProductSwitch
+          immersive
+          :params="productSwitchParams"
+        />
+      </view>
     </view>
     <PlatformScroll
       v-if="scroll"
@@ -50,6 +57,8 @@ import BaseButton from '@/components/BaseButton.vue';
 import FeedbackHost from '@/components/FeedbackHost.vue';
 import HomeTabBar from '@/components/home/HomeTabBar.vue';
 import PlatformScroll from '@/components/PlatformScroll.vue';
+import ProductBrand from '@/components/ProductBrand.vue';
+import ProductSwitch from '@/components/ProductSwitch.vue';
 import { getAccentPreference } from '@/services/theme';
 import { hydrateOutfitStyle } from '@/services/themeCenter';
 import { getAppliedOutfitVars } from '@/services/themeSchema';
@@ -57,7 +66,7 @@ import { getAppliedOutfitVars } from '@/services/themeSchema';
 export default {
   name: 'AppShell',
   components: {
-    BaseButton, FeedbackHost, HomeTabBar, PlatformScroll,
+    BaseButton, FeedbackHost, HomeTabBar, PlatformScroll, ProductBrand, ProductSwitch,
   },
   props: {
     scrollIntoView: { type: String, default: '' },
@@ -65,6 +74,7 @@ export default {
     active: { type: String, required: true },
     actionText: { type: String, default: '' },
     scroll: { type: Boolean, default: true },
+    productSwitchParams: { type: Object, default: null },
   },
   emits: ['action', 'scrolltolower'],
   data() {
@@ -139,6 +149,12 @@ export default {
 }
 .app-shell__heading {
   min-width: 0;
+}
+.app-shell__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  flex: 0 0 auto;
 }
 .app-shell__brand {
   color: var(--immersive-accent-color);
