@@ -85,6 +85,7 @@ export function observeSharedOpen(path) {
   const landing = classify(launchUrl, base);
   if (!landing || launchUrl.origin !== liveUrl.origin
     || launchUrl.searchParams.get(SHARE_MARKER) !== landing.kind
+    || liveUrl.searchParams.get(SHARE_MARKER) !== landing.kind
     || !sameTarget(landing, classify(liveUrl, base))
     || !sameTarget(landing, classify(destination, '/'))) return;
   openedShare = true;
