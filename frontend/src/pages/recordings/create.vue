@@ -552,7 +552,9 @@ export default {
     },
     recordSubmitHint() {
       const remaining = 3 - this.completedRequiredSteps;
-      return remaining === 0 ? '三项必要信息已齐，请确认发声人授权' : `还差 ${remaining} 项必要信息`;
+      if (remaining) return `还差 ${remaining} 项必要信息`;
+      return this.form.speaker_consent_source
+        ? '信息和授权已确认，可以提交审核' : '三项必要信息已齐，请确认发声人授权';
     },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
