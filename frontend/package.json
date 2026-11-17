@@ -82,7 +82,7 @@
     "@dcloudio/uni-cli-shared": "3.0.0-5030420261029002",
     "@dcloudio/uni-stacktracey": "3.0.0-5030420261029002",
     "@dcloudio/vite-plugin-uni": "3.0.0-5030420261029002",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@vitejs/plugin-vue": "6.0.11",
     "@vue/compiler-dom": "3.5.45",
     "@vue/runtime-core": "3.5.45",
