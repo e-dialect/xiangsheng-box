@@ -28,11 +28,6 @@ import { openPage, ROUTES } from '@/services/navigation';
 import { LOCAL_TOOLS_ROUTE, productProfile } from '@/services/productProfile';
 
 const toolsRegistered = pagesJson.pages.some(({ path }) => `/${path}` === LOCAL_TOOLS_ROUTE);
-const featureRoutes = {
-  entry: ROUTES.entryDetail,
-  recording: ROUTES.recordingDetail,
-  collection: ROUTES.collectionDetail,
-};
 
 export default {
   components: { BaseButton },
@@ -53,8 +48,13 @@ export default {
       openPage(LOCAL_TOOLS_ROUTE, { dialect: this.profile.local_tools_dialect });
     },
     openFeature(feature) {
-      const route = featureRoutes[feature.type];
-      if (route) openPage(route, { id: feature.id });
+      const routes = {
+        entry: ROUTES.entryDetail,
+        recording: ROUTES.recordingDetail,
+        collection: ROUTES.collectionDetail,
+      };
+      const route = routes[feature.type];
+      if (typeof route === 'string') openPage(route, { id: feature.id });
     },
   },
 };
