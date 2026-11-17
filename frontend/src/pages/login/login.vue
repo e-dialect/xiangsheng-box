@@ -42,6 +42,14 @@
       </view>
       <!-- #endif -->
 
+      <!-- #ifdef H5 || APP-PLUS -->
+      <WechatBridgeLogin
+        ref="wechatBridge"
+        :disabled="submitting"
+        @cancel="cancelLogin"
+      />
+      <!-- #endif -->
+
       <t-tabs
         v-if="phoneCodeLoginEnabled"
         :value="loginMode"
@@ -223,11 +231,14 @@ import TTabPanel from '@tdesign/uniapp/tab-panel/tab-panel.vue';
 import TTabs from '@tdesign/uniapp/tabs/tabs.vue';
 import TButton from '@tdesign/uniapp/button/button.vue';
 import AuthJourney from '@/pages/login/components/AuthJourney.vue';
+// #ifdef H5 || APP-PLUS
+import WechatBridgeLogin from '@/pages/login/components/WechatBridgeLogin.vue';
+// #endif
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import { actionLabel, peekInterceptIntent } from '@/services/authGuard';
-import { cancelLogin, canReturnToGuestPage } from '@/services/authJourney';
+import { cancelLogin, canReturnToGuestPage, guestReturnDestination } from '@/services/authJourney';
 import { CAPABILITIES, isCapabilityEnabled } from '@/services/capabilities';
 import { mpLogin, normalLogin } from '@/services/login';
 import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
@@ -240,6 +251,9 @@ export default {
   name: 'LoginPage',
   components: {
     AuthJourney,
+    // #ifdef H5 || APP-PLUS
+    WechatBridgeLogin,
+    // #endif
     PageShell,
     BaseButton,
     BaseField,
@@ -290,7 +304,8 @@ export default {
       return `你刚才想${actionLabel(this.intent.action)}，验证身份后会回到原来的位置。`;
     },
     guestReturnLabel() {
-      return canReturnToGuestPage() ? '暂不登录，返回浏览' : '暂不登录，先去查词';
+      return canReturnToGuestPage() || guestReturnDestination(this.intent)
+        ? '暂不登录，返回浏览' : '暂不登录，先去查词';
     },
   },
   onLoad() {
@@ -379,6 +394,7 @@ export default {
       this.errors.phone = phone ? '' : '请输入手机号';
       this.errors.code = code ? '' : '请输入验证码';
       if (this.errors.phone || this.errors.code) return;
+      this.$refs.wechatBridge?.cancel();
       this.submitting = true;
       try {
         await loginWithPhone(phone, code);
@@ -396,6 +412,7 @@ export default {
       this.errors.username = username ? '' : '请输入用户名';
       this.errors.password = password ? '' : '请输入密码';
       if (this.errors.username || this.errors.password) return;
+      this.$refs.wechatBridge?.cancel();
       this.submitting = true;
       try {
         await normalLogin(username, password);

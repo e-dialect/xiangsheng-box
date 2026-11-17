@@ -93,6 +93,9 @@ export const ROUTE_VISUAL_MATRIX = Object.freeze([
     route: '/pages/login/login', target: '/pages/login/login', slug: 'login', issues: [344], persona: 'guest',
   },
   {
+    route: '/pages/login/wechat-confirm', target: '/pages/login/wechat-confirm', slug: 'wechat-confirm', issues: [344], persona: 'guest',
+  },
+  {
     route: '/pages/login/register', target: '/pages/login/register', slug: 'register', issues: [344], persona: 'guest',
   },
   {

@@ -58,6 +58,7 @@ def should_track_visitor(request):
         "/media",
         "/product-events/",
         "/site-settings/capabilities",
+        "/login/wechat/bridge/",
     )
     return not path.startswith(skipped_prefixes)
 

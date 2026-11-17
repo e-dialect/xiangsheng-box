@@ -2,6 +2,7 @@ import { contentFeedbackParams } from '@/services/contentFeedback';
 import { toLoginPage } from '@/routers/login';
 import {
   clearInterceptIntent,
+  peekInterceptIntent,
   saveInterceptIntent,
 } from '@/services/authGuard';
 import {
@@ -37,7 +38,7 @@ export function resolveAuthDestination(intent) {
     return routeDestination(ROUTES.mine);
   }
 
-  if (intent.action === 'interact_entry' && context.entryId) {
+  if (['interact_entry', 'bookmark_entry'].includes(intent.action) && context.entryId) {
     return routeDestination(ROUTES.entryDetail, { id: context.entryId });
   }
   if (intent.action === 'interact_recording' && context.recordingId) {
@@ -99,13 +100,33 @@ export function canReturnToGuestPage() {
   return GUEST_RETURN_ROUTES.has(`/${route}`);
 }
 
+export function guestReturnDestination(intent) {
+  const context = intent?.context;
+  if (intent?.action === 'content_feedback') {
+    const params = contentFeedbackParams(context?.object_type, context?.object_id);
+    if (!params?.object_id) return null;
+    const routes = {
+      entry: ROUTES.entryDetail,
+      recording: ROUTES.recordingDetail,
+      collection: ROUTES.collectionDetail,
+    };
+    return routeDestination(routes[params.object_type], { id: params.object_id });
+  }
+  if (intent?.action === 'record_recording' && context?.entryId) {
+    return routeDestination(ROUTES.entryDetail, { id: context.entryId });
+  }
+  const destination = resolveAuthDestination(intent);
+  return GUEST_RETURN_ROUTES.has(`/${destination.route}`) ? destination : null;
+}
+
 export function cancelLogin() {
+  const destination = guestReturnDestination(peekInterceptIntent());
   clearInterceptIntent();
   if (canReturnToGuestPage()) {
     goBack(ROUTES.search);
     return;
   }
-  openPage(ROUTES.search, {}, { reset: true });
+  openPage(destination?.url || ROUTES.search, {}, { reset: true });
 }
 
 export default {

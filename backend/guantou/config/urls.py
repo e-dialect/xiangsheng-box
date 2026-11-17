@@ -4,6 +4,7 @@ from django.contrib.staticfiles import views as staticfiles_views
 from django.urls import path, include
 
 from user import views as user
+from user.view import wechat_bridge
 from files.recording_media import recording_media
 from files.views import open_file_url
 
@@ -14,6 +15,12 @@ urlpatterns = [
     path("", include("productanalytics.urls")),
     path("local-tools/", include("localtools.urls")),
     path("users/", include("user.urls", namespace="users")),
+    path("login/wechat/bridge/availability", wechat_bridge.availability),
+    path("login/wechat/bridge/start", wechat_bridge.start),
+    path("login/wechat/bridge/details", wechat_bridge.details),
+    path("login/wechat/bridge/confirm", wechat_bridge.confirm),
+    path("login/wechat/bridge/exchange", wechat_bridge.exchange),
+    path("login/wechat/bridge/cancel", wechat_bridge.cancel),
     path("login/", include("user.urls", namespace="login")),
     path("users", user.router_users),
     path("login", user.login),
