@@ -336,7 +336,7 @@ import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
-import { APP_NAME } from '@/const/branding';
+import { currentProductName } from '@/services/productProfile';
 import { requireAuth } from '@/services/authGuard';
 import {
   entryTitle, listPublicCreatorEntries, listRecordings, pageResults,
@@ -484,7 +484,7 @@ export default {
   },
   onShareAppMessage() {
     return {
-      title: `${this.pageTitle} · ${APP_NAME}`,
+      title: `${this.pageTitle} · ${currentProductName()}`,
       path: `${ROUTES.userDetail}?id=${this.id}`,
       ...defaultMessage(),
     };

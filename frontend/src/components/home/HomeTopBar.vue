@@ -54,20 +54,24 @@
       </view>
     </view>
 
-    <!-- 品牌小标（保留 h5-smoke 断言文案） -->
-    <view class="home-top-bar__brand">
-      {{ appName }} · 听见乡音，找到词条
-    </view>
+    <ProductBrand
+      class="home-top-bar__brand"
+      immersive
+      switchable
+    />
+    <ProductHighlights />
   </view>
 </template>
 
 <script>
 import { LISTEN_FEED_TABS } from '@/services/listenFeed';
-import { APP_NAME } from '@/const/branding';
+import ProductBrand from '@/components/ProductBrand.vue';
+import ProductHighlights from '@/components/home/ProductHighlights.vue';
 import { goCircleList, goSearch } from '@/services/navigation';
 
 export default {
   name: 'HomeTopBar',
+  components: { ProductBrand, ProductHighlights },
   props: {
     activeTab: {
       type: String,
@@ -78,7 +82,6 @@ export default {
   data() {
     return {
       LISTEN_FEED_TABS,
-      appName: APP_NAME,
     };
   },
   computed: {

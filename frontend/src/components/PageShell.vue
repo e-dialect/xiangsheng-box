@@ -29,9 +29,15 @@
         v-else
         class="shell-back-placeholder"
       />
-      <text class="shell-title">
-        {{ title }}
-      </text>
+      <view class="shell-heading">
+        <text class="shell-title">
+          {{ title }}
+        </text>
+        <ProductBrand
+          v-if="profile.key !== 'general'"
+          class="shell-brand"
+        />
+      </view>
       <BaseButton
         v-if="actionText"
         class="shell-action"
@@ -54,7 +60,9 @@
       <view
         v-else
         class="shell-action-placeholder"
-      />
+      >
+        <ProductSwitch class="shell-action" />
+      </view>
     </view>
     <slot name="before" />
     <PlatformScroll
@@ -88,10 +96,15 @@ import { goBack, ROUTES } from '@/services/navigation';
 import BaseButton from '@/components/BaseButton.vue';
 import FeedbackHost from '@/components/FeedbackHost.vue';
 import PlatformScroll from '@/components/PlatformScroll.vue';
+import ProductBrand from '@/components/ProductBrand.vue';
+import ProductSwitch from '@/components/ProductSwitch.vue';
+import { productProfile } from '@/services/productProfile';
 
 export default {
   name: 'PageShell',
-  components: { BaseButton, FeedbackHost, PlatformScroll },
+  components: {
+    BaseButton, FeedbackHost, PlatformScroll, ProductBrand, ProductSwitch,
+  },
   props: {
     refreshable: { type: Boolean, default: false },
     refreshing: { type: Boolean, default: false },
@@ -127,6 +140,7 @@ export default {
   emits: ['action', 'back', 'scroll', 'scrolltolower', 'refresh'],
   data() {
     return {
+      profile: productProfile,
       resolvedTheme: 'light',
       accent: getAccentPreference(),
       outfitVars: {},
@@ -223,6 +237,21 @@ export default {
   line-height: 1;
 }
 
+.shell-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  justify-self: center;
+}
+.shell-brand {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary-color);
+  justify-content: center;
+}
+.shell-brand :deep(.product-brand__identity) {
+  justify-content: center;
+}
 .shell-title {
   min-width: 0;
   max-width: 420rpx;
@@ -242,6 +271,10 @@ export default {
 .shell-action {
   margin: 0;
   justify-self: end;
+}
+.shell-action-placeholder {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .shell-content {

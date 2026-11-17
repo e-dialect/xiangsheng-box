@@ -22,7 +22,7 @@
       </view>
 
       <view class="description">
-        可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用乡声集盒。
+        可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用{{ productName }}。
       </view>
 
       <view
@@ -69,6 +69,7 @@
 import BaseButton from '@/components/BaseButton.vue';
 import PageShell from '@/components/PageShell.vue';
 import { toIndexPage } from '@/routers';
+import { currentProductName } from '@/services/productProfile';
 
 const NOT_FOUND_ROUTE = '/pages/error/not-found';
 
@@ -93,6 +94,7 @@ export default {
   data() {
     return { requestedPath: '' };
   },
+  computed: { productName: currentProductName },
   onLoad(query = {}) {
     this.requestedPath = this.resolveRequestedPath(query);
   },

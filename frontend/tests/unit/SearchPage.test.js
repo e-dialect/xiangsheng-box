@@ -21,6 +21,9 @@ const request = (await import('@/utils/request')).default;
 const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
+const {
+  fallbackProductProfile, productProfile,
+} = await import('@/services/productProfile');
 
 function deferred() {
   let resolve;
@@ -58,6 +61,42 @@ describe('entry-first search page orchestration', () => {
 
     expect(callsBeforeCatalog).toBe(1);
     expect(page.search).toHaveBeenCalledOnce();
+  });
+
+  it('applies the local browse default without changing an explicitly selected or cleared region', async () => {
+    const dialects = [
+      { id: 20, name: '莆仙方言', qualified_code: '闽.莆仙' },
+      { id: 23, name: '城里', qualified_code: '闽.莆仙.莆田.城里' },
+    ];
+    listAllDialects.mockResolvedValue(dialects);
+    Object.assign(productProfile, fallbackProductProfile('pxm.test.edialect.top'));
+    try {
+      const local = pageContext();
+      await local.initializeSiteScope({});
+      expect(local.filters).toMatchObject({ dialectId: 20, dialectMatch: 'subtree' });
+      const switched = pageContext();
+      await switched.initializeSiteScope({
+        dialect: dialects[1].qualified_code,
+        dialect_scope: 'exact',
+        has_recording: 'false',
+      });
+      expect(switched.filters).toMatchObject({
+        dialectId: 23, dialectMatch: 'exact', hasRecording: false,
+      });
+      const legacyShare = pageContext();
+      await legacyShare.initializeSiteScope({ key: '行' });
+      expect(legacyShare.filters.dialectId).toBe('');
+      const catalog = deferred();
+      listAllDialects.mockReturnValueOnce(catalog.promise);
+      const opened = pageContext();
+      const ready = opened.initializeSiteScope({ dialect: dialects[1].qualified_code });
+      opened.clearDialect();
+      catalog.resolve(dialects);
+      await ready;
+      expect(opened.filters.dialectId).toBe('');
+    } finally {
+      Object.assign(productProfile, fallbackProductProfile());
+    }
   });
 
   it('reports a failed region catalog and retries without replacing search state', async () => {
