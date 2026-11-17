@@ -10,13 +10,13 @@
         size="small"
         variant="ghost"
         text="回本站首页"
-        @click="goHome(true)"
+        @click="returnHome"
       />
       <BaseButton
         size="small"
         variant="ghost"
         text="查找词条"
-        @click="goSearch()"
+        @click="search"
       />
       <BaseButton
         size="small"
@@ -47,8 +47,8 @@ export default {
   },
   emits: ['retry'],
   methods: {
-    goHome,
-    goSearch,
+    returnHome() { goHome(true); },
+    search() { goSearch(); },
     report() {
       const params = contentFeedbackParams(this.objectType, this.objectId);
       if (params && requireAuth('content_feedback', params)) openPage(ROUTES.mailSend, params);
