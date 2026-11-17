@@ -639,14 +639,24 @@ export default {
         if (!silent || draft.audioError) {
           notify({ title: this.draftMessage || '草稿已保存，可稍后继续' });
         }
-        return { restorable: unchanged && !draft.audioError, message: this.draftMessage };
+        return {
+          restorable: unchanged && !draft.audioError,
+          message: this.draftMessage,
+          sourceAudioPath: audioPath,
+          audioPath: draft.audio?.path || audioPath,
+        };
       } catch (error) {
         if (error.persistedAudio && this.audio.path === audioPath) {
           this.audio = { ...this.audio, ...error.persistedAudio };
         }
         this.draftMessage = error.message;
         if (!silent) notify({ title: error.message });
-        return { restorable: false, message: this.draftMessage };
+        return {
+          restorable: false,
+          message: this.draftMessage,
+          sourceAudioPath: audioPath,
+          audioPath: error.persistedAudio?.path || audioPath,
+        };
       } finally { this.savingDraft = false; }
     },
     dialectLabel,
@@ -752,9 +762,12 @@ export default {
           citation: String(this.form.citation || '').trim(),
         };
         if (this.selectedEntry?.id) payload.primary_entry_id = this.selectedEntry.id;
-        await this.saveDraft({ silent: true });
+        const savedDraft = await this.saveDraft({ silent: true });
         if (draftOwner() !== owner) throw new Error('账号已切换，请重新打开录音页');
-        const uploaded = await uploadFile(audio.path);
+        // Native saveFile moves the temporary file. Use its new location only
+        // when the saved audio belongs to this submission snapshot.
+        const path = savedDraft?.sourceAudioPath === audio.path ? savedDraft.audioPath : audio.path;
+        const uploaded = await uploadFile(path);
         if (draftOwner() !== owner) throw new Error('账号已切换，请重新打开录音页');
         payload.audio_url = uploaded.url;
         payload.duration_ms = Number(uploaded.duration_ms ?? audio.durationMs ?? 0);

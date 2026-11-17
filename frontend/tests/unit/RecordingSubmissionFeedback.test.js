@@ -59,9 +59,16 @@ beforeEach(() => {
 describe('recording submission feedback', () => {
   it('uses shared submission wording after the recording is created', async () => {
     uploadFile.mockResolvedValue({ url: '/files/voice.mp3', duration_ms: 2300 });
-    createRecording.mockResolvedValue({ id: 12, status: 'draft', visibility: true });
+    createRecording.mockResolvedValue({ id: 12, status: 'draft', visibility: false });
+    saveRecordingDraft.mockResolvedValue({
+      id: 'draft-1', audio: { path: '/saved/recording.mp3', persisted: true }, audioError: false,
+    });
     const page = pageContext();
     await page.submit();
+    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3');
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      publication_consent: 'public-display-v1',
+    }));
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);
