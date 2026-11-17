@@ -243,7 +243,8 @@ export default {
         this.packs = response.packs || {};
         this.quizUnavailable = response.quiz_unavailable;
         if (this.quizVersion && this.tool === 'quiz' && this.packs.quiz) {
-          observeSharedOpen(quizShareMessage(this.currentDialect.qualified_code, this.packs.quiz)?.path);
+          const shared = quizShareMessage(this.currentDialect.qualified_code, this.packs.quiz);
+          observeSharedOpen(shared?.path);
         }
       } catch {
         if (request === this.generation) this.error = true;

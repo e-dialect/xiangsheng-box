@@ -426,6 +426,9 @@
 
 <script>
 import { observeSharedOpen } from '@/services/shareObservation';
+import {
+  publicSearchShareParams, readPublicSearchFilters, SOURCE_TYPES, WRITING_TYPES,
+} from '@/services/publicSearchFilters';
 import TCell from '@tdesign/uniapp/cell/cell.vue';
 import TCollapse from '@tdesign/uniapp/collapse/collapse.vue';
 import TCollapsePanel from '@tdesign/uniapp/collapse-panel/collapse-panel.vue';
@@ -471,29 +474,6 @@ const SWITCH_FILTERS = {
   concept: 'concept',
 };
 
-const WRITING_TYPES = [
-  { label: '不限', value: '' },
-  { label: '汉字正字', value: 'orthographic' },
-  { label: '俗写', value: 'popular' },
-  { label: '借字', value: 'loan' },
-  { label: '拟音', value: 'phonetic' },
-  { label: '罗马字', value: 'romanization' },
-  { label: '待考写法', value: 'uncertain' },
-];
-
-const SOURCE_TYPES = [
-  { label: '不限', value: '' },
-  { label: '用户原话', value: 'user_statement' },
-  { label: '口述', value: 'oral' },
-  { label: '田野记录', value: 'fieldwork' },
-  { label: '书籍', value: 'book' },
-  { label: '论文或文章', value: 'article' },
-  { label: '档案', value: 'archive' },
-  { label: '网页', value: 'web' },
-  { label: '旧库原文', value: 'legacy' },
-  { label: '其他', value: 'other' },
-];
-
 function defaultFilters() {
   return {
     keyword: '',
@@ -508,38 +488,6 @@ function defaultFilters() {
     concept: '',
     hasRecording: '',
   };
-}
-
-// Only persisted public search criteria travel to another user.
-function publicFilters(filters = {}) {
-  const result = {};
-  if (/^[1-9]\d*$/.test(String(filters.dialectId || ''))) {
-    result.dialectId = String(filters.dialectId);
-    if (filters.dialectMatch === 'exact') result.dialectMatch = 'exact';
-  }
-  if (WRITING_TYPES.some(({ value }) => value && value === filters.writingType)) {
-    result.writingType = filters.writingType;
-  }
-  if (SOURCE_TYPES.some(({ value }) => value && value === filters.sourceType)) {
-    result.sourceType = filters.sourceType;
-  }
-  if (['draft', 'reviewed', 'disputed'].includes(filters.status)) result.status = filters.status;
-  if (typeof filters.hasRecording === 'boolean') result.hasRecording = filters.hasRecording;
-  ['ipa', 'romanization', 'source', 'concept'].forEach((key) => {
-    if (typeof filters[key] === 'string' && filters[key].trim()) result[key] = filters[key].trim();
-  });
-  return result;
-}
-
-function sharedFilters(raw) {
-  if (typeof raw !== 'string' || !raw) return {};
-  try {
-    // H5 supplies decoded route options. WeChat may supply the encoded component.
-    const parsed = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
-    return parsed && typeof parsed === 'object' ? publicFilters(parsed) : {};
-  } catch {
-    return {};
-  }
 }
 
 function resultBucket(count) {
@@ -634,16 +582,15 @@ export default {
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
-      const criteria = publicFilters(this.appliedFilters || {});
-      const filtered = Object.keys(criteria).length > 0;
+      const params = publicSearchShareParams(this.submittedKeyword, this.appliedFilters);
+      const filtered = Boolean(params.filters);
       if (!hasShareTarget() || this.loading || this.errorMessage || !this.entries.length
         || (!this.submittedKeyword && !filtered)) return null;
       const characters = Array.from(this.submittedKeyword);
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
-      const filters = filtered ? JSON.stringify(criteria) : undefined;
-      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword, filters });
-      const query = pageUrl('', { sharedKeyword: this.submittedKeyword, filters }).slice(1);
+      const path = pageUrl(ROUTES.search, params);
+      const query = pageUrl('', { sharedKeyword: params.key, filters: params.filters }).slice(1);
       return {
         title: `查词｜${keyword || '筛选结果'} · ${currentProductName()}`, path, query, filtered,
       };
@@ -739,9 +686,11 @@ export default {
       }
     }
     // #endif
-    Object.assign(this.filters, sharedFilters(options.filters));
-    this.siteScopeReady = this.initializeSiteScope(options);
-    if (this.filters.keyword || activeFilterCount(this.filters)) await this.search();
+    const sharedFilters = readPublicSearchFilters(options.filters);
+    Object.assign(this.filters, sharedFilters);
+    const filtered = Object.keys(sharedFilters).length > 0;
+    this.siteScopeReady = this.initializeSiteScope(options, filtered);
+    if (this.filters.keyword || filtered) await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
@@ -755,11 +704,10 @@ export default {
   },
   // #endif
   methods: {
-    async initializeSiteScope(options) {
+    async initializeSiteScope(options, filtered = false) {
       this.explicitDialectScope = typeof options.dialect === 'string';
-      const sharedSearch = ['sharedKeyword', 'key', 'filters'].some((key) => (
-        typeof options[key] === 'string'
-      ));
+      const sharedSearch = filtered
+        || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
       Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
         if (typeof options[key] === 'string') this.filters[field] = options[key];
       });
@@ -874,7 +822,9 @@ export default {
         this.next = response?.next || null;
         this.page = 1;
         this.appliedFilters = filters;
-        observeSharedOpen(pageUrl(ROUTES.search, { key: this.submittedKeyword }));
+        observeSharedOpen(
+          pageUrl(ROUTES.search, publicSearchShareParams(this.submittedKeyword, filters)),
+        );
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',

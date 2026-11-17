@@ -123,6 +123,34 @@ describe('anonymous H5 shares', () => {
     expect(JSON.stringify(fetchEvents())).not.toContain('version-1');
   });
 
+  it('classifies filter-only links and compares the normalized applied criteria', () => {
+    const path = '/pages/search?filters=%7B%22dialectId%22%3A42%2C%22hasRecording%22%3Afalse%7D';
+    const marked = markWebShareUrl(new URL(path, window.location.origin).href, '/');
+    expect(marked.kind).toBe('search');
+    setLanding(marked.url, marked.url);
+    const otherDialect = '/pages/search?filters=%7B%22dialectId%22%3A43%2C%22hasRecording%22%3Afalse%7D';
+    observeSharedOpen(otherDialect);
+    expect(window.fetch).not.toHaveBeenCalled();
+    const sameApplied = '/pages/search?filters=%7B%22hasRecording%22%3Afalse%2C%22dialectId%22%3A%2242%22%7D';
+    observeSharedOpen(sameApplied);
+    expect(fetchEvents()).toMatchObject([{ event_name: 'share_opened', surface: 'search' }]);
+    expect(fetchEvents()[0].metadata).toEqual({});
+    expect(fetchEvents()[0]).not.toHaveProperty('filters');
+  });
+
+  it('requires filters to match even if a modified search retains the same word', () => {
+    const path = '/pages/search?key=alpha&filters=%7B%22source%22%3A%22privateSource%22%7D';
+    const marked = `${path}&share_kind=search`;
+    setLanding(marked, marked);
+    observeSharedOpen(path.replace('privateSource', 'otherSource'));
+    observeSharedOpen('/pages/search?key=alpha');
+    expect(window.fetch).not.toHaveBeenCalled();
+    observeSharedOpen(path);
+    expect(fetchEvents()).toMatchObject([{ event_name: 'share_opened', surface: 'search' }]);
+    expect(JSON.stringify(fetchEvents())).not.toContain('privateSource');
+    expect(JSON.stringify(fetchEvents())).not.toContain('alpha');
+  });
+
   it('ignores in-app navigations and unmarked or incorrectly marked direct opens', () => {
     const path = '/pages/recordings/details?id=8';
     setLanding('/', `${path}&share_kind=recording`);

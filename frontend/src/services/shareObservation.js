@@ -1,16 +1,22 @@
 import { appRoutePath, ROUTES } from '@/services/navigation';
 import { productEventPayload, PRODUCT_EVENTS } from '@/services/productAnalytics';
 import { BASE_URL } from '@/const/urls';
+import { readPublicSearchFilters } from '@/services/publicSearchFilters';
 
 const SHARE_MARKER = 'share_kind';
 const QUIZ_ROUTE = '/pages/tools/local';
-const SHARE_ROUTES = Object.freeze({
-  [ROUTES.collectionDetail]: 'collection',
-  [ROUTES.entryDetail]: 'entry',
-  [ROUTES.recordingDetail]: 'recording',
-  [ROUTES.search]: 'search',
-  [QUIZ_ROUTE]: 'quiz',
-});
+const SHARE_TYPES = new Set(['collection', 'entry', 'recording', 'search', 'quiz']);
+
+function routeKind(route) {
+  const routes = {
+    [ROUTES.collectionDetail]: 'collection',
+    [ROUTES.entryDetail]: 'entry',
+    [ROUTES.recordingDetail]: 'recording',
+    [ROUTES.search]: 'search',
+    [QUIZ_ROUTE]: 'quiz',
+  };
+  return routes[route];
+}
 
 let openedShare = false;
 
@@ -18,11 +24,13 @@ let openedShare = false;
 // stay in the actual link and never enter the analytics request.
 function classify(url, base) {
   const route = appRoutePath(url.pathname, base);
-  const kind = SHARE_ROUTES[route];
+  const kind = routeKind(route);
   const params = url.searchParams;
   if (kind === 'search') {
-    const key = params.get('keywords') || params.get('key');
-    return key?.trim() ? { kind, target: [key] } : null;
+    const key = (params.get('keywords') || params.get('key') || '').trim();
+    const filters = readPublicSearchFilters(params.get('filters'));
+    return key || Object.keys(filters).length
+      ? { kind, target: [key, JSON.stringify(filters)] } : null;
   }
   if (kind === 'quiz') {
     const dialect = params.get('dialect');
@@ -49,7 +57,7 @@ export function markWebShareUrl(value, base) {
 }
 
 export function trackShareObservation(eventName, kind, result) {
-  if (!Object.values(SHARE_ROUTES).includes(kind) || typeof window === 'undefined' || typeof window.fetch !== 'function') return;
+  if (!SHARE_TYPES.has(kind) || typeof window === 'undefined' || typeof window.fetch !== 'function') return;
   try {
     const payload = productEventPayload(eventName, { surface: kind, result });
     if (!payload || payload.platform !== 'h5') return;
