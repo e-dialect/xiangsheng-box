@@ -40,6 +40,7 @@ function pageContext() {
     ...RecordingCreate.data(),
     ...RecordingCreate.methods,
     ownerScope: 'user:1',
+    draftReady: true,
     $refs: { form: { validate: vi.fn(async () => true) } },
   };
   page.audio = { path: 'blob:recording', durationMs: 2300 };
