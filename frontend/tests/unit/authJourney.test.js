@@ -68,6 +68,16 @@ describe('auth journey', () => {
   });
 
   it.each([
+    ['record_recording', { page: 'record' }],
+    ['record_recording', { entryId: 'missing' }],
+    ['bookmark_entry', { entryId: -1 }],
+  ])('uses search when a saved %s has no valid public object', (action, context) => {
+    peekInterceptIntent.mockReturnValueOnce({ action, context });
+    cancelLogin();
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/search' });
+  });
+
+  it.each([
     'pages/index',
     'pages/entries/details',
     'pages/recordings/details',

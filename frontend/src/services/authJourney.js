@@ -100,6 +100,11 @@ export function canReturnToGuestPage() {
   return GUEST_RETURN_ROUTES.has(`/${route}`);
 }
 
+function validGuestObjectId(id) {
+  if (typeof id === 'number') return Number.isSafeInteger(id) && id > 0;
+  return typeof id === 'string' && /^[1-9]\d{0,18}$/.test(id);
+}
+
 export function guestReturnDestination(intent) {
   const context = intent?.context;
   if (intent?.action === 'content_feedback') {
@@ -112,11 +117,21 @@ export function guestReturnDestination(intent) {
     };
     return routeDestination(routes[params.object_type], { id: params.object_id });
   }
-  if (intent?.action === 'record_recording' && context?.entryId) {
-    return routeDestination(ROUTES.entryDetail, { id: context.entryId });
+  if (intent?.action === 'record_recording') {
+    return validGuestObjectId(context?.entryId)
+      ? routeDestination(ROUTES.entryDetail, { id: context.entryId }) : null;
   }
   const destination = resolveAuthDestination(intent);
-  return GUEST_RETURN_ROUTES.has(`/${destination.route}`) ? destination : null;
+  const route = `/${destination.route}`;
+  const objectIds = {
+    [ROUTES.entryDetail]: context?.entryId,
+    [ROUTES.recordingDetail]: context?.recordingId,
+    [ROUTES.userDetail]: context?.userId,
+    [ROUTES.circleDetail]: context?.circleId,
+  };
+  if (Object.prototype.hasOwnProperty.call(objectIds, route)
+    && !validGuestObjectId(objectIds[route])) return null;
+  return GUEST_RETURN_ROUTES.has(route) ? destination : null;
 }
 
 export function cancelLogin(intent = peekInterceptIntent()) {
