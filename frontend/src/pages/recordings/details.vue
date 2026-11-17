@@ -84,6 +84,7 @@
   </PageShell>
 </template>
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
@@ -221,6 +222,7 @@ export default {
       this.error = '';
       try {
         this.recording = await getRecording(this.id);
+        observeSharedOpen(recordingShareMessage(this.recording)?.path);
       } catch (error) {
         this.recording = null;
         this.error = '录音不存在、未公开或暂时无法读取';

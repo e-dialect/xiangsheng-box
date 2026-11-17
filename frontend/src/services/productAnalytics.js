@@ -7,12 +7,15 @@ export const PRODUCT_EVENTS = Object.freeze({
   RECORDING_SUBMIT: 'recording_submit',
   EVIDENCE_SUBMIT: 'evidence_submit',
   CURATION_TASK_COMPLETE: 'curation_task_complete',
+  SHARE_CLIPBOARD: 'share_clipboard',
+  SHARE_SYSTEM: 'share_system',
+  SHARE_OPENED: 'share_opened',
   CAPABILITY_DEGRADED: 'capability_degraded',
 });
 
 const EVENT_NAMES = new Set(Object.values(PRODUCT_EVENTS));
-const RESULTS = new Set(['view', 'success', 'empty', 'error', 'unavailable', 'cancelled']);
-const SURFACES = new Set(['listen', 'search', 'record', 'entry_detail', 'curation']);
+const RESULTS = new Set(['view', 'success', 'empty', 'error', 'unavailable', 'cancelled', 'attempt']);
+const SURFACES = new Set(['listen', 'search', 'record', 'entry_detail', 'curation', 'collection', 'entry', 'recording', 'quiz']);
 const METADATA_KEYS = new Set([
   'tab',
   'result_bucket',

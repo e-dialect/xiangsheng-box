@@ -7,6 +7,9 @@ class ProductEventName(models.TextChoices):
     RECORDING_SUBMIT = "recording_submit", "提交录音"
     EVIDENCE_SUBMIT = "evidence_submit", "提交补证"
     CURATION_TASK_COMPLETE = "curation_task_complete", "完成整理任务"
+    SHARE_CLIPBOARD = "share_clipboard", "复制分享链接"
+    SHARE_SYSTEM = "share_system", "系统分享"
+    SHARE_OPENED = "share_opened", "冷启动打开分享"
     CAPABILITY_DEGRADED = "capability_degraded", "能力降级"
 
 
@@ -27,6 +30,7 @@ class ProductEvent(models.Model):
         choices=ProductPlatform.choices,
         default=ProductPlatform.UNKNOWN,
     )
+    site = models.CharField(max_length=40, blank=True)
     surface = models.CharField(max_length=32, blank=True)
     result = models.CharField(max_length=24, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -46,6 +50,7 @@ class ProductEventDailySummary(models.Model):
     date = models.DateField()
     event_name = models.CharField(max_length=48, choices=ProductEventName.choices)
     platform = models.CharField(max_length=16, choices=ProductPlatform.choices)
+    site = models.CharField(max_length=40, blank=True)
     surface = models.CharField(max_length=32, blank=True)
     result = models.CharField(max_length=24, blank=True)
     event_count = models.PositiveIntegerField(default=0)
@@ -53,10 +58,10 @@ class ProductEventDailySummary(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-date", "event_name", "platform", "surface", "result"]
+        ordering = ["-date", "event_name", "platform", "site", "surface", "result"]
         constraints = [
             models.UniqueConstraint(
-                fields=["date", "event_name", "platform", "surface", "result"],
+                fields=["date", "event_name", "platform", "site", "surface", "result"],
                 name="unique_product_event_daily_dimension",
             )
         ]
