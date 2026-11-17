@@ -330,7 +330,7 @@
             提交前，请确认公开范围
           </view>
           <view class="record-submit__note">
-            提交后将公开为初稿，其他用户可以收听，审核状态为待核对。写法和专业读音可以由你或整理员继续补充；保存草稿仅保留在当前设备的浏览器中。
+            请确认已取得说话人同意。点击下方按钮即同意审核员试听，以及审核通过后在本站公开录音和所填资料。审核前仅你和有权限的审核员可听，你可在详情中撤回。
           </view>
           <view
             class="record-submit__status"
@@ -343,7 +343,7 @@
             size="large"
             :loading="submitting"
             :disabled="submitting || savingDraft"
-            text="提交并公开"
+            text="同意并提交审核"
             @click="submit"
           />
           <text class="record-section__help">
@@ -734,26 +734,32 @@ export default {
     },
     async submit() {
       if (this.submitting || this.savingDraft || !await this.validateForm()) return;
+      if (this.submitting || this.savingDraft) return;
       if (draftOwner() !== this.ownerScope) { notify({ title: '账号已切换，请重新打开录音页' }); return; }
       this.submitting = true;
       clearTimeout(this.draftTimer);
-      await this.saveDraft({ silent: true });
+      const owner = this.ownerScope;
+      const audio = { ...this.audio };
       try {
-        const uploaded = await uploadFile(this.audio.path);
-        if (draftOwner() !== this.ownerScope) throw new Error('账号已切换，请重新打开录音页');
         const payload = {
-          audio_url: uploaded.url,
+          publication_consent: 'public-display-v1',
           usage_dialect_id: Number(this.form.usage_dialect_id),
           recording_type: this.form.recording_type || 'word',
           original_gloss: String(this.form.original_gloss).trim(),
-          duration_ms: Number(uploaded.duration_ms ?? this.audio.durationMs ?? 0),
           rights_statement: String(this.form.rights_statement || '').trim(),
           original_writing: String(this.form.original_writing || '').trim(),
           original_pronunciation: String(this.form.original_pronunciation || '').trim(),
           citation: String(this.form.citation || '').trim(),
         };
         if (this.selectedEntry?.id) payload.primary_entry_id = this.selectedEntry.id;
+        await this.saveDraft({ silent: true });
+        if (draftOwner() !== owner) throw new Error('账号已切换，请重新打开录音页');
+        const uploaded = await uploadFile(audio.path);
+        if (draftOwner() !== owner) throw new Error('账号已切换，请重新打开录音页');
+        payload.audio_url = uploaded.url;
+        payload.duration_ms = Number(uploaded.duration_ms ?? audio.durationMs ?? 0);
         const recording = await createRecording(payload);
+        if (draftOwner() !== owner) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'success',
@@ -767,6 +773,7 @@ export default {
         }
         goRecordingDetail(recording.id, { replace: true });
       } catch (error) {
+        if (draftOwner() !== owner) return;
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
           result: 'error',

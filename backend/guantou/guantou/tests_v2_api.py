@@ -1,4 +1,8 @@
 from datetime import timedelta
+from urllib.parse import urlsplit
+
+from files.recording_media import media_url
+from audit.models import ObjectChangeLog
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -19,6 +23,7 @@ from .models import (
     LegacyReviewCandidate,
     PronunciationVariant,
     Recording,
+    RecordingMedia,
     RecordingEntryLink,
     UsageAttestation,
     WritingForm,
@@ -332,7 +337,12 @@ class EntryFirstApiTests(TestCase):
         response = self.client.post(
             "/recordings/",
             {
-                "audio_url": "https://example.test/fear.mp3",
+                "audio_url": media_url(
+                    RecordingMedia.objects.create(
+                        owner=self.owner, content=b"sound", duration_ms=800
+                    ).pk
+                ),
+                "publication_consent": "public-display-v1",
                 "usage_dialect_id": self.group.id,
                 "original_gloss": " 表示害怕的意思 ",
                 "original_writing": " 惊 ",
@@ -358,68 +368,198 @@ class EntryFirstApiTests(TestCase):
         self.assertNotIn("location", recording.metadata)
         self.assertNotIn("device_location", recording.metadata)
 
-    def test_submitted_draft_is_public_but_explicit_and_historical_private_stay_hidden(
-        self,
-    ):
+    def test_submission_review_revision_publication_takedown_and_withdrawal(self):
+        anonymous, other, reviewer = APIClient(), APIClient(), APIClient()
+        other.force_authenticate(self.other)
+        curator = User.objects.create_user(username="reviewer")
+        now = timezone.now()
+        CuratorGrant.objects.create(
+            user=curator,
+            role="regional_curator",
+            dialect=self.group,
+            valid_from=now - timedelta(hours=1),
+            valid_until=now + timedelta(days=1),
+        )
+        reviewer.force_authenticate(curator)
+        asset = RecordingMedia.objects.create(
+            owner=self.owner, content=b"sample", duration_ms=300
+        )
+        url = media_url(asset.id)
+        path = urlsplit(url).path
         payload = {
-            "audio_url": "https://example.test/submitted.mp3",
-            "usage_dialect_id": self.group.id,
-            "original_gloss": "公开初稿",
+            "audio_url": url,
+            "usage_dialect_id": self.city.id,
+            "original_gloss": "sample caption",
         }
-        public = self.client.post("/recordings/", payload, format="json")
-        self.assertEqual(public.status_code, 201, public.data)
-        self.assertEqual(public.data["status"], Recording.Status.DRAFT)
-        self.assertTrue(public.data["visibility"])
-        private = self.client.post(
-            "/recordings/", {**payload, "visibility": False}, format="json"
-        )
-        self.assertEqual(private.status_code, 201, private.data)
-        historical = Recording.objects.create(
-            audio_url=payload["audio_url"],
-            usage_dialect=self.group,
-            recorder=self.owner,
-            original_gloss="历史私有录音",
-        )
-        viewer = APIClient()
-        viewer.force_authenticate(self.other)
-        listed = viewer.get("/recordings/")
-        self.assertIn(public.data["id"], {row["id"] for row in listed.data["results"]})
-        detail = viewer.get(f"/recordings/{public.data['id']}/")
-        self.assertEqual(detail.status_code, 200)
-        self.assertEqual(detail.data["audio_url"], payload["audio_url"])
-        entry_id = (
-            Recording.objects.get(pk=public.data["id"]).entry_links.get().entry_id
-        )
-        linked = viewer.get("/recordings/", {"entry_id": entry_id})
+        self.assertEqual(self.client.get(path).content, b"sample")
+        self.assertEqual(anonymous.get(path).status_code, 404)
+        self.assertEqual(reviewer.get(path).status_code, 404)
+        self.assertEqual(self.client.post("/recordings/", payload).status_code, 400)
+        payload.update(publication_consent="public-display-v1", visibility=True)
+        self.assertEqual(other.post("/recordings/", payload).status_code, 400)
         self.assertEqual(
-            [row["id"] for row in linked.data["results"]], [public.data["id"]]
+            self.client.post(
+                "/recordings/",
+                {**payload, "audio_url": "https://example.org/public.mp3"},
+            ).status_code,
+            400,
         )
-        for recording_id in (private.data["id"], historical.id):
-            self.assertEqual(
-                viewer.get(f"/recordings/{recording_id}/").status_code, 404
+        submission = self.client.post("/recordings/", payload)
+        self.assertEqual(submission.status_code, 201, submission.data)
+        self.assertFalse(submission.data["visibility"])
+        self.assertEqual(self.client.post("/recordings/", payload).status_code, 400)
+        recording_id = submission.data["id"]
+        detail = f"/recordings/{recording_id}/"
+        entry_id = submission.data["entry_links"][0]["entry"]["id"]
+        entry_url = f"/entries/{entry_id}/"
+        self.assertIn(
+            recording_id,
+            [
+                row["id"]
+                for row in reviewer.get("/curation/tasks/", {"kind": "recording"}).data[
+                    "results"
+                ]
+            ],
+        )
+        self.assertEqual(reviewer.get(path).content, b"sample")
+        self.assertEqual(self.client.get("/recordings/").data["count"], 0)
+        self.assertEqual(
+            self.client.get("/recordings/", {"mine": True}).data["results"][0]["id"],
+            recording_id,
+        )
+        self.assertEqual(other.get("/recordings/", {"mine": True}).data["count"], 0)
+
+        def hidden():
+            for client in (anonymous, other):
+                for route in (path, detail, entry_url):
+                    self.assertEqual(client.get(route).status_code, 404, route)
+                self.assertEqual(
+                    client.get("/recordings/", {"entry_id": entry_id}).data["count"], 0
+                )
+                self.assertEqual(
+                    client.get(
+                        "/evidence-records/", {"recording_id": recording_id}
+                    ).data["count"],
+                    0,
+                )
+            self.assertEqual(self.client.get(path).content, b"sample")
+
+        def review(new_status, revision=None):
+            return reviewer.post(
+                "/curation/actions/",
+                {
+                    "action_type": "review",
+                    "target_type": "recording",
+                    "target_id": recording_id,
+                    "reason": "核实录制者的说明",
+                    "changes": {
+                        "status": new_status,
+                        "revision": revision or reviewer.get(detail).data["updated_at"],
+                    },
+                },
+                format="json",
             )
-        self.other.is_staff = True
-        self.other.save(update_fields=["is_staff"])
-        rejected = viewer.post(
-            "/curation/actions/",
+
+        hidden()
+        self.assertEqual(other.post(detail + "withdraw/").status_code, 404)
+        self.assertEqual(
+            self.client.patch(detail, {"visibility": True}).status_code, 400
+        )
+        initial_revision = reviewer.get(detail).data["updated_at"]
+        self.assertEqual(review("rejected").status_code, 201)
+        self.assertEqual(
+            self.client.get(detail).data["review_reason"], "核实录制者的说明"
+        )
+        hidden()
+        replacement = RecordingMedia.objects.create(
+            owner=self.owner, content=b"revised", duration_ms=400
+        )
+        revised_url = media_url(replacement.pk)
+        revision = {
+            "original_gloss": "revised caption",
+            "audio_url": revised_url,
+            "publication_consent": "public-display-v1",
+        }
+        self.assertEqual(other.post(detail + "resubmit/", revision).status_code, 404)
+        self.assertEqual(
+            self.client.post(detail + "resubmit/", revision).status_code, 200
+        )
+        self.assertEqual(
+            self.client.post(detail + "resubmit/", revision).status_code, 400
+        )
+        revised_path = urlsplit(revised_url).path
+        self.assertEqual(anonymous.get(revised_path).status_code, 404)
+        self.assertEqual(reviewer.get(revised_path).content, b"revised")
+        self.assertEqual(review("published", initial_revision).status_code, 400)
+        self.assertEqual(review("published").status_code, 201)
+        self.assertTrue(anonymous.get(detail).data["visibility"])
+        self.assertEqual(anonymous.get(entry_url).data["summary"], "revised caption")
+        public_audio = anonymous.get(revised_path)
+        self.assertEqual(public_audio.content, b"revised")
+        self.assertIn("no-store", public_audio["Cache-Control"])
+        self.assertEqual(anonymous.get(path).status_code, 404)
+        self.assertEqual(review("rejected").status_code, 201)
+        self.assertEqual(anonymous.get(detail).status_code, 404)
+        self.assertEqual(anonymous.get(revised_path).status_code, 404)
+        self.assertEqual(
+            self.client.post(
+                detail + "resubmit/", {**revision, "audio_url": ""}
+            ).status_code,
+            200,
+        )
+        self.assertEqual(review("published").status_code, 201)
+        self.assertEqual(self.client.post(detail + "withdraw/").status_code, 200)
+        self.assertEqual(self.client.post(detail + "withdraw/").status_code, 200)
+        self.assertEqual(review("published").status_code, 400)
+        self.assertEqual(self.client.get(detail).data["status"], "withdrawn")
+        for route in (detail, entry_url, revised_path):
+            self.assertEqual(anonymous.get(route).status_code, 404)
+        self.assertTrue(
+            ObjectChangeLog.objects.filter(
+                content_type__model="recording",
+                object_id=str(recording_id),
+                after__status="withdrawn",
+            ).exists()
+        )
+
+    def test_submission_to_existing_public_entry_does_not_expose_evidence(self):
+        entry, sense = self.make_entry("public", "词")
+        asset = RecordingMedia.objects.create(
+            owner=self.owner, content=b"sample", duration_ms=1
+        )
+        response = self.client.post(
+            "/recordings/",
             {
-                "action_type": "review",
-                "target_type": "recording",
-                "target_id": public.data["id"],
-                "reason": "授权待核实，暂时退回",
-                "changes": {"status": "rejected"},
+                "audio_url": media_url(asset.pk),
+                "publication_consent": "public-display-v1",
+                "usage_dialect_id": self.city.pk,
+                "original_gloss": "private caption",
+                "primary_entry_id": entry.pk,
+                "primary_sense_id": sense.pk,
             },
-            format="json",
         )
-        self.assertEqual(rejected.status_code, 201, rejected.data)
-        self.other.is_staff = False
-        self.other.save(update_fields=["is_staff"])
+        self.assertEqual(response.status_code, 201, response.data)
+        viewer = APIClient()
         self.assertEqual(
-            viewer.get(f"/recordings/{public.data['id']}/").status_code, 404
+            viewer.get("/evidence-records/", {"entry_id": entry.pk}).data["count"], 0
+        )
+        self.assertNotIn(
+            b"private caption", viewer.get(f"/entries/{entry.pk}/").content
         )
         self.assertEqual(
-            viewer.get("/recordings/", {"entry_id": entry_id}).data["results"], []
+            viewer.get("/entries/", {"q": "private caption"}).data["count"], 0
         )
+        for visible in (False, True):
+            legacy = Recording.objects.create(
+                audio_url="https://example.test/legacy.mp3",
+                usage_dialect=self.city,
+                recorder=self.owner,
+                visibility=visible,
+            )
+            self.assertEqual(
+                viewer.get(f"/recordings/{legacy.pk}/").status_code,
+                200 if visible else 404,
+            )
 
     def test_recording_can_link_mentions_and_competing_entries(self):
         primary, _ = self.make_entry("走", "行")
