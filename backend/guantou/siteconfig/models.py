@@ -1,6 +1,7 @@
 from django.db import models
 
 from .capabilities import default_remote_capabilities, validate_remote_capabilities
+from .profile_layout import default_enabled_tools, default_home_sections
 
 
 class SiteSettings(models.Model):
@@ -82,6 +83,12 @@ class ProductProfileRevision(models.Model):
     )
     local_tools_dialect = models.CharField(
         max_length=160, blank=True, verbose_name="地方工具方言限定码"
+    )
+    home_sections = models.JSONField(
+        default=default_home_sections, blank=True, verbose_name="首页栏目"
+    )
+    enabled_tools = models.JSONField(
+        default=default_enabled_tools, blank=True, verbose_name="启用工具"
     )
     featured = models.JSONField(default=list, blank=True, verbose_name="精选")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
