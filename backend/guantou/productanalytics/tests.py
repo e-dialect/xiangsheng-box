@@ -195,3 +195,90 @@ class ProductEventRetentionTests(TestCase):
 
         self.assertEqual(result, {"summaries": 0, "deleted_raw_events": 0})
         self.assertEqual(mocked.call_count, 2)
+
+
+@override_settings(
+    BOX_PRODUCT_PROFILE_ORIGINS={
+        "https://local.example.test": "pxm",
+        "https://common.example.test": "box",
+        "http://localhost": "box",
+        "https://draft.example.test": "draft",
+    }
+)
+class ShareObservationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.payload = {
+            "session_id": "session-abc-12345678",
+            "event_name": "share_opened",
+            "platform": "h5",
+            "surface": "quiz",
+            "result": "success",
+        }
+
+    def send(self, payload, **headers):
+        return self.client.post(
+            "/product-events/", payload, content_type="application/json", **headers
+        )
+
+    def test_uses_allowlisted_origin_and_falls_back_to_the_same_origin_host(self):
+        for headers, site in (
+            ({"HTTP_ORIGIN": "https://local.example.test"}, "pxm"),
+            ({"HTTP_ORIGIN": "https://common.example.test"}, "box"),
+            ({"HTTP_ORIGIN": "https://other.example.test"}, "general"),
+            ({"HTTP_ORIGIN": "https://draft.example.test"}, "general"),
+            ({"HTTP_ORIGIN": "null", "HTTP_HOST": "localhost"}, "general"),
+            ({"HTTP_HOST": "localhost"}, "box"),
+        ):
+            with self.subTest(headers=headers):
+                self.assertEqual(self.send(self.payload, **headers).status_code, 202)
+                event = ProductEvent.objects.first()
+                self.assertEqual(event.site, site)
+                self.assertEqual(event.metadata, {})
+
+    def test_rejects_content_and_invalid_share_combinations(self):
+        for changes in (
+            {"site": "pxm"},
+            {"score": 5},
+            {"metadata": {"query": "方言词"}},
+            {"metadata": {"tab": "today"}},
+            {"metadata": {"tab": {"unknown": "value"}}},
+            {"session_id": "user-12345678"},
+            {"platform": "mp-weixin"},
+            {"surface": "listen"},
+            {"result": "cancelled"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertEqual(
+                    self.send({**self.payload, **changes}).status_code, 400
+                )
+        self.assertFalse(ProductEvent.objects.exists())
+
+    def test_aggregates_by_site_object_and_phase_without_linking_participants(self):
+        now = timezone.now()
+        yesterday = now - timedelta(days=1)
+        for host, changes in (
+            ("https://local.example.test", {}),
+            ("https://local.example.test", {}),
+            ("https://common.example.test", {}),
+            ("https://local.example.test", {"surface": "collection"}),
+            (
+                "https://local.example.test",
+                {"event_name": "share_system", "result": "attempt"},
+            ),
+            (
+                "https://local.example.test",
+                {"event_name": "share_system", "result": "cancelled"},
+            ),
+        ):
+            self.assertEqual(
+                self.send({**self.payload, **changes}, HTTP_ORIGIN=host).status_code,
+                202,
+            )
+        ProductEvent.objects.update(received_at=yesterday)
+        summary = aggregate_and_prune_product_events(now=now)
+        self.assertEqual(summary["summaries"], 5)
+        opened = ProductEventDailySummary.objects.get(
+            site="pxm", surface="quiz", event_name="share_opened", result="success"
+        )
+        self.assertEqual((opened.event_count, opened.unique_sessions), (2, 1))

@@ -39,18 +39,22 @@ def active_profile(key):
     )
 
 
-def resolve_profile_request(request):
+def registered_request_profile(request):
     origins = product_profile_origins(settings.BOX_PRODUCT_PROFILE_ORIGINS)
     host_origin = f"{request.scheme}://{request.get_host().lower()}"
     # A cross-origin browser supplies Origin. Same-origin GETs may omit it.
     # These are selectors for public data, never a signal of authentication.
     origin = request.headers.get("Origin", host_origin)
     key = origins.get(origin)
-    profile = active_profile(key) if key else None
+    return (active_profile(key) if key else None), origins
+
+
+def resolve_profile_request(request):
+    profile, origins = registered_request_profile(request)
     if not profile:
         return profile_payload(active_profile(GENERAL_KEY)), []
 
-    others = {other_key for other_key in origins.values() if other_key != key}
+    others = {other_key for other_key in origins.values() if other_key != profile.pk}
     others = ProductProfile.objects.select_related("active_revision").filter(
         pk__in=others
     )

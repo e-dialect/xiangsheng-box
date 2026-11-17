@@ -3,11 +3,12 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import ProductEventInputSerializer
+from .serializers import SHARE_RESULTS, ProductEventInputSerializer
 from .services import (
     create_product_event,
     daily_session_hash,
     maybe_maintain_product_events,
+    share_site,
 )
 
 
@@ -23,6 +24,7 @@ def event_rate_limited(session_hash, increment):
 
 
 class ProductEventView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
@@ -51,7 +53,17 @@ class ProductEventView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
+        site = (
+            share_site(request)
+            if any(
+                item["event_name"] in SHARE_RESULTS
+                for item in serializer.validated_data
+            )
+            else ""
+        )
         for item in serializer.validated_data:
-            create_product_event(item)
+            create_product_event(
+                item, site=site if item["event_name"] in SHARE_RESULTS else ""
+            )
         maybe_maintain_product_events()
         return Response({"accepted": len(events)}, status=status.HTTP_202_ACCEPTED)

@@ -143,6 +143,7 @@
   </PageShell>
 </template>
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseField from '@/components/BaseField.vue';
@@ -304,6 +305,7 @@ export default {
         this.gloss = recording.original_gloss || '';
         this.replacement = null;
         this.reason = '';
+        observeSharedOpen(recordingShareMessage(recording)?.path);
       } catch (error) {
         if (version !== this.loadVersion) return;
         this.recording = null;

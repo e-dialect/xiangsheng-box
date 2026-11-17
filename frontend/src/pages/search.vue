@@ -425,6 +425,7 @@
 </template>
 
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import TCell from '@tdesign/uniapp/cell/cell.vue';
 import TCollapse from '@tdesign/uniapp/collapse/collapse.vue';
 import TCollapsePanel from '@tdesign/uniapp/collapse-panel/collapse-panel.vue';
@@ -873,6 +874,7 @@ export default {
         this.next = response?.next || null;
         this.page = 1;
         this.appliedFilters = filters;
+        observeSharedOpen(pageUrl(ROUTES.search, { key: this.submittedKeyword }));
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',

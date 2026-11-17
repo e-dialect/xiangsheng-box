@@ -99,6 +99,7 @@
 </template>
 
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
@@ -241,6 +242,9 @@ export default {
         this.currentDialect = response.dialect;
         this.packs = response.packs || {};
         this.quizUnavailable = response.quiz_unavailable;
+        if (this.quizVersion && this.tool === 'quiz' && this.packs.quiz) {
+          observeSharedOpen(quizShareMessage(this.currentDialect.qualified_code, this.packs.quiz)?.path);
+        }
       } catch {
         if (request === this.generation) this.error = true;
       } finally {
