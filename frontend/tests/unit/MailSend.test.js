@@ -58,6 +58,18 @@ describe('mail send recipient', () => {
     mocks.searchUsers.mockResolvedValue([recipient]);
   });
 
+  it('opens an editable administrator draft for a public object without sending it', () => {
+    const wrapper = mountPage();
+    MailSendPage.onLoad.call(wrapper.vm, {
+      id: '-1', object_type: 'entry', object_id: '64', content: 'untrusted', title: 'untrusted',
+    });
+    expect(wrapper.vm.recipientId).toBe('-1');
+    expect(wrapper.vm.Notification.title).toBe('词条链接反馈');
+    expect(wrapper.vm.Notification.content).toContain('对象：词条 64');
+    expect(wrapper.vm.Notification.content).toContain(window.location.hostname);
+    expect(wrapper.vm.Notification.content).not.toContain('untrusted');
+  });
+
   it('does not leak route title parameters into the page shell', () => {
     expect(MailSendPage.inheritAttrs).toBe(false);
   });

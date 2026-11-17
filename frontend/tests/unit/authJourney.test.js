@@ -26,6 +26,15 @@ describe('auth journey', () => {
     globalThis.getCurrentPages = vi.fn(() => [{ route: 'pages/login/login' }]);
   });
 
+  it('returns a signed-in reporter to the administrator draft for the same public object', () => {
+    const destination = resolveAuthDestination({ action: 'content_feedback', context: {
+      object_type: 'recording', object_id: '52', id: 7, token: 'ignored',
+    } });
+    expect(destination.url).toBe('/pages/mails/send?id=-1&object_type=recording&object_id=52');
+    expect(resolveAuthDestination({ action: 'content_feedback', context: { object_type: 'invalid' } }).kind)
+      .toBe('fallback');
+  });
+
   it('records voluntary mine login before opening the shared login page', () => {
     openLoginFromMine();
 
