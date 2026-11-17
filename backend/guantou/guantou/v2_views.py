@@ -19,6 +19,7 @@ from .models import (
     CuratorGrant,
     Dialect,
     DialectCircle,
+    LegacyImportRecord,
     Entry,
     EntryBookmark,
     EntrySense,
@@ -405,6 +406,26 @@ class EntryViewSet(viewsets.ModelViewSet):
         "options",
     ]
     permission_classes = [V2ResourcePermission]
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        url_path=r"from-hinghwa/(?P<legacy_id>[1-9][0-9]{0,18})",
+    )
+    def from_hinghwa(self, request, legacy_id):
+        target = LegacyImportRecord.objects.filter(
+            source_system="hinghwa-dict-backend",
+            source_table="word_word",
+            source_id=legacy_id,
+            target_model=Entry._meta.label,
+        ).values_list("target_id", flat=True)
+        entry = get_object_or_404(
+            Entry.objects.filter(visibility=True, pk__in=target).exclude(
+                status=Entry.Status.REDIRECTED
+            )
+        )
+        return Response({"id": entry.pk})
 
     @action(detail=False, methods=["get"])
     def suggestions(self, request):
