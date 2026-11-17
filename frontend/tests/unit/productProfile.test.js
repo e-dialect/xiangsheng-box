@@ -1,3 +1,5 @@
+import { mount } from '@vue/test-utils';
+import ProductHighlights from '@/components/home/ProductHighlights.vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fallbackProductProfile, loadProductProfile, productProfile, productShareTitle, productSwitchUrl,
@@ -54,6 +56,42 @@ describe('product profile routing', () => {
     expect(productSwitchUrl(null, { pathname: '/' })).toBeNull();
   });
 
+  it('renders ordered sections and opens only active tools for a visitor-chosen dialect', async () => {
+    vi.stubGlobal('uni', { navigateTo: vi.fn() });
+    Object.assign(productProfile, {
+      home_sections: ['collections', 'tools', 'entries', 'recordings'],
+      enabled_tools: ['quiz'],
+      local_tools_dialect: '',
+      featured: [
+        { type: 'entry', id: 3, title: '词条' },
+        { type: 'collection', id: 4, title: '专题' },
+      ],
+    });
+    const wrapper = mount(ProductHighlights, {
+      global: {
+        stubs: {
+          BaseButton: {
+            props: ['text'],
+            template: '<button @click="emitClick">{{ text }}</button>',
+            methods: { emitClick() { this.$emit('click'); } },
+          },
+        },
+      },
+    });
+    expect(wrapper.findAll('[data-home-section]').map((section) => (
+      section.attributes('data-home-section')
+    ))).toEqual(['collections', 'tools', 'entries']);
+    const tools = wrapper.get('[data-home-section="tools"]');
+    expect(tools.text()).toContain('聪明花开');
+    expect(tools.text()).not.toContain('拼音方案');
+    await tools.get('button').trigger('click');
+    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/tools/local?tool=quiz' });
+    productProfile.enabled_tools = [];
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-home-section="tools"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('reads the deployment mapping anonymously and uses the current public name in share text', async () => {
     const request = vi.fn().mockResolvedValue({
       statusCode: 200,
@@ -69,6 +107,8 @@ describe('product profile routing', () => {
       method: 'GET', url: expect.stringMatching(/\/site-settings\/product-profile$/), dataType: 'json', timeout: 3500,
     });
     expect(productProfile.switchTargets).toEqual([pxm]);
+    expect(productProfile.home_sections).toEqual(['tools', 'featured']);
+    expect(productProfile.enabled_tools).toEqual(['pinyin', 'quiz', 'kinship']);
     expect(productShareTitle('词条｜走路')).toBe('词条｜走路 · 中性测试站');
     expect(document.title).toBe('中性测试站');
   });

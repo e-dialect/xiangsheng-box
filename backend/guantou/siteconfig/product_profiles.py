@@ -6,8 +6,14 @@ from django.utils.text import Truncator
 
 from config.product_origins import product_profile_origins
 from guantou.models import Collection, Dialect, Entry, Recording
+from localtools.models import MaterialPack
 
 from .models import ProductProfile, ProductProfileRevision
+from .profile_layout import (
+    HOME_SECTION_LABELS,
+    default_enabled_tools,
+    default_home_sections,
+)
 
 GENERAL_KEY = "general"
 GENERAL_PROFILE = {
@@ -16,6 +22,8 @@ GENERAL_PROFILE = {
     "credit": "",
     "default_dialect": "",
     "local_tools_dialect": "",
+    "home_sections": default_home_sections(),
+    "enabled_tools": default_enabled_tools(),
     "featured": [],
     "version": None,
 }
@@ -123,6 +131,8 @@ def revision_payload(revision):
         "credit": revision.credit,
         "default_dialect": resolve_dialect_code(revision.default_dialect),
         "local_tools_dialect": resolve_dialect_code(revision.local_tools_dialect),
+        "home_sections": revision.home_sections,
+        "enabled_tools": revision.enabled_tools,
         "featured": visible_features(revision.featured),
         "version": revision.pk,
     }
@@ -132,8 +142,26 @@ def profile_payload(profile):
     return revision_payload(profile.active_revision) if profile else GENERAL_PROFILE
 
 
+def valid_ordered_choices(value, choices):
+    return (
+        isinstance(value, list)
+        and len(value) <= len(choices)
+        and all(isinstance(item, str) and item in choices for item in value)
+        and len(value) == len(set(value))
+    )
+
+
 def validate_profile_revision(revision):
     errors = {}
+    if not valid_ordered_choices(revision.home_sections, HOME_SECTION_LABELS):
+        errors["home_sections"] = "请选择已登记的栏目，每个栏目只能出现一次。"
+    elif "featured" in revision.home_sections and any(
+        key in revision.home_sections
+        for key in ("entries", "recordings", "collections")
+    ):
+        errors["home_sections"] = "混合精选与按内容类别分列的精选只能选择一种。"
+    if not valid_ordered_choices(revision.enabled_tools, MaterialPack.Kind.values):
+        errors["enabled_tools"] = "请选择已登记的工具，每项工具只能出现一次。"
     for name in ("default_dialect", "local_tools_dialect"):
         code = getattr(revision, name)
         if code and not resolve_dialect_code(code):

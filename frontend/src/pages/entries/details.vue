@@ -205,7 +205,7 @@
             </view>
             <PronunciationForms :variant="variant" />
             <BaseButton
-              v-if="variant.dialect?.qualified_code"
+              v-if="pinyinToolEnabled && variant.dialect?.qualified_code"
               size="small"
               variant="ghost"
               text="查看拼音方案"
@@ -327,6 +327,7 @@
 </template>
 
 <script>
+import { productProfile } from '@/services/productProfile';
 import { observeSharedOpen } from '@/services/shareObservation';
 import PronunciationForms from '@/components/PronunciationForms.vue';
 import SenseConcepts from '@/components/SenseConcepts.vue';
@@ -395,6 +396,9 @@ export default {
     };
   },
   computed: {
+    pinyinToolEnabled() {
+      return productProfile.enabled_tools.includes('pinyin');
+    },
     shareType() {
       return canUseNativeMiniProgramShare() ? 'share' : '';
     },

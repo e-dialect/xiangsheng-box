@@ -5,6 +5,21 @@ import { appRoutePath, ROUTES } from '@/services/navigation';
 
 const endpoint = '/site-settings/product-profile';
 const localDialect = '闽.莆仙';
+const homeSectionKeys = ['tools', 'featured', 'entries', 'recordings', 'collections'];
+const defaultHomeSections = ['tools', 'featured'];
+
+export const LOCAL_TOOL_OPTIONS = Object.freeze([
+  { id: 'pinyin', label: '拼音方案' },
+  { id: 'quiz', label: '聪明花开' },
+  { id: 'kinship', label: '亲戚计算器' },
+]);
+
+const toolIds = LOCAL_TOOL_OPTIONS.map(({ id }) => id);
+
+function orderedKeys(value, fallback, known) {
+  if (!Array.isArray(value)) return [...fallback];
+  return [...new Set(value.filter((key) => known.includes(key)))];
+}
 const profileKey = /^[a-z][a-z0-9-]{0,39}$/;
 
 const betaHosts = new Map([
@@ -31,6 +46,8 @@ export function fallbackProductProfile(hostname = '', compiledKey = '') {
     credit: '',
     default_dialect: '',
     local_tools_dialect: '',
+    home_sections: [...defaultHomeSections],
+    enabled_tools: [...toolIds],
     featured: [],
     version: null,
     switchTargets: [],
@@ -50,6 +67,12 @@ export const productProfile = reactive(fallbackProductProfile(
   typeof window === 'undefined' ? '' : window.location.hostname,
   configuredClientKey(),
 ));
+
+export function enabledLocalTools() {
+  return productProfile.enabled_tools
+    .map((id) => LOCAL_TOOL_OPTIONS.find((item) => item.id === id))
+    .filter(Boolean);
+}
 
 export function currentProductName() {
   return productProfile.name;
@@ -107,6 +130,8 @@ export async function loadProductProfile() {
           credit: profile.credit || '',
           default_dialect: profile.default_dialect || '',
           local_tools_dialect: profile.local_tools_dialect || '',
+          home_sections: orderedKeys(profile.home_sections, defaultHomeSections, homeSectionKeys),
+          enabled_tools: orderedKeys(profile.enabled_tools, toolIds, toolIds),
           featured: Array.isArray(profile.featured) ? profile.featured : [],
           version: profile.version,
           switchTargets: h5 && Array.isArray(targets) ? targets.filter(validTarget) : [],
