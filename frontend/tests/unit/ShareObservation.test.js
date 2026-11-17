@@ -155,6 +155,8 @@ describe('anonymous H5 shares', () => {
     const path = '/pages/recordings/details?id=8';
     setLanding('/', `${path}&share_kind=recording`);
     observeSharedOpen(path);
+    setLanding(`${path}&share_kind=recording`, path);
+    observeSharedOpen(path);
     setLanding(path, path);
     observeSharedOpen(path);
     setLanding(`${path}&share_kind=entry`, `${path}&share_kind=entry`);
