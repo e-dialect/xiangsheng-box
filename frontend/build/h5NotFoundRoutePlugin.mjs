@@ -12,7 +12,14 @@ if (
     path: '${H5_CATCH_ALL_ROUTE}',
     redirect: (to) => ({
       path: '${H5_NOT_FOUND_ROUTE}',
-      query: { path: to.path },
+      query: {
+        path: to.path,
+        ...(to.path === '/pages/words/details' && typeof to.query?.id === 'string'
+          && /^[1-9][0-9]{0,18}$/.test(to.query.id) ? { legacyWord: to.query.id } : {}),
+        ...(to.path === '/search' && typeof to.query?.key === 'string'
+          && !to.query.index && (!to.query.keywords || to.query.keywords === to.query.key)
+          ? { legacySearch: to.query.key.slice(0, 200) } : {}),
+      },
     }),
     meta: { route: 'pages/error/not-found' },
   });

@@ -725,6 +725,28 @@ paths:
           in: query
           schema:
             type: string
+  /entries/from-hinghwa/{legacy_id}/:
+    get:
+      tags: [Entries]
+      operationId: resolveHinghwaLegacyWord
+      summary: 从旧兴化语记词条编号查找已迁入的公开词条
+      security: []
+      parameters:
+        - name: legacy_id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[1-9][0-9]{0,18}$' }
+      responses:
+        "200":
+          description: 迁入台账指向的现行公开词条
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: integer }
+        "404": { description: 没有对应的公开词条 }
   /entries/popular/:
     get:
       tags:
