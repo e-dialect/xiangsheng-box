@@ -286,7 +286,7 @@ export function contributionStatus(objectType, status) {
 }
 
 export function recordingStatusLabel(recording) {
-  const label = contributionStatus('recording', recording.status).label;
+  const { label } = contributionStatus('recording', recording.status);
   if (recording.media_id) {
     return { draft: '待审核', rejected: '已退回' }[recording.status] || label;
   }
