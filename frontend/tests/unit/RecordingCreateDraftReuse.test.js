@@ -127,6 +127,8 @@ describe('recording entry association survives unavailable metadata', () => {
     await RecordingCreate.onLoad.call(page, { draft_id: 'existing' });
     expect(page.selectedEntry).toBeNull();
     expect(page.linkedEntryId).toBe(17);
+    expect(page.form.speaker_consent_source).toBe('');
+    page.setSpeakerConsent('speaker_oral');
     page.form.original_gloss = '修改的大意';
     await page.persistDirtyDraft();
     expect(saveRecordingDraft).toHaveBeenLastCalledWith(
@@ -138,7 +140,7 @@ describe('recording entry association survives unavailable metadata', () => {
     createRecording.mockResolvedValue({ id: 90 });
     await page.submit();
     expect(createRecording).toHaveBeenCalledWith(
-      expect.objectContaining({ primary_entry_id: 17 }),
+      expect.objectContaining({ primary_entry_id: 17, speaker_consent_source: 'speaker_oral' }),
       expect.any(Object),
     );
   });

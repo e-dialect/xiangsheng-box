@@ -357,20 +357,36 @@
                 type="textarea"
                 label="录音授权说明"
                 :maxlength="300"
-                placeholder="例如：允许乡声集盒展示与非商业研究引用，请注明录制者"
+                placeholder="例如：公开展示时希望使用的署名"
                 @update:model-value="updateFormField('rights_statement', $event)"
               />
             </view>
           </t-collapse-panel>
         </t-collapse>
 
-        <view class="record-submit">
+        <view
+          id="record-speaker-consent"
+          class="record-submit"
+        >
           <view class="record-submit__title">
             提交前，请确认公开范围
           </view>
           <view class="record-submit__note">
-            请确认已取得说话人同意。点击下方按钮即同意审核员试听，以及审核通过后在本站公开录音和所填资料。审核前仅你和有权限的审核员可听，你可在详情中撤回。
+            审核前仅投稿人和有权限的审核员可试听。你可以从投稿详情撤回。
           </view>
+          <RecordingSpeakerDeclaration
+            :source="form.speaker_consent_source"
+            :speaker-label="form.speaker_label"
+            :disabled="isSubmissionLocked() || savingDraft"
+            @choose="setSpeakerConsent"
+            @label="updateFormField('speaker_label', $event)"
+          />
+          <text
+            v-if="fieldErrors.speaker_consent_source"
+            class="field-error"
+          >
+            {{ fieldErrors.speaker_consent_source }}
+          </text>
           <view
             class="record-submit__status"
             :class="{ 'record-submit__status--ready': completedRequiredSteps === 3 }"
@@ -426,6 +442,7 @@ import {
   listEntries,
   pageResults,
 } from '@/services/entryRecording';
+import RecordingSpeakerDeclaration from '@/components/RecordingSpeakerDeclaration.vue';
 import { uploadFile } from '@/services/file';
 import { confirm, notify, notifySuccess } from '@/services/feedback';
 import { contributionSuccessMessage } from '@/services/contributionStatus';
@@ -448,6 +465,7 @@ function emptyAudio() {
 export default {
   components: {
     AppShell,
+    RecordingSpeakerDeclaration,
     AudioCapture,
     BaseButton,
     BaseField,
@@ -468,6 +486,8 @@ export default {
         original_pronunciation: '',
         citation: '',
         rights_statement: '',
+        speaker_consent_source: '',
+        speaker_label: '',
         recording_type: 'word',
       },
       rules: {
@@ -532,7 +552,7 @@ export default {
     },
     recordSubmitHint() {
       const remaining = 3 - this.completedRequiredSteps;
-      return remaining === 0 ? '三项必要信息已齐，可以提交' : `还差 ${remaining} 项必要信息`;
+      return remaining === 0 ? '三项必要信息已齐，请确认发声人授权' : `还差 ${remaining} 项必要信息`;
     },
     primaryDialect() {
       return getApp()?.globalData?.userInfo?.primary_dialect || null;
@@ -770,13 +790,21 @@ export default {
         if (version === this.entryLoadVersion) this.entryLoading = false;
       }
     },
+    setSpeakerConsent(value) {
+      if (this.isSubmissionLocked()) return;
+      this.form.speaker_consent_source = value;
+      if (!value || value === 'self') this.form.speaker_label = '';
+      this.clearFieldError('speaker_consent_source');
+    },
     onAudioChange(audio) {
       if (this.isSubmissionLocked()) return;
+      this.setSpeakerConsent('');
       this.audio = { ...emptyAudio(), ...audio };
       this.clearFieldError('audio_url');
     },
     clearAudio() {
       if (this.isSubmissionLocked()) return;
+      this.setSpeakerConsent('');
       this.audio = emptyAudio();
     },
     onAudioError(error) {
@@ -835,6 +863,7 @@ export default {
       if (!String(this.form.original_gloss || '').trim()) {
         errors.original_gloss = '请用自己的话简单说明意思';
       }
+      if (!this.form.speaker_consent_source) errors.speaker_consent_source = '请选择发声人及其同意方式';
       this.fieldErrors = errors;
       if (baseValid !== true || Object.keys(errors).length) {
         const firstMissing = Object.keys(errors)[0];
@@ -842,6 +871,7 @@ export default {
           audio_url: 'record-required-audio',
           usage_dialect_id: 'record-required-dialect',
           original_gloss: 'record-required-gloss',
+          speaker_consent_source: 'record-speaker-consent',
         };
         if (!targets[firstMissing]) notify({ title: '请检查填写内容', icon: 'none' });
         // Clear first so repeated submissions can revisit the same missing step.
@@ -889,6 +919,8 @@ export default {
         const payload = {
           audio_url: uploaded.url,
           publication_consent: 'public-display-v1',
+          speaker_consent_source: submission.form.speaker_consent_source,
+          speaker_label: submission.form.speaker_label || '',
           usage_dialect_id: Number(submission.form.usage_dialect_id),
           recording_type: submission.form.recording_type || 'word',
           original_gloss: String(submission.form.original_gloss).trim(),

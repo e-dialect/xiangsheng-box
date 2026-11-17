@@ -22,7 +22,8 @@
         <text class="box-title">
           录音详情
         </text>
-        <text>{{ dialectLabel(recording.usage_dialect) }} · {{ recorderName }}</text>
+        <text>{{ dialectLabel(recording.usage_dialect) }} · 投稿账号 {{ recorderName }}</text>
+        <text>{{ speakerRoleLabel }}</text>
       </view>
       <view class="box-panel">
         <EntryRecordingCard
@@ -61,6 +62,10 @@
         v-if="showModeration"
         class="box-panel box-stack"
       >
+        <text v-if="recording.speaker_consent_source">
+          投稿时的同意来源 · {{ declarationLabel(recording.speaker_consent_source) }}
+          {{ recording.speaker_label ? `（${recording.speaker_label}）` : '' }}
+        </text>
         <text v-if="recording.review_reason">
           处理说明 · {{ recording.review_reason }}
         </text>
@@ -78,9 +83,15 @@
             :text="replacement ? replacement.name : '更换录音（可选）'"
             @click="chooseReplacement"
           />
-          <text>请确认已取得说话人同意，审核通过后将公开录音和所填资料。</text>
+          <RecordingSpeakerDeclaration
+            :source="declaration"
+            :speaker-label="speakerLabel"
+            :disabled="busy"
+            @choose="chooseDeclaration"
+            @label="speakerLabel = $event"
+          />
           <BaseButton
-            :disabled="busy || !gloss.trim()"
+            :disabled="busy || !gloss.trim() || !declaration"
             text="同意并重新提交审核"
             @click="resubmit"
           />
@@ -146,6 +157,8 @@
 import { observeSharedOpen } from '@/services/shareObservation';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
+import RecordingSpeakerDeclaration from '@/components/RecordingSpeakerDeclaration.vue';
+import { declarationLabel } from '@/services/recordingSpeaker';
 import BaseField from '@/components/BaseField.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
@@ -178,6 +191,7 @@ import {
 
 export default {
   components: {
+    RecordingSpeakerDeclaration,
     BaseField,
     DiscussionThread,
     PageShell,
@@ -199,15 +213,24 @@ export default {
     gloss: '',
     replacement: null,
     reason: '',
+    declaration: '',
+    speakerLabel: '',
     sessionToken: '',
     loadVersion: 0,
 
   }),
   computed: {
     productName: currentProductName,
+    speakerRoleLabel() {
+      return {
+        self: '发声人 · 投稿人本人',
+        other: '发声人 · 他人发声，由投稿人代录',
+      }[this.recording?.speaker_role] || '发声人与投稿人关系 · 历史未记录';
+    },
     showModeration() {
       const r = this.recording;
-      return r && (r.can_withdraw || r.can_resubmit || r.can_take_down || r.review_reason);
+      return r && (r.can_withdraw || r.can_resubmit || r.can_take_down
+        || r.review_reason || r.speaker_consent_source);
     },
     recordingTarget() {
       const { recording } = this;
@@ -269,6 +292,7 @@ export default {
   },
   // #endif
   methods: {
+    declarationLabel,
     entryTitle,
     dialectLabel,
     goEntryDetail,
@@ -306,6 +330,8 @@ export default {
         this.replacement = null;
         this.reason = '';
         observeSharedOpen(recordingShareMessage(recording)?.path);
+        this.declaration = recording.speaker_consent_source || '';
+        this.speakerLabel = recording.speaker_label || '';
       } catch (error) {
         if (version !== this.loadVersion) return;
         this.recording = null;
@@ -314,10 +340,17 @@ export default {
         if (version === this.loadVersion) this.loading = false;
       }
     },
+    chooseDeclaration(value) {
+      this.declaration = value;
+      if (!value || value === 'self') this.speakerLabel = '';
+    },
     async chooseReplacement() {
       try {
         const file = await chooseAudioFile();
-        if (file && this.sessionToken === uni.getStorageSync('token')) this.replacement = file;
+        if (file && this.sessionToken === uni.getStorageSync('token')) {
+          this.replacement = file;
+          this.chooseDeclaration('');
+        }
       } catch (error) {
         notify({ title: error.message || '无法选择录音' });
       }
@@ -343,7 +376,12 @@ export default {
     },
     resubmit() {
       return this.changeSubmission(async () => {
-        const payload = { original_gloss: this.gloss.trim(), publication_consent: 'public-display-v1' };
+        const payload = {
+          original_gloss: this.gloss.trim(),
+          publication_consent: 'public-display-v1',
+          speaker_consent_source: this.declaration,
+          speaker_label: this.speakerLabel,
+        };
         if (this.replacement) payload.audio_url = (await uploadFile(this.replacement.path)).url;
         if (this.sessionToken === uni.getStorageSync('token')) await resubmitRecording(this.id, payload);
       });

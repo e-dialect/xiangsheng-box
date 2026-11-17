@@ -999,7 +999,7 @@ paths:
               allOf:
                 - $ref: "#/components/schemas/RecordingV2"
                 - type: object
-                  required: [audio_url, original_gloss, usage_dialect_id, publication_consent]
+                  required: [audio_url, original_gloss, usage_dialect_id, publication_consent, speaker_consent_source]
       responses:
         "201": { description: 已创建, content: { application/json: { schema: { $ref: "#/components/schemas/RecordingV2" } } } }
   /recordings/{recording_id}/:
@@ -1034,10 +1034,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [original_gloss, publication_consent]
+              required: [original_gloss, publication_consent, speaker_consent_source]
               properties:
                 original_gloss: { type: string }
                 publication_consent: { type: string, enum: [public-display-v1] }
+                speaker_consent_source: { type: string, enum: [self, speaker_oral, speaker_written] }
+                speaker_label: { type: string, maxLength: 40, description: 可选的发声人称呼或关系，无需实名 }
                 audio_url: { type: string, format: uri, description: 可选，替换为本人的新上传 }
       responses:
         "200": { description: 已重新进入待审队列 }
@@ -1771,6 +1773,9 @@ components:
         id: { type: integer, readOnly: true }
         audio_url: { type: string, format: uri }
         publication_consent: { type: string, enum: [public-display-v1], writeOnly: true }
+        speaker_role: { type: string, enum: [self, other, unknown], readOnly: true, description: 发声人与登录投稿人的关系 }
+        speaker_consent_source: { type: string, enum: [self, speaker_oral, speaker_written, ""], description: 本人确认或代录人申报的发声人口头、书面同意方式。读取仅限本人或审核员，历史空值表示未记录。 }
+        speaker_label: { type: string, maxLength: 40, description: 可选私有称呼或关系，仅本人或审核员可读 }
         media_id: { type: string, format: uuid, nullable: true, readOnly: true }
         usage_dialect_id: { type: integer, writeOnly: true }
         review_reason: { type: string, readOnly: true, description: 仅本人或审核员详情返回 }
