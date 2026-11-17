@@ -331,11 +331,17 @@ export default {
 /* #ifdef H5 */
 @media screen and (min-width: 600px) and (max-height: 500px) and (orientation: landscape) {
   .home-top-bar {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) auto;
+    align-items: center;
+    gap: 10px;
     padding: 4px 20px 0;
   }
 
   .home-top-bar__row {
-    gap: 8px;
+    min-width: 0;
+    gap: 6px;
   }
 
   .home-top-bar__entry,
@@ -354,10 +360,27 @@ export default {
   }
 
   .home-top-bar__brand {
+    display: grid;
+    justify-content: stretch;
+    justify-items: end;
+    min-width: 0;
+    row-gap: 2px;
     margin-top: 0;
     font-size: 10px;
     line-height: 1;
-    letter-spacing: 4px;
+    letter-spacing: 0;
+  }
+
+  .home-top-bar__brand :deep(.product-brand__identity),
+  .home-top-bar__brand :deep(.product-brand__switch) {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .home-top-bar__brand :deep(.product-brand__switch-action) {
+    flex: 0 0 auto;
   }
 }
 /* #endif */
