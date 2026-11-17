@@ -134,3 +134,27 @@ class EmailVerification(models.Model):
         indexes = [models.Index(fields=["expires_at"], name="email_code_expires_idx")]
         verbose_name = "邮箱验证码"
         verbose_name_plural = "邮箱验证码"
+
+
+class WechatLoginRequest(models.Model):
+    class Channel(models.TextChoices):
+        WEB = "web"
+        WEB_QR = "web_qr"
+        APP = "app"
+
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        CONFIRMED = "confirmed"
+        REDEEMED = "redeemed"
+        CANCELLED = "cancelled"
+
+    id = models.CharField(primary_key=True, max_length=32)
+    channel = models.CharField(max_length=6, choices=Channel.choices)
+    exchange_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField(db_index=True)
+    status = models.CharField(
+        max_length=9, choices=Status.choices, default=Status.PENDING
+    )
+    user = models.ForeignKey(User, null=True, on_delete=models.CASCADE)
+    openid_digest = models.CharField(max_length=64, blank=True)
+    is_new = models.BooleanField(default=False)

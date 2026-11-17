@@ -238,6 +238,8 @@ APP_ID = env.str("APP_ID", "DEFAULT_APP_ID")
 APP_SECRET = env.str("APP_SECRET", env.str("APP_SECRECT", "DEFAULT_APP_SECRET"))
 # Backward-compatible alias for old code paths and old local env files.
 APP_SECRECT = APP_SECRET
+WECHAT_BRIDGE_WEB_ENABLED = env.bool("WECHAT_BRIDGE_WEB_ENABLED", False)
+WECHAT_BRIDGE_APP_ENABLED = env.bool("WECHAT_BRIDGE_APP_ENABLED", False)
 
 # Web OAuth credentials are a different WeChat application identity. Never
 # silently reuse mini-program credentials for web authorization.

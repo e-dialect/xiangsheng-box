@@ -42,6 +42,13 @@
       </view>
       <!-- #endif -->
 
+      <!-- #ifdef H5 || APP-PLUS -->
+      <WechatBridgeLogin
+        ref="wechatBridge"
+        :disabled="submitting"
+      />
+      <!-- #endif -->
+
       <t-tabs
         v-if="phoneCodeLoginEnabled"
         :value="loginMode"
@@ -223,6 +230,9 @@ import TTabPanel from '@tdesign/uniapp/tab-panel/tab-panel.vue';
 import TTabs from '@tdesign/uniapp/tabs/tabs.vue';
 import TButton from '@tdesign/uniapp/button/button.vue';
 import AuthJourney from '@/pages/login/components/AuthJourney.vue';
+// #ifdef H5 || APP-PLUS
+import WechatBridgeLogin from '@/pages/login/components/WechatBridgeLogin.vue';
+// #endif
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
@@ -240,6 +250,9 @@ export default {
   name: 'LoginPage',
   components: {
     AuthJourney,
+    // #ifdef H5 || APP-PLUS
+    WechatBridgeLogin,
+    // #endif
     PageShell,
     BaseButton,
     BaseField,
@@ -379,6 +392,7 @@ export default {
       this.errors.phone = phone ? '' : '请输入手机号';
       this.errors.code = code ? '' : '请输入验证码';
       if (this.errors.phone || this.errors.code) return;
+      this.$refs.wechatBridge?.cancel();
       this.submitting = true;
       try {
         await loginWithPhone(phone, code);
@@ -396,6 +410,7 @@ export default {
       this.errors.username = username ? '' : '请输入用户名';
       this.errors.password = password ? '' : '请输入密码';
       if (this.errors.username || this.errors.password) return;
+      this.$refs.wechatBridge?.cancel();
       this.submitting = true;
       try {
         await normalLogin(username, password);

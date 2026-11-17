@@ -38,6 +38,15 @@ Traefik 不按 path 前缀区分前后端，这样资源路径可以在后端域
 - `APP_SECRET`：微信小程序密钥；旧拼写 `APP_SECRECT` 暂时兼容，但不建议继续新增使用。
 后端数据目录为 `data/backend/`。生产部署前应配置真实密钥、对象存储和邮件参数。
 
+## 网页与 App 的微信登录
+
+网页和原生 App 共用正式小程序中的 `pages/login/wechat-confirm`。手机网页和 App 使用微信 URL Link，电脑网页使用小程序码。
+
+1. 核对后端 `APP_ID` 与正式小程序的 AppID 一致，确认该小程序可生成 URL Link 和小程序码，并已配置后端 HTTPS 请求域名。
+2. 部署包含数据库迁移的后端，发布包含确认页的小程序。H5 和 App 的构建使用同一套后端。小程序和 App 构建时把 `VITE_BACKEND_URL` 指向该 HTTPS API。
+3. 将后端的 `WECHAT_BRIDGE_WEB_ENABLED` 和 `WECHAT_BRIDGE_APP_ENABLED` 分别设为 `true`。两个开关默认关闭，关闭对应开关会停止该入口发起和完成微信登录。
+4. 用 iOS Safari、Android Chrome、微信内置浏览器、电脑扫码和 Android／iOS 安装包各验一次。覆盖已有账号、首次注册、取消与超时。确认后手动切回原网页或 App。
+
 ## GitHub Actions
 
 - `.github/workflows/ci.yml`：默认 CI，执行后端、前端和 Docker 检查。

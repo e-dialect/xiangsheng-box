@@ -146,6 +146,10 @@
       "style": {}
     },
     {
+      "path": "pages/login/wechat-confirm",
+      "style": {}
+    },
+    {
       "path": "pages/login/register",
       "style": {}
     },
