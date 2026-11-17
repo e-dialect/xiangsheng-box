@@ -168,7 +168,13 @@ class RecordingAdmin(admin.ModelAdmin):
             return False
         return super().has_change_permission(request, obj)
 
-    exclude = ("media", "publication_consent", "review_reason")
+    exclude = (
+        "media",
+        "publication_consent",
+        "review_reason",
+        "speaker_consent_source",
+        "speaker_label",
+    )
 
     list_display = (
         "id",

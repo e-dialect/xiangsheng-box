@@ -203,6 +203,7 @@ class ObjectChangeLogTests(TestCase):
                     ).pk
                 ),
                 "publication_consent": "public-display-v1",
+                "speaker_consent_source": "self",
                 "usage_dialect_id": self.dialect.id,
                 "original_gloss": "moon",
             },

@@ -121,7 +121,7 @@ describe('low-threshold recording flow', () => {
     globalThis.getApp = vi.fn(() => ({ globalData: { userInfo: {} } }));
   });
 
-  it('submits with only audio, usage region, and a plain-language gloss', async () => {
+  it('submits with audio, region, a gloss and explicit self-speaker consent', async () => {
     uploadFile.mockResolvedValue({
       url: 'https://example.test/voice.mp3',
       duration_ms: 2300,
@@ -137,6 +137,7 @@ describe('low-threshold recording flow', () => {
     page.audio = { path: '/tmp/voice.mp3', durationMs: 2300 };
     page.form.usage_dialect_id = 11;
     page.form.original_gloss = '表示害怕的意思';
+    page.form.speaker_consent_source = 'self';
 
     await page.submit();
 
@@ -173,6 +174,7 @@ describe('low-threshold recording flow', () => {
     page.audio = { path: '/tmp/voice.mp3', durationMs: 1200 };
     page.form.usage_dialect_id = 11;
     page.form.original_gloss = '意思还不太确定';
+    page.form.speaker_consent_source = 'self';
 
     expect(await page.validateForm()).toBe(true);
     expect(page.form.original_writing).toBe('');

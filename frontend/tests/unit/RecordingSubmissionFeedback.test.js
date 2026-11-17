@@ -45,6 +45,8 @@ function pageContext() {
   page.audio = { path: 'blob:recording', durationMs: 2300 };
   page.form.usage_dialect_id = 11;
   page.form.original_gloss = '测试录音';
+  page.form.speaker_consent_source = 'speaker_oral';
+  page.form.speaker_label = '家中长辈';
   return page;
 }
 
@@ -68,10 +70,18 @@ describe('recording submission feedback', () => {
     expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3');
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       publication_consent: 'public-display-v1',
+      speaker_consent_source: 'speaker_oral', speaker_label: '家中长辈',
     }));
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);
+  });
+
+  it('clears the last speaker declaration when a contributor changes the audio', () => {
+    const page = pageContext();
+    page.onAudioChange({ path: '/next.wav' });
+    expect(page.form.speaker_consent_source).toBe('');
+    expect(page.form.speaker_label).toBe('');
   });
 
   it('retains the upload error while confirming a complete draft can be retried', async () => {
