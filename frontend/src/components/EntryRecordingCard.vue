@@ -122,6 +122,7 @@
 </template>
 
 <script>
+import privateRecordingAudio from '@/services/recordingMedia';
 import { goRecordingDetail } from '@/services/navigation';
 import BaseButton from '@/components/BaseButton.vue';
 import AvatarFrame from '@/components/AvatarFrame.vue';
@@ -158,6 +159,8 @@ export default {
       playing: false,
       playbackHandle: null,
       playbackFailed: false,
+      playbackRequest: 0,
+      privateSource: null,
     };
   },
   computed: {
@@ -197,6 +200,10 @@ export default {
     },
   },
   watch: {
+    recording() {
+      this.stopPlayback();
+      this.playbackFailed = false;
+    },
     audioSource() {
       this.stopPlayback();
       this.playbackFailed = false;
@@ -220,6 +227,9 @@ export default {
       if (handle) stopManagedAudio(handle);
     },
     resetPlayback() {
+      this.playbackRequest += 1;
+      this.privateSource?.release();
+      this.privateSource = null;
       this.playing = false;
       this.playbackHandle = null;
     },
@@ -227,21 +237,35 @@ export default {
       this.resetPlayback();
       this.playbackFailed = true;
     },
-    toggleAudio() {
+    async toggleAudio() {
       if (this.playing) {
         this.stopPlayback();
         return;
       }
       if (!this.hasAudio) return;
       this.playbackFailed = false;
+      this.playbackRequest += 1;
+      const request = this.playbackRequest;
       try {
-        this.playbackHandle = playManaged(this.audioSource, {
+        let source = this.audioSource;
+        if (this.recording.media_id && !this.recording.visibility) {
+          this.playing = true;
+          const token = uni.getStorageSync('token');
+          const audio = await privateRecordingAudio(this.recording.media_id);
+          if (request !== this.playbackRequest || token !== uni.getStorageSync('token')) {
+            audio.release();
+            return;
+          }
+          this.privateSource = audio;
+          source = audio.source;
+        }
+        this.playbackHandle = playManaged(source, {
           onEnded: this.resetPlayback,
           onError: this.failPlayback,
         });
         this.playing = Boolean(this.playbackHandle);
       } catch (error) {
-        this.failPlayback();
+        if (request === this.playbackRequest) this.failPlayback();
       }
     },
   },

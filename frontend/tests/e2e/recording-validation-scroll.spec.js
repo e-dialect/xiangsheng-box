@@ -7,7 +7,7 @@ import { installVisualFixture, openVisualRoute } from './helpers/visualReviewFix
       await page.setViewportSize(viewport);
       await installVisualFixture(page, { persona: 'member', theme });
       await openVisualRoute(page, '/pages/recordings/create?dialect_id=3', { persona: 'member' });
-      const submit = page.getByRole('button', { name: '提交并公开', exact: true });
+      const submit = page.getByRole('button', { name: '同意并提交审核', exact: true });
       const section = page.locator('#record-required-audio');
       const toolbar = page.locator('.record-tools');
       const assertMissingStepVisible = async () => {

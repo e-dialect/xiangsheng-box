@@ -83,6 +83,36 @@
         </view>
       </view>
 
+      <view class="archive-section">
+        <BaseButton
+          variant="ghost"
+          text="我的录音投稿"
+          :disabled="submissionsLoading"
+          @click="loadSubmissions(1)"
+        />
+        <template v-if="submissions !== null">
+          <text v-if="!submissions.length && !submissionsError">
+            暂无录音投稿
+          </text>
+          <BaseButton
+            v-for="row in submissions"
+            :key="row.id"
+            variant="ghost"
+            :text="`${recordingStatusLabel(row)} · ${row.original_gloss}`"
+            @click="goRecordingDetail(row.id)"
+          />
+          <BaseButton
+            v-if="submissionsNext"
+            variant="ghost"
+            text="更多投稿"
+            :disabled="submissionsLoading"
+            @click="loadSubmissions(submissionsPage + 1)"
+          />
+        </template>
+        <text v-if="submissionsError">
+          {{ submissionsError }}
+        </text>
+      </view>
       <view class="archive-section activity-section">
         <view class="section-heading">
           <view>
@@ -147,7 +177,8 @@ import BaseLoading from '@/components/BaseLoading.vue';
 import DialectLabel from '@/components/DialectLabel.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import PageShell from '@/components/PageShell.vue';
-import { getMyContributionHistory } from '@/services/entryRecording';
+import { recordingStatusLabel } from '@/services/contributionStatus';
+import { getMyContributionHistory, listRecordings } from '@/services/entryRecording';
 import { goRecord, goRecordingDetail } from '@/services/navigation';
 
 export default {
@@ -158,7 +189,19 @@ export default {
     EmptyState,
     PageShell,
   },
-  data() { return { history: {}, loading: true, error: '' }; },
+  data() {
+    return {
+      history: {},
+      loading: true,
+      error: '',
+      submissions: null,
+      submissionsLoading: false,
+      submissionsPage: 0,
+      submissionsVersion: 0,
+      submissionsNext: false,
+      submissionsError: '',
+    };
+  },
   computed: {
     metrics() {
       const summary = this.history.summary || {};
@@ -171,9 +214,34 @@ export default {
     },
   },
   onLoad() { this.load(); },
+  onHide() {
+    this.submissionsVersion += 1;
+    this.submissionsLoading = false;
+    this.submissions = null;
+    this.submissionsNext = false;
+  },
   methods: {
     goRecordingDetail,
     goRecord,
+    recordingStatusLabel,
+    async loadSubmissions(page) {
+      if (this.submissionsLoading) return;
+      const version = this.submissionsVersion;
+      const token = uni.getStorageSync('token');
+      this.submissionsLoading = true;
+      this.submissionsError = '';
+      try {
+        const data = await listRecordings({ mine: true, page });
+        if (version !== this.submissionsVersion || token !== uni.getStorageSync('token')) return;
+        this.submissions = page === 1 ? data.results : [...this.submissions, ...data.results];
+        this.submissionsPage = page;
+        this.submissionsNext = Boolean(data.next);
+      } catch (error) {
+        if (version === this.submissionsVersion) this.submissionsError = '录音投稿读取失败，请重试';
+      } finally {
+        if (version === this.submissionsVersion) this.submissionsLoading = false;
+      }
+    },
     kindLabel(kind) {
       return ({
         recording: '录音', evidence: '补证', revision: '修订', attestation: '地区确认',

@@ -112,6 +112,39 @@ class FileApiTests(TestCase):
         self.assertEqual(response.json()["message"], "无法解析音频文件")
         normalize_audio.assert_called_once()
 
+    def test_normalized_audio_bytes_only_use_the_protected_endpoint(self):
+        # Exercise the actual upload / byte-serving boundary with a deterministic encoder.
+        # The codec capability/format contract is covered independently below.
+        def encode(source, destination):
+            with open(destination, "wb") as output:
+                output.write(b"normalized fixture")
+            return 750
+
+        with patch("files.views.normalize_audio_to_mp3", side_effect=encode), patch(
+            "files.views.upload_file"
+        ) as public_upload:
+            upload = self.client.post(
+                "/files",
+                {
+                    "file": SimpleUploadedFile(
+                        "recording.wav",
+                        b"test source",
+                        content_type="audio/wav",
+                    )
+                },
+                **self._auth_headers(),
+            )
+        self.assertEqual(upload.status_code, 200)
+        from urllib.parse import urlsplit
+
+        path = urlsplit(upload.json()["url"]).path
+        self.assertEqual(self.client.get(path).status_code, 404)
+        self.assertEqual(
+            self.client.get(path, **self._auth_headers()).content, b"normalized fixture"
+        )
+        public_upload.assert_not_called()
+        self.assertEqual(os.listdir(self.media_root), [])
+
     def test_reject_oversized_audio(self):
         big_data = b"x" * (5 * 1024 * 1024 + 1)  # just over 5 MB
         file = SimpleUploadedFile("big.mp3", big_data, content_type="audio/mpeg")
@@ -193,7 +226,8 @@ class FileApiTests(TestCase):
         response = self.client.post("/files", {"file": file}, **self._auth_headers())
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["url"], upload_file.return_value)
+        self.assertIn("/recording-media/", data["url"])
+        upload_file.assert_not_called()
         self.assertEqual(data["duration_ms"], 3456)
         normalize_audio.assert_called_once()
 

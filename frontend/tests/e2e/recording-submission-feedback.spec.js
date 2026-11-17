@@ -47,7 +47,7 @@ function shortWav() {
     await expect(page.locator('.record-ready-action--secondary')).toHaveAttribute('aria-disabled', 'false');
     await expect(page.getByText('三项必要信息已齐，可以提交')).toBeVisible();
     await expect(page.getByText('保存草稿', { exact: true })).toBeEnabled();
-    await page.getByText('提交并公开', { exact: true }).click();
+    await page.getByText('同意并提交审核', { exact: true }).click();
     const message = page.locator('.record-draft-message');
     await expect(message).toContainText('提交失败：上传服务暂不可用，请稍后重试');
     await expect(message).toContainText('尚未加入个人贡献');
@@ -73,5 +73,46 @@ function shortWav() {
     expect(contrast).toBeGreaterThanOrEqual(4.5);
     expect(recordingsCreated).toBe(0);
     await page.screenshot({ path: testInfo.outputPath(`feedback-${theme}.png`) });
+  });
+});
+
+
+['light', 'dark'].forEach((theme) => {
+  test(`returned submission keeps its reason private and can be revised in ${theme}`, async ({ page }, testInfo) => {
+    await installVisualFixture(page, { persona: 'member', theme });
+    const media = 'ee606ad5-f3de-4a59-9350-f1951b5e4dfa';
+    let revised = false;
+    await page.route('**/recordings/11/', (route) => route.fulfill({
+      json: {
+        id: 11, original_gloss: '待修订的大意', visibility: false, media_id: media,
+        status: revised ? 'draft' : 'rejected', can_withdraw: true, can_resubmit: !revised,
+        audio_url: `http://localhost:8000/files/recording-media/${media}/`,
+        review_reason: revised ? '' : '请补充原话的大意', entry_links: [],
+      },
+    }));
+    await page.route('**/recordings/11/resubmit/', (route) => {
+      const payload = route.request().postDataJSON();
+      expect(payload.original_gloss).toBe('补充后的原话大意');
+      expect(payload.publication_consent).toBe('public-display-v1');
+      revised = true;
+      return route.fulfill({ json: { status: 'draft' } });
+    });
+    let preview = false;
+    await page.route('**/files/recording-media/*/', (route) => {
+      expect(route.request().headers().authorization).toBe('Bearer visual-review-token');
+      preview = true;
+      return route.fulfill({ contentType: 'audio/wav', body: shortWav() });
+    });
+    await openVisualRoute(page, '/pages/recordings/details?id=11', { persona: 'member' });
+    await expect(page.getByText('处理说明 · 请补充原话的大意')).toBeVisible();
+    await expect(page.getByRole('button', { name: /分享乡音|复制乡音链接/ })).toHaveCount(0);
+    await page.getByRole('button', { name: '听录音', exact: true }).click();
+    await expect.poll(() => preview).toBe(true);
+    await page.getByText('同意并重新提交审核', { exact: true }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath(`returned-${theme}.png`) });
+    await page.locator('.box-panel textarea:visible').first().fill('补充后的原话大意');
+    await page.getByRole('button', { name: '同意并重新提交审核' }).click();
+    await expect(page.getByText('待审核', { exact: true })).toBeVisible();
+    expect(revised).toBe(true);
   });
 });
