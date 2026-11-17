@@ -426,6 +426,9 @@
 
 <script>
 import { observeSharedOpen } from '@/services/shareObservation';
+import {
+  publicSearchShareParams, readPublicSearchFilters, SOURCE_TYPES, WRITING_TYPES,
+} from '@/services/publicSearchFilters';
 import TCell from '@tdesign/uniapp/cell/cell.vue';
 import TCollapse from '@tdesign/uniapp/collapse/collapse.vue';
 import TCollapsePanel from '@tdesign/uniapp/collapse-panel/collapse-panel.vue';
@@ -470,29 +473,6 @@ const SWITCH_FILTERS = {
   source: 'source',
   concept: 'concept',
 };
-
-const WRITING_TYPES = [
-  { label: '不限', value: '' },
-  { label: '汉字正字', value: 'orthographic' },
-  { label: '俗写', value: 'popular' },
-  { label: '借字', value: 'loan' },
-  { label: '拟音', value: 'phonetic' },
-  { label: '罗马字', value: 'romanization' },
-  { label: '待考写法', value: 'uncertain' },
-];
-
-const SOURCE_TYPES = [
-  { label: '不限', value: '' },
-  { label: '用户原话', value: 'user_statement' },
-  { label: '口述', value: 'oral' },
-  { label: '田野记录', value: 'fieldwork' },
-  { label: '书籍', value: 'book' },
-  { label: '论文或文章', value: 'article' },
-  { label: '档案', value: 'archive' },
-  { label: '网页', value: 'web' },
-  { label: '旧库原文', value: 'legacy' },
-  { label: '其他', value: 'other' },
-];
 
 function defaultFilters() {
   return {
@@ -609,7 +589,10 @@ export default {
       const characters = Array.from(this.submittedKeyword);
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
-      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      const path = pageUrl(
+        ROUTES.search,
+        publicSearchShareParams(this.submittedKeyword, this.appliedFilters),
+      );
       return {
         title: `查词｜${keyword} · ${currentProductName()}`,
         path,
@@ -702,8 +685,11 @@ export default {
       }
     }
     // #endif
-    this.siteScopeReady = this.initializeSiteScope(options);
-    if (this.filters.keyword) await this.search();
+    const sharedFilters = readPublicSearchFilters(options.filters);
+    Object.assign(this.filters, sharedFilters);
+    const filtered = Object.keys(sharedFilters).length > 0;
+    this.siteScopeReady = this.initializeSiteScope(options, filtered);
+    if (this.filters.keyword || filtered) await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
@@ -717,9 +703,10 @@ export default {
   },
   // #endif
   methods: {
-    async initializeSiteScope(options) {
+    async initializeSiteScope(options, filtered = false) {
       this.explicitDialectScope = typeof options.dialect === 'string';
-      const legacyShare = typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
+      const sharedSearch = filtered
+        || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
       Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
         if (typeof options[key] === 'string') this.filters[field] = options[key];
       });
@@ -727,7 +714,7 @@ export default {
         this.filters.hasRecording = options.has_recording === 'true';
       }
       const catalog = this.loadDialects();
-      if (legacyShare && !this.explicitDialectScope) return;
+      if (sharedSearch && !this.explicitDialectScope) return;
       const code = this.explicitDialectScope
         ? options.dialect : (await loadProductProfile()).default_dialect;
       if (!code || code === 'all') return;
@@ -831,7 +818,9 @@ export default {
         this.next = response?.next || null;
         this.page = 1;
         this.appliedFilters = filters;
-        observeSharedOpen(pageUrl(ROUTES.search, { key: this.submittedKeyword }));
+        observeSharedOpen(
+          pageUrl(ROUTES.search, publicSearchShareParams(this.submittedKeyword, filters)),
+        );
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',
