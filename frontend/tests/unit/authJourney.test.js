@@ -3,7 +3,7 @@ import {
 } from 'vitest';
 
 import { toLoginPage } from '@/routers/login';
-import { clearInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
+import { clearInterceptIntent, peekInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
 import {
   cancelLogin,
   openLoginFromMine,
@@ -16,6 +16,7 @@ vi.mock('@/routers/login', () => ({
 
 vi.mock('@/services/authGuard', () => ({
   clearInterceptIntent: vi.fn(),
+  peekInterceptIntent: vi.fn(() => null),
   saveInterceptIntent: vi.fn(),
 }));
 
@@ -51,6 +52,19 @@ describe('auth journey', () => {
 
     expect(clearInterceptIntent).toHaveBeenCalledTimes(1);
     expect(uni.reLaunch).toHaveBeenCalledWith({ url: '/pages/search' });
+  });
+
+  it.each([
+    ['bookmark_entry', { entryId: 42 }, '/pages/entries/details?id=42'],
+    ['interact_recording', { recordingId: 42 }, '/pages/recordings/details?id=42'],
+    ['content_feedback', { object_type: 'collection', object_id: '42' }, '/pages/collections/details?id=42'],
+  ])('restores a cold cancelled %s to the same-origin public object', (action, context, url) => {
+    peekInterceptIntent.mockReturnValueOnce({ action, context });
+    cancelLogin();
+
+    expect(clearInterceptIntent).toHaveBeenCalledOnce();
+    expect(uni.reLaunch).toHaveBeenCalledWith({ url });
+    expect(uni.navigateBack).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -46,7 +46,7 @@
       <WechatBridgeLogin
         ref="wechatBridge"
         :disabled="submitting"
-        @cancel="cancelLogin"
+        @cancel="cancelBridgeLogin"
       />
       <!-- #endif -->
 
@@ -318,7 +318,15 @@ export default {
     this.clearCountdown();
   },
   methods: {
-    cancelLogin,
+    cancelLogin() {
+      const bridge = this.$refs.wechatBridge;
+      const intent = bridge?.attempt?.intent;
+      bridge?.cancel();
+      cancelLogin(intent);
+    },
+    cancelBridgeLogin(intent) {
+      cancelLogin(intent);
+    },
     startWechatLogin() {
       this.wechatLoginAvailable = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
       if (!this.wechatLoginAvailable) {

@@ -9,6 +9,7 @@ vi.mock('@/services/authGuard', () => ({
 vi.mock('@/services/authJourney', () => ({
   cancelLogin: vi.fn(),
   canReturnToGuestPage: vi.fn(() => false),
+  guestReturnDestination: vi.fn(() => null),
 }));
 
 vi.mock('@/services/login', () => ({

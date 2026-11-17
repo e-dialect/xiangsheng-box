@@ -66,10 +66,14 @@ describe('recording submission feedback', () => {
     });
     const page = pageContext();
     await page.submit();
-    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3');
+    const requestOptions = expect.objectContaining({
+      canPresent: expect.any(Function),
+      loading: false,
+    });
+    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3', requestOptions);
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       publication_consent: 'public-display-v1',
-    }));
+    }), requestOptions);
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);

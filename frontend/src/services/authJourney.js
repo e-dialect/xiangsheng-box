@@ -119,8 +119,8 @@ export function guestReturnDestination(intent) {
   return GUEST_RETURN_ROUTES.has(`/${destination.route}`) ? destination : null;
 }
 
-export function cancelLogin() {
-  const destination = guestReturnDestination(peekInterceptIntent());
+export function cancelLogin(intent = peekInterceptIntent()) {
+  const destination = guestReturnDestination(intent);
   clearInterceptIntent();
   if (canReturnToGuestPage()) {
     goBack(ROUTES.search);

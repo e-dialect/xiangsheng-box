@@ -136,6 +136,14 @@ class WechatBridgeTests(TestCase):
         info.save(update_fields=["wechat"])
         self.assertEqual(self.redeem(attempt).status_code, 410)
 
+    @override_settings(WECHAT_BRIDGE_APP_ENABLED=False)
+    def test_web_and_qr_can_be_enabled_without_app(self):
+        flags = self.client.get(BASE_URL + "availability")
+        self.assertEqual(flags.json(), {"web": True, "app": False})
+        self.assertEqual(self.post("start", channel="app").status_code, 503)
+        self.assertEqual(self.start("web")["launch_url"], LAUNCH_URL)
+        self.assertEqual(self.start("web_qr")["qr_image"], QR_IMAGE)
+
     @override_settings(WECHAT_BRIDGE_WEB_ENABLED=False)
     def test_flags_are_independent(self):
         flags = self.client.get(BASE_URL + "availability")
