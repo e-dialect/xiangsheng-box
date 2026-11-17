@@ -117,7 +117,7 @@ describe('entry-first search page orchestration', () => {
     expect(page.filters.dialectId).toBe(23);
   });
 
-  it('round-trips the submitted keyword in WeChat without the draft or filters', async () => {
+  it('round-trips the submitted keyword in WeChat without unsaved filters', async () => {
     const page = pageContext();
     page.submittedKeyword = '行 & hiŋ+? %2F';
     page.filters.keyword = '尚未提交';
@@ -146,6 +146,45 @@ describe('entry-first search page orchestration', () => {
     page.loading = true;
     expect(SearchPage.onShareAppMessage.call(page).path).toBe('/pages/search');
     expect(SearchPage.onShareTimeline.call(page).query).toBe('sharedKeyword=');
+  });
+
+  it('restores only the published filter snapshot for both H5 and WeChat', async () => {
+    const sender = pageContext();
+    sender.entries = [{ id: 8 }];
+    sender.submittedKeyword = '菜名';
+    sender.appliedFilters = {
+      ...sender.filters, dialectId: 21, dialectMatch: 'exact', hasRecording: false,
+      source: '资料 & 50% / 1', status: 'reviewed', owner: 'private',
+    };
+    sender.filters.dialectId = 99;
+    const shared = SearchPage.computed.keywordShare.call(sender);
+    const h5 = Object.fromEntries(new URL(shared.path, 'https://example.com').searchParams);
+    const wechat = Object.fromEntries(shared.query.split('&').map((part) => part.split('=')));
+    request.get.mockResolvedValue({ results: [] });
+    for (const options of [h5, wechat]) {
+      const recipient = pageContext();
+      // eslint-disable-next-line no-await-in-loop
+      await SearchPage.onLoad.call(recipient, options);
+      expect(recipient.filters).toMatchObject({
+        keyword: '菜名', dialectId: '21', dialectMatch: 'exact', hasRecording: false,
+        source: '资料 & 50% / 1', status: 'reviewed',
+      });
+      expect(recipient.filters).not.toHaveProperty('owner');
+    }
+    expect(shared.filtered).toBe(true);
+  });
+
+  it('opens a filters-only share and ignores malformed filter payloads', async () => {
+    const page = pageContext();
+    page.search = vi.fn();
+    const options = { filters: JSON.stringify({ hasRecording: false, dialectMatch: 'bad' }) };
+    await SearchPage.onLoad.call(page, options);
+    expect(page.search).toHaveBeenCalledOnce();
+    expect(page.filters).toMatchObject({ hasRecording: false, dialectMatch: 'subtree' });
+    const broken = pageContext();
+    broken.search = vi.fn();
+    await SearchPage.onLoad.call(broken, { filters: '%7Bbroken' });
+    expect(broken.search).not.toHaveBeenCalled();
   });
 
   it('keeps same-writing results as separate entries', async () => {
