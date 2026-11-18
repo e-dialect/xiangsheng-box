@@ -731,9 +731,6 @@ export default {
   },
   // #endif
   methods: {
-    openCharacterReadings() {
-      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
-    },
     async initializeSiteScope(options) {
       const explicitDialect = typeof options.dialect === 'string';
       const legacyShare = typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
@@ -937,6 +934,9 @@ export default {
     onSourceTypeChange(context = {}) {
       this.filters.sourceType = context.value?.[0] || '';
       this.sourcePickerVisible = false;
+    },
+    openCharacterReadings() {
+      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
     },
   },
 };
