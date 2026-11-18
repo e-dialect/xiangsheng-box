@@ -4,11 +4,12 @@
       v-if="loading"
       text="正在打开盒子…"
     />
-    <EmptyState
+    <UnavailableContent
       v-else-if="error"
       :title="error"
-      action-text="重试"
-      @action="load"
+      object-type="collection"
+      :object-id="id"
+      @retry="load"
     />
     <view
       v-else-if="box"
@@ -385,6 +386,7 @@ import BaseForm from '@/components/BaseForm.vue';
 import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import UnavailableContent from '@/components/UnavailableContent.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
@@ -413,6 +415,7 @@ export default {
     BaseField,
     BaseLoading,
     EmptyState,
+    UnavailableContent,
     EntryRecordingCard,
   },
   data: () => ({

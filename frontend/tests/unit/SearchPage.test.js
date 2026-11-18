@@ -120,6 +120,40 @@ describe('entry-first search page orchestration', () => {
     }
   });
 
+  it('includes a pending region when switching sites unless the user clears it', async () => {
+    const source = pageContext();
+    const catalog = deferred();
+    listAllDialects.mockReturnValueOnce(catalog.promise);
+    const code = '闽.莆仙';
+    const ready = source.initializeSiteScope({ dialect: code, dialect_scope: 'exact' });
+    const switchParams = () => SearchPage.computed.productSwitchParams.call(source);
+
+    expect(switchParams()).toMatchObject({ dialect: code, dialect_scope: 'exact' });
+    catalog.resolve([]);
+    await ready;
+    expect(switchParams()).toMatchObject({ dialect: code, dialect_scope: 'exact' });
+
+    source.clearDialect();
+    expect(switchParams()).toMatchObject({ dialect: 'all', dialect_scope: '' });
+  });
+
+  it('retries an explicit site scope without sending an unscoped search', async () => {
+    const page = pageContext();
+    page.filters.keyword = '行';
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    request.get.mockResolvedValue({ results: [] });
+
+    page.siteScopeReady = page.initializeSiteScope({ dialect: '闽.莆仙', dialect_scope: 'exact' });
+    await page.search();
+    expect(request.get).not.toHaveBeenCalled();
+    expect(page.errorMessage).toContain('指定的地区');
+
+    listAllDialects.mockResolvedValueOnce([{ id: 23, qualified_code: '闽.莆仙' }]);
+    await page.handleErrorAction();
+    expect(request.get).toHaveBeenCalledOnce();
+    expect(page.appliedFilters).toMatchObject({ dialectId: 23, dialectMatch: 'exact' });
+  });
+
   it('reports a failed region catalog and retries without replacing search state', async () => {
     const page = pageContext();
     page.filters.keyword = '行';

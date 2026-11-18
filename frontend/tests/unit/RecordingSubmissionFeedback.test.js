@@ -40,6 +40,7 @@ function pageContext() {
     ...RecordingCreate.data(),
     ...RecordingCreate.methods,
     ownerScope: 'user:1',
+    draftReady: true,
     $refs: { form: { validate: vi.fn(async () => true) } },
   };
   page.audio = { path: 'blob:recording', durationMs: 2300 };
@@ -59,9 +60,20 @@ beforeEach(() => {
 describe('recording submission feedback', () => {
   it('uses shared submission wording after the recording is created', async () => {
     uploadFile.mockResolvedValue({ url: '/files/voice.mp3', duration_ms: 2300 });
-    createRecording.mockResolvedValue({ id: 12, status: 'draft', visibility: true });
+    createRecording.mockResolvedValue({ id: 12, status: 'draft', visibility: false });
+    saveRecordingDraft.mockResolvedValue({
+      id: 'draft-1', audio: { path: '/saved/recording.mp3', persisted: true }, audioError: false,
+    });
     const page = pageContext();
     await page.submit();
+    const requestOptions = expect.objectContaining({
+      canPresent: expect.any(Function),
+      loading: false,
+    });
+    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3', requestOptions);
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      publication_consent: 'public-display-v1',
+    }), requestOptions);
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);

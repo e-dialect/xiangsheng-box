@@ -4,11 +4,12 @@
       v-if="loading"
       text="正在读取词条…"
     />
-    <EmptyState
+    <UnavailableContent
       v-else-if="errorMessage"
       :title="errorMessage"
-      action-text="重试"
-      @action="load"
+      object-type="entry"
+      :object-id="id"
+      @retry="load"
     />
     <view
       v-else-if="entry"
@@ -203,6 +204,13 @@
               />
             </view>
             <PronunciationForms :variant="variant" />
+            <BaseButton
+              v-if="variant.dialect?.qualified_code"
+              size="small"
+              variant="ghost"
+              text="查看拼音方案"
+              @click="openPinyinGuide(variant.dialect.qualified_code)"
+            />
           </view>
         </view>
         <view
@@ -328,6 +336,7 @@ import CollectionPicker from '@/components/CollectionPicker.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import UnavailableContent from '@/components/UnavailableContent.vue';
 import DialectLabel from '@/components/DialectLabel.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
@@ -364,6 +373,7 @@ export default {
     BaseLoading,
     DialectLabel,
     EmptyState,
+    UnavailableContent,
     EntryRecordingCard,
     PageShell,
   },
@@ -534,6 +544,9 @@ export default {
       const result = await action(this.id);
       this.entry.is_bookmarked = result.bookmarked;
       notifySuccess({ title: result.bookmarked ? '已收藏词条' : '已取消收藏' });
+    },
+    openPinyinGuide(dialect) {
+      openPage(ROUTES.localTools, { dialect, tool: 'pinyin' });
     },
     async attest({ dialectId }) {
       if (!dialectId) return;

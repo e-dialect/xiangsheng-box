@@ -23,7 +23,7 @@
 </template>
 
 <script>
-import { contributionStatus } from '@/services/contributionStatus';
+import { recordingStatusLabel } from '@/services/contributionStatus';
 
 export default {
   name: 'RecordingContext',
@@ -38,11 +38,7 @@ export default {
       return '可见性未提供';
     },
     statusLabel() {
-      const status = contributionStatus('recording', this.recording.status);
-      if (this.recording.status === 'draft') {
-        return this.recording.visibility === false ? '未公开初稿' : `${status.label}·待核对`;
-      }
-      return status.label;
+      return recordingStatusLabel(this.recording);
     },
     rightsText() {
       return String(this.recording.rights_statement || '').trim() || '暂未补充引用授权说明';

@@ -29,6 +29,12 @@
       </view>
     </view>
 
+    <BaseButton
+      variant="ghost"
+      :disabled="loading"
+      :text="recordingsOnly ? '查看全部整理任务' : '仅看录音审核队列'"
+      @click="toggleQueue"
+    />
     <BaseLoading
       v-if="loading"
       text="正在整理你的待办…"
@@ -203,6 +209,7 @@ export default {
     return {
       summary: null,
       tasks: [],
+      recordingsOnly: false,
       loading: true,
       error: '',
       selectedKey: '',
@@ -225,6 +232,11 @@ export default {
   },
   onLoad() { this.load(); },
   methods: {
+    toggleQueue() {
+      this.recordingsOnly = !this.recordingsOnly;
+      this.cancel();
+      return this.load();
+    },
     openMaterial(task) {
       if (task.target_type === 'entry') {
         openPage(ROUTES.entryReview, { entry_id: task.id });
@@ -277,7 +289,7 @@ export default {
       this.summary = null;
       this.tasks = [];
       try {
-        const [summary, tasks] = await Promise.all([getCurationSummary(), listCurationTasks()]);
+        const [summary, tasks] = await Promise.all([getCurationSummary(), listCurationTasks(this.recordingsOnly ? { kind: 'recording' } : {})]);
         this.summary = summary;
         this.tasks = pageResults(tasks);
       } catch (error) {
@@ -301,7 +313,10 @@ export default {
         target_type: task.target_type,
         target_id: task.id,
         reason: this.reason.trim(),
-        changes: { status: this.selectedAction },
+        changes: {
+          status: this.selectedAction,
+          ...(task.revision ? { revision: task.revision } : {}),
+        },
       };
     },
     async submit(task) {
