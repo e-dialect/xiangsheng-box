@@ -618,12 +618,13 @@ export default {
     productSwitchParams() {
       const { filters } = this;
       const pending = !this.dialectTouched && !filters.dialectId ? this.pendingSiteScope : null;
+      const pendingMatch = pending?.exact ? 'exact' : '';
       const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
       return {
         keywords: filters.keyword,
         dialect: dialect?.qualified_code || pending?.code || (filters.dialectId ? '' : 'all'),
         dialect_id: dialect ? '' : filters.dialectId,
-        dialect_scope: filters.dialectId ? filters.dialectMatch : (pending?.exact ? 'exact' : ''),
+        dialect_scope: filters.dialectId ? filters.dialectMatch : pendingMatch,
         ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
           [key, filters[field]]
         ))),
