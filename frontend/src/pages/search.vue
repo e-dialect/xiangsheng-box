@@ -597,7 +597,6 @@ export default {
       dialects: [],
       dialectsLoading: false,
       siteScopeReady: null,
-      explicitDialectScope: false,
       dialectTouched: false,
       dialectsError: '',
       dialectPickerVisible: false,
@@ -657,8 +656,9 @@ export default {
       const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
       return {
         keywords: filters.keyword,
-        dialect: dialect?.qualified_code || (this.explicitDialectScope ? 'all' : ''),
-        dialect_scope: dialect ? filters.dialectMatch : '',
+        dialect: dialect?.qualified_code || (filters.dialectId ? '' : 'all'),
+        dialect_id: dialect ? '' : filters.dialectId,
+        dialect_scope: filters.dialectId ? filters.dialectMatch : '',
         ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
           [key, filters[field]]
         ))),
@@ -738,9 +738,17 @@ export default {
       }
     }
     // #endif
-    Object.assign(this.filters, sharedFilters(options.filters));
-    this.siteScopeReady = this.initializeSiteScope(options);
-    if (this.filters.keyword || activeFilterCount(this.filters)) await this.search();
+    const restored = sharedFilters(options.filters);
+    Object.assign(this.filters, restored);
+    const filtered = Object.keys(restored).length > 0;
+    this.siteScopeReady = this.initializeSiteScope(options, filtered);
+    if (!this.filters.keyword && !filtered) {
+      const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
+      if (!switchKeys.some((key) => options[key])) return;
+      await this.siteScopeReady;
+      if (!activeFilterCount(this.filters)) return;
+    }
+    await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
@@ -754,11 +762,10 @@ export default {
   },
   // #endif
   methods: {
-    async initializeSiteScope(options) {
-      this.explicitDialectScope = typeof options.dialect === 'string';
-      const sharedSearch = ['sharedKeyword', 'key', 'filters'].some((key) => (
-        typeof options[key] === 'string'
-      ));
+    async initializeSiteScope(options, filtered = false) {
+      const explicitDialect = typeof options.dialect === 'string';
+      const sharedSearch = filtered
+        || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
       Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
         if (typeof options[key] === 'string') this.filters[field] = options[key];
       });
@@ -766,11 +773,13 @@ export default {
         this.filters.hasRecording = options.has_recording === 'true';
       }
       const catalog = this.loadDialects();
-      if (sharedSearch && !this.explicitDialectScope) {
-        this.explicitDialectScope = true;
+      if (!explicitDialect && /^[1-9]\d*$/.test(options.dialect_id || '')) {
+        this.filters.dialectId = options.dialect_id;
+        this.filters.dialectMatch = options.dialect_scope === 'exact' ? 'exact' : 'subtree';
         return;
       }
-      const code = this.explicitDialectScope
+      if (sharedSearch && !explicitDialect) return;
+      const code = explicitDialect
         ? options.dialect : (await loadProductProfile()).default_dialect;
       if (!code || code === 'all') return;
       await catalog;
@@ -821,7 +830,6 @@ export default {
     },
     resetAdvancedFilters() {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       const { keyword } = this.filters;
       this.filters = { ...defaultFilters(), keyword };
       this.search();
@@ -920,12 +928,10 @@ export default {
     },
     onDialectChange(context = {}) {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       this.filters.dialectId = context.value || '';
     },
     clearDialect() {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       this.filters.dialectId = '';
       this.filters.dialectMatch = 'subtree';
     },

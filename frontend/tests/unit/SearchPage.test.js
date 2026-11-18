@@ -22,7 +22,7 @@ const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
 const {
-  fallbackProductProfile, productProfile,
+  fallbackProductProfile, productProfile, productSwitchUrl,
 } = await import('@/services/productProfile');
 
 function deferred() {
@@ -99,6 +99,27 @@ describe('entry-first search page orchestration', () => {
     }
   });
 
+  it.each(['', '23'])('preserves the source region "%s" when switching to a local site before the catalog loads', async (dialectId) => {
+    const source = pageContext();
+    Object.assign(source.filters, { keyword: '红团', dialectId, dialectMatch: 'exact' });
+    const target = { key: 'pxm', name: '兴化语记', origin: 'https://pxm.test.edialect.top' };
+    const params = SearchPage.computed.productSwitchParams.call(source);
+    const url = productSwitchUrl(target, { pathname: '/pages/search' }, '/', params);
+    const query = Object.fromEntries(new URL(url).searchParams);
+    expect(query.keywords).toBe('红团');
+    expect(dialectId ? query.dialect_id : query.dialect).toBe(dialectId || 'all');
+    Object.assign(productProfile, fallbackProductProfile('pxm.test.edialect.top'));
+    try {
+      listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+      const destination = pageContext();
+      await destination.initializeSiteScope(query);
+      expect(destination.filters.dialectId).toBe(dialectId);
+      if (dialectId) expect(destination.filters.dialectMatch).toBe('exact');
+    } finally {
+      Object.assign(productProfile, fallbackProductProfile());
+    }
+  });
+
   it('reports a failed region catalog and retries without replacing search state', async () => {
     const page = pageContext();
     page.filters.keyword = '行';
@@ -124,6 +145,26 @@ describe('entry-first search page orchestration', () => {
     expect(page.entries).toEqual([{ id: 7 }]);
     expect(page.next).toBe('/entries/?page=2');
     expect(request.get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ has_recording: 'false' }, { has_recording: false }],
+    [{ writing_type: 'phonetic', source_type: 'oral' }, { writing_type: 'phonetic', source_type: 'oral' }],
+    [{ dialect: '闽.莆仙', dialect_scope: 'exact' }, { dialect_id: 20, dialect_scope: 'exact' }],
+  ])('runs a filter-only station landing with the restored criteria %o', async (query, expected) => {
+    listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+    request.get.mockResolvedValue({ results: [{ id: 7 }], count: 1 });
+    const destination = pageContext();
+    await SearchPage.onLoad.call(destination, query);
+    expect(request.get).toHaveBeenCalledWith('/entries/', expect.objectContaining(expected), true, { loading: false });
+    expect(destination.entries).toEqual([{ id: 7 }]);
+  });
+
+  it.each([{}, { dialect: 'all' }])('keeps an empty station landing idle for %o', async (query) => {
+    const destination = pageContext();
+    destination.search = vi.fn();
+    await SearchPage.onLoad.call(destination, query);
+    expect(destination.search).not.toHaveBeenCalled();
   });
 
   it('makes an empty region catalog recoverable', async () => {
