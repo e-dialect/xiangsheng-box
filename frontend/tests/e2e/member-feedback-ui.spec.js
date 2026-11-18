@@ -14,7 +14,7 @@ for (const theme of ['light', 'dark']) {
       });
       await expect(page.getByRole('button', { name: '选择本地录音', exact: true })).toBeVisible();
       await page.locator('textarea').first().fill('只保存为本地草稿');
-      await page.getByRole('button', { name: '提交并公开', exact: true }).scrollIntoViewIfNeeded();
+      await page.getByRole('button', { name: '同意并提交审核', exact: true }).scrollIntoViewIfNeeded();
       const toolbar = page.locator('.record-tools');
       await expect(toolbar).toBeInViewport();
       const tools = await toolbar.boundingBox();

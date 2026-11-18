@@ -42,8 +42,16 @@ export function getRecording(id) {
   return request.get(`/recordings/${id}/`, {}, true, PAGE_LOAD_OPTIONS);
 }
 
-export function createRecording(payload) {
-  return request.post('/recordings/', payload);
+export function createRecording(payload, options) {
+  return request.post('/recordings/', payload, false, options);
+}
+
+export function resubmitRecording(id, payload) {
+  return request.post(`/recordings/${id}/resubmit/`, payload);
+}
+
+export function withdrawRecording(id) {
+  return request.post(`/recordings/${id}/withdraw/`, {});
 }
 
 export function createUsageAttestation(entryId, dialectId, note = '') {

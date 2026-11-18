@@ -4,10 +4,11 @@ import { notify } from '@/services/feedback';
 /**
  * 上传文件
  * @param file 文件对象（路径）
+ * @param options 请求选项
  * @returns {Promise<unknown>}
  */
-export function uploadFile(file) {
-  return upload(file);
+export function uploadFile(file, options) {
+  return upload(file, options);
 }
 
 export function supportsAudioFileSelection() {

@@ -1,3 +1,4 @@
+import { contentFeedbackParams } from '@/services/contentFeedback';
 import { toLoginPage } from '@/routers/login';
 import {
   clearInterceptIntent,
@@ -57,6 +58,12 @@ export function resolveAuthDestination(intent) {
 
   if (intent.action === 'attest_usage' && context.entryId) {
     return routeDestination(ROUTES.entryDetail, { id: context.entryId });
+  }
+
+  if (intent.action === 'content_feedback') {
+    const params = contentFeedbackParams(context.object_type, context.object_id);
+    if (params) return routeDestination(ROUTES.mailSend, params);
+    return { kind: AUTH_DESTINATION_KINDS.FALLBACK };
   }
 
   if (intent.action === 'dm') {
