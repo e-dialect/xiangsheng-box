@@ -391,6 +391,7 @@ class EntryFirstApiTests(TestCase):
             "audio_url": url,
             "usage_dialect_id": self.city.id,
             "original_gloss": "sample caption",
+            "citation": "海边访谈",
         }
         self.assertEqual(self.client.get(path).content, b"sample")
         self.assertEqual(anonymous.get(path).status_code, 404)
@@ -418,6 +419,7 @@ class EntryFirstApiTests(TestCase):
         detail = f"/recordings/{recording_id}/"
         entry_id = submission.data["entry_links"][0]["entry"]["id"]
         entry_url = f"/entries/{entry_id}/"
+        source_filters = {"source": "海边访谈", "source_type": "user_statement"}
         self.assertIn(
             recording_id,
             [
@@ -453,6 +455,9 @@ class EntryFirstApiTests(TestCase):
                         "/evidence-records/", {"recording_id": recording_id}
                     ).data["count"],
                     0,
+                )
+                self.assertEqual(
+                    client.get("/entries/", source_filters).data["count"], 0
                 )
             self.assertEqual(self.client.get(path).content, b"sample")
 
@@ -527,6 +532,13 @@ class EntryFirstApiTests(TestCase):
             reviewer.get(detail).data["speaker_consent_source"], "speaker_written"
         )
         self.assertEqual(anonymous.get(entry_url).data["summary"], "revised caption")
+        matching = anonymous.get("/entries/", source_filters).data["results"]
+        self.assertEqual(
+            [(row["id"], row["evidence_count"]) for row in matching], [(entry_id, 1)]
+        )
+        self.assertEqual(
+            anonymous.get("/evidence-records/", {"entry_id": entry_id}).data["count"], 1
+        )
         public_audio = anonymous.get(revised_path)
         self.assertEqual(public_audio.content, b"revised")
         self.assertIn("no-store", public_audio["Cache-Control"])
@@ -545,6 +557,7 @@ class EntryFirstApiTests(TestCase):
         self.assertEqual(self.client.post(detail + "withdraw/").status_code, 200)
         self.assertEqual(review("published").status_code, 400)
         self.assertEqual(self.client.get(detail).data["status"], "withdrawn")
+        self.assertEqual(anonymous.get("/entries/", source_filters).data["count"], 0)
         for route in (detail, entry_url, revised_path):
             self.assertEqual(anonymous.get(route).status_code, 404)
         self.assertTrue(
@@ -601,6 +614,7 @@ class EntryFirstApiTests(TestCase):
                 "speaker_consent_source": "self",
                 "usage_dialect_id": self.city.pk,
                 "original_gloss": "private caption",
+                "citation": "private interview",
                 "primary_entry_id": entry.pk,
                 "primary_sense_id": sense.pk,
             },
@@ -616,6 +630,13 @@ class EntryFirstApiTests(TestCase):
         self.assertEqual(
             viewer.get("/entries/", {"q": "private caption"}).data["count"], 0
         )
+        source_filters = {
+            "source": "private interview",
+            "source_type": "user_statement",
+        }
+        self.assertEqual(viewer.get("/entries/", source_filters).data["count"], 0)
+        self.assertEqual(viewer.get(f"/entries/{entry.pk}/").data["evidence_count"], 0)
+        self.assertEqual(self.client.get("/entries/", source_filters).data["count"], 1)
         for visible in (False, True):
             legacy = Recording.objects.create(
                 audio_url="https://example.test/legacy.mp3",
