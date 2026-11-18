@@ -296,6 +296,27 @@ describe('entry-first search page orchestration', () => {
     expect(shared.filtered).toBe(true);
   });
 
+  it('keeps the shared district in the first query when the local station catalog is offline', async () => {
+    const recipient = pageContext();
+    Object.assign(productProfile, fallbackProductProfile('pxm.test.edialect.top'));
+    listAllDialects.mockRejectedValueOnce(new Error('offline'));
+    request.get.mockResolvedValue({ results: [] });
+    try {
+      await SearchPage.onLoad.call(recipient, {
+        key: '菜名',
+        filters: JSON.stringify({ dialectId: 21, dialectMatch: 'exact', hasRecording: false }),
+      });
+      const queries = request.get.mock.calls.filter(([path]) => path === '/entries/');
+      expect(queries).toHaveLength(1);
+      expect(queries[0][1]).toMatchObject({
+        search: '菜名', dialect_id: '21', dialect_scope: 'exact', has_recording: false,
+      });
+      expect(recipient.dialectsError).toBeTruthy();
+    } finally {
+      Object.assign(productProfile, fallbackProductProfile());
+    }
+  });
+
   it('opens a filters-only share and ignores malformed filter payloads', async () => {
     const page = pageContext();
     page.search = vi.fn();

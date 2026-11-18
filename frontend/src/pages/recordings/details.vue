@@ -322,10 +322,10 @@ export default {
         const recording = await getRecording(this.id);
         if (version !== this.loadVersion || token !== uni.getStorageSync('token')) return;
         this.recording = recording;
-        observeSharedOpen(recordingShareMessage(recording)?.path);
         this.revision.original_gloss = recording.original_gloss || '';
         this.replacement = null;
         this.takedown.reason = '';
+        observeSharedOpen(recordingShareMessage(recording)?.path);
       } catch (error) {
         if (version !== this.loadVersion) return;
         this.recording = null;
