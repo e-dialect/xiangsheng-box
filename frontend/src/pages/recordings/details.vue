@@ -63,10 +63,16 @@
         <text v-if="recording.review_reason">
           处理说明 · {{ recording.review_reason }}
         </text>
-        <template v-if="recording.can_resubmit">
+        <BaseForm
+          v-if="recording.can_resubmit"
+          ref="revisionForm"
+          :data="revision"
+          :rules="revisionRules"
+        >
           <BaseField
-            v-model="gloss"
-            name="revision"
+            v-model="revision.original_gloss"
+            name="original_gloss"
+            :disabled="busy"
             label="修改录音大意"
             type="textarea"
             required
@@ -79,11 +85,11 @@
           />
           <text>请确认已取得说话人同意，审核通过后将公开录音和所填资料。</text>
           <BaseButton
-            :disabled="busy || !gloss.trim()"
+            :disabled="busy || !revision.original_gloss.trim()"
             text="同意并重新提交审核"
             @click="resubmit"
           />
-        </template>
+        </BaseForm>
         <BaseButton
           v-if="recording.can_withdraw"
           variant="danger-ghost"
@@ -91,20 +97,26 @@
           text="撤回投稿"
           @click="withdraw"
         />
-        <template v-if="recording.can_take_down">
+        <BaseForm
+          v-if="recording.can_take_down"
+          ref="takedownForm"
+          :data="takedown"
+          :rules="takedownRules"
+        >
           <BaseField
-            v-model="reason"
+            v-model="takedown.reason"
             name="reason"
+            :disabled="busy"
             label="下架理由"
             required
           />
           <BaseButton
             variant="danger-ghost"
-            :disabled="busy || reason.trim().length < 4"
+            :disabled="busy || takedown.reason.trim().length < 4"
             text="下架并退回"
             @click="takeDown"
           />
-        </template>
+        </BaseForm>
       </view>
       <view class="box-panel">
         <text class="box-heading">
@@ -145,6 +157,7 @@
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseField from '@/components/BaseField.vue';
+import BaseForm from '@/components/BaseForm.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
@@ -176,6 +189,7 @@ import {
 export default {
   components: {
     BaseField,
+    BaseForm,
     DiscussionThread,
     PageShell,
     BaseButton,
@@ -193,9 +207,15 @@ export default {
     loading: true,
     error: '',
     busy: false,
-    gloss: '',
+    revision: { original_gloss: '' },
+    revisionRules: {
+      original_gloss: [{ validator: (value) => Boolean(value?.trim()), message: '请填写录音大意' }],
+    },
     replacement: null,
-    reason: '',
+    takedown: { reason: '' },
+    takedownRules: {
+      reason: [{ validator: (value) => (value?.trim().length || 0) >= 4, message: '请写下至少 4 个字的下架理由' }],
+    },
     sessionToken: '',
     loadVersion: 0,
 
@@ -298,9 +318,9 @@ export default {
         const recording = await getRecording(this.id);
         if (version !== this.loadVersion || token !== uni.getStorageSync('token')) return;
         this.recording = recording;
-        this.gloss = recording.original_gloss || '';
+        this.revision.original_gloss = recording.original_gloss || '';
         this.replacement = null;
-        this.reason = '';
+        this.takedown.reason = '';
       } catch (error) {
         if (version !== this.loadVersion) return;
         this.recording = null;
@@ -317,11 +337,16 @@ export default {
         notify({ title: error.message || '无法选择录音' });
       }
     },
-    async changeSubmission(action) {
-      if (this.busy || this.sessionToken !== uni.getStorageSync('token')) return;
+    async changeSubmission(action, formName) {
+      const { sessionToken, loadVersion } = this;
+      const isCurrent = () => loadVersion === this.loadVersion && sessionToken === uni.getStorageSync('token');
+      if (this.busy || !isCurrent()) return;
       this.busy = true;
       try {
-        await action();
+        if (formName && (await this.$refs[formName]?.validate()) !== true) return;
+        if (!isCurrent()) return;
+        await action(isCurrent);
+        if (!isCurrent()) return;
         this.$refs.player?.stopPlayback?.();
         await this.load();
       } catch (error) {
@@ -331,17 +356,20 @@ export default {
       }
     },
     withdraw() {
-      return this.changeSubmission(async () => {
+      return this.changeSubmission(async (isCurrent) => {
         if (!await confirm({ title: '撤回这段录音？', content: '撤回后本站的录音链接将停止对外提供收听，已经保存的副本无法收回。', danger: true })) return;
-        if (this.sessionToken === uni.getStorageSync('token')) await withdrawRecording(this.id);
+        if (isCurrent()) await withdrawRecording(this.id);
       });
     },
     resubmit() {
-      return this.changeSubmission(async () => {
-        const payload = { original_gloss: this.gloss.trim(), publication_consent: 'public-display-v1' };
+      return this.changeSubmission(async (isCurrent) => {
+        const payload = {
+          original_gloss: this.revision.original_gloss.trim(),
+          publication_consent: 'public-display-v1',
+        };
         if (this.replacement) payload.audio_url = (await uploadFile(this.replacement.path)).url;
-        if (this.sessionToken === uni.getStorageSync('token')) await resubmitRecording(this.id, payload);
-      });
+        if (isCurrent()) await resubmitRecording(this.id, payload);
+      }, 'revisionForm');
     },
     takeDown() {
       return this.changeSubmission(() => createCurationAction({
@@ -349,8 +377,8 @@ export default {
         target_id: this.id,
         action_type: 'review',
         changes: { status: 'rejected', revision: this.recording.updated_at },
-        reason: this.reason.trim(),
-      }));
+        reason: this.takedown.reason.trim(),
+      }), 'takedownForm');
     },
     async toggleLike() {
       if (this.busy || !this.auth()) return;
