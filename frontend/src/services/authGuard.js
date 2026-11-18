@@ -10,6 +10,7 @@ export const PROTECTED_ACTIONS = {
   follow: '关注',
   circle_join: '加入方言圈',
   dm: '私信',
+  content_feedback: '反馈内容链接',
   open_mine: '查看我的',
   bookmark_entry: '收藏词条',
 };

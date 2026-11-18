@@ -4,6 +4,7 @@ from django.contrib.staticfiles import views as staticfiles_views
 from django.urls import path, include
 
 from user import views as user
+from files.recording_media import recording_media
 from files.views import open_file_url
 
 urlpatterns = [
@@ -20,6 +21,11 @@ urlpatterns = [
     path("site-settings/", include("siteconfig.urls", namespace="siteconfig")),
     path("files", include("files.urls", namespace="files")),
     path("notifications", include("inbox.urls", namespace="inbox")),
+    path(
+        "files/recording-media/<uuid:asset_id>/",
+        recording_media,
+        name="recording-media",
+    ),
     path("files/<type>/<id>/<Y>/<M>/<D>/<X>", open_file_url),
 ]
 

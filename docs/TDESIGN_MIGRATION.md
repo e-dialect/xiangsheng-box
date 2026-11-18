@@ -246,6 +246,18 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 关联 #405、#407。新增共享 DiscussionThread，词条与录音详情共用 BaseForm/BaseField/BaseButton、加载与错误反馈；词条讨论为独立内容区。草稿箱用 BaseLoading 展示实际音频状态检查，录音页沿用原表单和保存反馈，增加编辑与离页保存。
 
+### 录音草稿词条关联恢复
+
+关联 [#634](https://github.com/e-dialect/xiangsheng-box/issues/634)。词条详情暂时不可读时，录音页保留原关联 ID，并使用 BaseButton 提供重试读取与明确取消选词；显示信息失败不再改变草稿或提交的关联。覆盖恢复、entry_id 入口、保存与提交、重试以及取消/替换后的迟到响应。
+
+### 录音页地区目录失败恢复
+
+关联 [#643](https://github.com/e-dialect/xiangsheng-box/issues/643) 和 [PR #645](https://github.com/e-dialect/xiangsheng-box/pull/645)。使用既有 BaseLoading 与 EmptyState，在必填地区步骤提供读取状态和原页重试；重试保留录音、文字、词条关联和已选地区，不用档案默认地区覆盖新选择。读取、验证或提交期间不提供重试动作，方法内仍保留并发保护。回归覆盖失败/空目录、重复点击、等待期间选择及草稿恢复路径。
+
+### 提交期间切换账号的恢复导航
+
+关联 [PR #645](https://github.com/e-dialect/xiangsheng-box/pull/645) 对 [#638 评审意见](https://github.com/e-dialect/xiangsheng-box/pull/638#discussion_r4559426746) 的修复。用户主动编辑、取消词条关联与导航仍受提交锁保护；账号切换的生命周期恢复独立清除关联、使迟到词条请求失效并直接进入当前账号草稿箱，不通过会保存草稿的用户导航入口。单测覆盖上传和草稿保存等待期间的账号切换、旧请求返回及新账号隔离。
+
 ## 2026-10-24：公开初稿标识
 
 依据 [H5 可见性核查](audits/2026-10-24-h5-recording-visibility.md)，录音卡片（含紧凑模式与详情复用）区分“初稿·待核对”和“未公开初稿”，普通提交成功提示说明已公开。沿用现有组件和样式，没有新增交互控件。回归覆盖见 RecordingDraftVisibility.test.js；本次未创建 PR。
@@ -261,3 +273,13 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 ## 地方工具（#675、#700、#701）
 
 地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
+
+## 录音投稿审核（#702）
+
+重新送审和下架均经 BaseForm 校验。校验期间按钮锁定，切换账号后旧操作不会提交。
+
+投稿页使用“同意并提交审核”按钮记录公开展示许可。录音详情复用 BaseField、BaseButton 和确认对话框，让本人查看退回理由、修改大意、换音频、重投或撤回。地区审核员在整理工作台切换“仅看录音审核队列”，试听后给出审核结论，已公开投稿可从详情填写理由并下架。
+
+新音频由 `POST /files` 转码为 MP3，编码过程使用临时文件，输入和输出各上限 5 MB。音频字节随数据库备份，受控播放地址位于 `/files/recording-media/<uuid>/`。H5 使用带登录凭证的临时 Blob 试听，微信使用带凭证的临时下载。匿名公开播放、审核员试听和撤回均使用同一权限判定。网关需将该前缀转发到 Django 并保留 `Cache-Control: private, no-store`，不得以静态文件或 CDN 缓存命中。
+
+上线前由站点负责人指定实际地区值班人，使用普通账号和地区审核账号在两站校验待审、退回、重投、公开和撤回，记录审核员撤权后的结果。迁移 0029 保留原有录音 URL 和可见性，已外发的旧 COS 地址或下载副本须单独清点。#479 继续跟踪上传后未提交的孤立音频。回退旧后端前需暂停投稿、审核与录音媒体访问，旧写入路径会立即公开录音。保留 0029 和新增数据，恢复支持审核的应用后再开放写入。

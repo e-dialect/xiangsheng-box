@@ -219,6 +219,36 @@ describe('httpClient compatibility wrappers', () => {
     expect(toLoginPage).toHaveBeenCalledTimes(1);
   });
 
+  it.each(['request', 'uploadFile'])('ignores feedback from a late %s error', async (adapter) => {
+    vi.useFakeTimers();
+    uni[adapter].mockResolvedValue({ statusCode: 401, data: { message: '未登录' } });
+    const options = { canPresent: () => false, loading: false };
+    const pending = adapter === 'request'
+      ? httpClient.request('POST', '/recordings/', {}, options)
+      : httpClient.upload('/tmp/audio.mp3', options);
+
+    await expect(pending).rejects.toMatchObject({ statusCode: 401 });
+    expect(uni.showToast).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(toLoginPage).not.toHaveBeenCalled();
+  });
+
+  it('rechecks whether the page is current before a delayed login redirect', async () => {
+    vi.useFakeTimers();
+    let active = true;
+    uni.request.mockResolvedValue({ statusCode: 401, data: { message: '未登录' } });
+    const pending = httpClient.request('POST', '/recordings/', {}, {
+      canPresent: () => active,
+      loading: false,
+    });
+
+    await expect(pending).rejects.toMatchObject({ statusCode: 401 });
+    expect(uni.showToast).toHaveBeenCalledTimes(1);
+    active = false;
+    vi.runAllTimers();
+    expect(toLoginPage).not.toHaveBeenCalled();
+  });
+
   it('request noPrompt remains silent and does not redirect', async () => {
     vi.useFakeTimers();
     uni.request.mockResolvedValue({
