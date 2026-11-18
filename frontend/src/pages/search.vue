@@ -690,7 +690,13 @@ export default {
     Object.assign(this.filters, sharedFilters);
     const filtered = Object.keys(sharedFilters).length > 0;
     this.siteScopeReady = this.initializeSiteScope(options, filtered);
-    if (this.filters.keyword || filtered) await this.search();
+    if (!this.filters.keyword && !filtered) {
+      const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
+      if (!switchKeys.some((key) => options[key])) return;
+      await this.siteScopeReady;
+      if (!activeFilterCount(this.filters)) return;
+    }
+    await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {

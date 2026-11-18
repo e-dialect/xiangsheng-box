@@ -147,6 +147,26 @@ describe('entry-first search page orchestration', () => {
     expect(request.get).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [{ has_recording: 'false' }, { has_recording: false }],
+    [{ writing_type: 'phonetic', source_type: 'oral' }, { writing_type: 'phonetic', source_type: 'oral' }],
+    [{ dialect: '闽.莆仙', dialect_scope: 'exact' }, { dialect_id: 20, dialect_scope: 'exact' }],
+  ])('runs a filter-only station landing with the restored criteria %o', async (query, expected) => {
+    listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+    request.get.mockResolvedValue({ results: [{ id: 7 }], count: 1 });
+    const destination = pageContext();
+    await SearchPage.onLoad.call(destination, query);
+    expect(request.get).toHaveBeenCalledWith('/entries/', expect.objectContaining(expected), true, { loading: false });
+    expect(destination.entries).toEqual([{ id: 7 }]);
+  });
+
+  it.each([{}, { dialect: 'all' }])('keeps an empty station landing idle for %o', async (query) => {
+    const destination = pageContext();
+    destination.search = vi.fn();
+    await SearchPage.onLoad.call(destination, query);
+    expect(destination.search).not.toHaveBeenCalled();
+  });
+
   it('makes an empty region catalog recoverable', async () => {
     const page = pageContext();
     await page.loadDialects();
