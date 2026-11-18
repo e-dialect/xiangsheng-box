@@ -815,7 +815,7 @@ export default {
         return;
       }
       if (this.pendingSiteScope) await this.loadDialects();
-      return this.search();
+      await this.search();
     },
     async search() {
       const requestId = this.searchRequestId + 1;
