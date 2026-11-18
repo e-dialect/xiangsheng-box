@@ -22,16 +22,17 @@ describe('Entry / Recording V2 service', () => {
   it('calls the entry-first and recording resources', async () => {
     request.get.mockResolvedValue({ results: [] });
     request.post.mockResolvedValue({ id: 8 });
+    const options = { canPresent: () => true, loading: false };
 
     await service.listEntries({ search: '行' });
     await service.listRecordings({ entry_id: 3 });
-    await service.createRecording({ audio_url: 'https://example.test/a.mp3' });
+    await service.createRecording({ audio_url: 'https://example.test/a.mp3' }, options);
 
     expect(request.get).toHaveBeenNthCalledWith(1, '/entries/', { search: '行' }, true, { loading: false });
     expect(request.get).toHaveBeenNthCalledWith(2, '/recordings/', { entry_id: 3 }, true, { loading: false });
     expect(request.post).toHaveBeenCalledWith('/recordings/', {
       audio_url: 'https://example.test/a.mp3',
-    });
+    }, false, options);
   });
 
   it('keeps false filter values and omits only empty filters', () => {

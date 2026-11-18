@@ -95,11 +95,12 @@ export function createApiError(error) {
 }
 
 function notifyError(error, options) {
-  if (options.silent) return;
+  const { canPresent = () => true } = options;
+  if (options.silent || !canPresent()) return;
   notifyGlobalError(error);
   if (error.statusCode === 401 && options.redirectOnUnauthorized) {
     setTimeout(() => {
-      toLoginPage();
+      if (canPresent()) toLoginPage();
     }, 1000);
   }
 }
