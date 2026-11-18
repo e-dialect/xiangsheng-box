@@ -105,6 +105,39 @@ class ProductProfileTests(TestCase):
             [{"type": "collection", "id": second.id, "title": "莆仙集盒"}],
         )
 
+    def test_layout_defaults_and_empty_sets_have_distinct_meaning(self):
+        default = self.read()["profile"]
+        self.assertEqual(default["home_sections"], ["tools", "featured"])
+        self.assertEqual(default["enabled_tools"], ["pinyin", "quiz", "kinship"])
+        general = self.read("https://unknown.example")["profile"]
+        self.assertEqual(general["local_tools_dialect"], "")
+        self.assertIn("tools", general["home_sections"])
+        self.assertIn("pinyin", general["enabled_tools"])
+
+        draft = ProductProfileRevision.objects.create(
+            profile_id="box", name="无可选栏目", home_sections=[], enabled_tools=[]
+        )
+        publish_revision(draft)
+        profile = self.read()["profile"]
+        self.assertEqual(profile["home_sections"], [])
+        self.assertEqual(profile["enabled_tools"], [])
+
+    def test_publish_rejects_invalid_layout_and_tool_keys(self):
+        for field, value in (
+            ("home_sections", ["entries", "entries"]),
+            ("home_sections", ["featured", "entries"]),
+            ("home_sections", ["unknown"]),
+            ("enabled_tools", ["arbitrary-link"]),
+            ("enabled_tools", [["pinyin"]]),
+        ):
+            with self.subTest(field=field, value=value):
+                draft = ProductProfileRevision.objects.create(
+                    profile_id="box", name="无效配置", **{field: value}
+                )
+                with self.assertRaises(ValidationError) as error:
+                    publish_revision(draft)
+                self.assertIn(field, error.exception.error_dict)
+
     def test_draft_validation_rejects_private_duplicates_and_noninteger_ids(self):
         private = Entry.objects.create(summary="后台内容", visibility=False)
         box = ProductProfile.objects.get(pk="box")
@@ -158,6 +191,8 @@ class ProductProfileEditorTests(TestCase):
                 "credit": "",
                 "default_dialect": "",
                 "local_tools_dialect": "闽.莆仙",
+                "home_sections": "精选词条\n地方工具",
+                "enabled_tools": ["quiz"],
                 "featured": f"词条 {entry.id}",
                 "_save": "保存",
             },
@@ -166,17 +201,31 @@ class ProductProfileEditorTests(TestCase):
         preview = self.client.get(self.preview_url(draft))
         self.assertContains(preview, "莆仙读法")
         self.assertContains(preview, "发布此版本")
+        self.assertContains(preview, "<li>精选词条</li>", html=True)
+        self.assertContains(preview, "<li>地方工具</li>", html=True)
+        self.assertLess(
+            preview.content.index("<li>精选词条</li>".encode()),
+            preview.content.index("<li>地方工具</li>".encode()),
+        )
+        self.assertContains(preview, "聪明花开")
+        self.assertNotContains(preview, "拼音方案")
         self.box.refresh_from_db()
         self.assertEqual(self.box.active_revision, self.original)
         self.client.post(self.preview_url(draft), {"action": "publish"})
         self.box.refresh_from_db()
         self.assertEqual(self.box.active_revision, draft)
+        published = self.client.get(URL, HTTP_ORIGIN=BOX).json()["profile"]
+        self.assertEqual(published["home_sections"], ["entries", "tools"])
+        self.assertEqual(published["enabled_tools"], ["quiz"])
         self.assertContains(
             self.client.get(self.preview_url(self.original)), "恢复此版本"
         )
         self.client.post(self.preview_url(self.original), {"action": "publish"})
         self.box.refresh_from_db()
         self.assertEqual(self.box.active_revision, self.original)
+        restored = self.client.get(URL, HTTP_ORIGIN=BOX).json()["profile"]
+        self.assertEqual(restored["home_sections"], ["tools", "featured"])
+        self.assertEqual(restored["enabled_tools"], ["pinyin", "quiz", "kinship"])
         logs = LogEntry.objects.filter(user=self.editor).values_list(
             "change_message", flat=True
         )

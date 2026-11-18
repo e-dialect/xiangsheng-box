@@ -531,6 +531,22 @@ class RecordingEntryLinkRefSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+def speaker_declaration(data):
+    source = data.get("speaker_consent_source")
+    if source not in Recording.SpeakerConsent.values:
+        raise serializers.ValidationError(
+            {"speaker_consent_source": "请选择发声人及其同意方式"}
+        )
+    label = data.get("speaker_label", "")
+    if not isinstance(label, str) or len(label.strip()) > 40:
+        raise serializers.ValidationError(
+            {"speaker_label": "发声人称呼或关系限 40 字以内"}
+        )
+    if source == Recording.SpeakerConsent.SELF and label.strip():
+        raise serializers.ValidationError({"speaker_label": "本人发声无需填写他人称呼"})
+    return {"speaker_consent_source": source, "speaker_label": label.strip()}
+
+
 class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer):
     publication_consent = serializers.ChoiceField(
         choices=["public-display-v1"], write_only=True, required=False
@@ -577,6 +593,9 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
             "audio_url",
             "media_id",
             "publication_consent",
+            "speaker_role",
+            "speaker_consent_source",
+            "speaker_label",
             "usage_dialect",
             "usage_dialect_id",
             "recorder",
@@ -596,6 +615,10 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
             "created_at",
             "updated_at",
         ]
+        extra_kwargs = {
+            "speaker_consent_source": {"write_only": True},
+            "speaker_label": {"write_only": True},
+        }
         read_only_fields = [
             "id",
             "recorder",
@@ -611,6 +634,16 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
         if not self.instance and not attrs.get("publication_consent"):
             raise serializers.ValidationError(
                 {"publication_consent": "请确认同意审核通过后公开展示"}
+            )
+        if self.instance is None:
+            attrs.update(speaker_declaration(attrs))
+        elif {
+            "speaker_consent_source",
+            "speaker_label",
+            "publication_consent",
+        }.intersection(attrs):
+            raise serializers.ValidationError(
+                {"speaker_consent_source": "请在退回后重投时确认发声人授权"}
             )
         gloss = attrs.get("original_gloss")
         if gloss is not None and not str(gloss).strip():

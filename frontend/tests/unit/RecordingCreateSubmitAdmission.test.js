@@ -56,7 +56,7 @@ function pageContext() {
     ownerScope: 'user:1',
     draftReady: true,
     audio: { path: 'blob:recording', durationMs: 1000 },
-    form: { original_gloss: '家乡话', usage_dialect_id: 1 },
+    form: { original_gloss: '家乡话', usage_dialect_id: 1, speaker_consent_source: 'self' },
     $refs: { form: { validate: vi.fn().mockResolvedValue(true) } },
     $nextTick: vi.fn().mockResolvedValue(),
   };
@@ -307,7 +307,7 @@ describe('recording submit admission', () => {
     restore.resolve({
       id: 'draft-B',
       entryId: 20,
-      form: { original_gloss: 'meaning B', usage_dialect_id: 2 },
+      form: { original_gloss: 'meaning B', usage_dialect_id: 2, speaker_consent_source: 'speaker_written' },
       audio: { path: 'blob:B', durationMs: 2000 },
     });
     await loading;
@@ -316,7 +316,11 @@ describe('recording submit admission', () => {
     await page.submit();
     expect(uploadFile.mock.calls[0][0]).toBe('blob:B');
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
-      original_gloss: 'meaning B', usage_dialect_id: 2, primary_entry_id: 20, duration_ms: 2000,
+      original_gloss: 'meaning B',
+      usage_dialect_id: 2,
+      primary_entry_id: 20,
+      duration_ms: 2000,
+      speaker_consent_source: 'speaker_written',
     }), expect.any(Object));
     entry.resolve();
   });

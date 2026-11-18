@@ -50,6 +50,7 @@ V2 全站聚合验收由 [#346](https://github.com/e-dialect/xiangsheng-box/issu
 | `pages/users/settings/email` | done | [#227](https://github.com/e-dialect/xiangsheng-box/issues/227) / [#344](https://github.com/e-dialect/xiangsheng-box/issues/344)：验证码、邮箱绑定流程与账户安全视觉层级 |
 | `pages/login/register` | done | [#228](https://github.com/e-dialect/xiangsheng-box/issues/228) / [PR #309](https://github.com/e-dialect/xiangsheng-box/pull/309)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：邮箱注册迁移到 BaseField/BaseButton，保留既有 API 契约并补字段错误与提交状态；[#389](https://github.com/e-dialect/xiangsheng-box/issues/389) 统一第二步返回修改账号的文字按钮语义与草稿保留 |
 | `pages/login/register/wechat` | done | [#230](https://github.com/e-dialect/xiangsheng-box/issues/230) / [PR #308](https://github.com/e-dialect/xiangsheng-box/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：BaseField/BaseButton、昵称确认、行内错误及可等待的微信授权注册 |
+| `pages/login/wechat-confirm` | done | 使用 PageShell、AuthJourney 和 BaseButton 显示发起端、编号及确认结果，发布后验收步骤见[部署说明](DEPLOYMENT.md#网页与-app-的微信登录) |
 | `pages/login/forget` | done | [#226](https://github.com/e-dialect/xiangsheng-box/issues/226) / [PR #308](https://github.com/e-dialect/xiangsheng-box/pull/308)（源自关闭的 [#209](https://github.com/e-dialect/xiangsheng-box/pull/209)）：分步找回、字段校验、提交状态与错误映射；[#389](https://github.com/e-dialect/xiangsheng-box/issues/389) 补齐第二步返回修改用户名动作并清理敏感重置草稿；不引入演示验证码 |
 | `pages/cans/create` | done | [#232](https://github.com/e-dialect/xiangsheng-box/issues/232) / [PR #282](https://github.com/e-dialect/xiangsheng-box/pull/282)：BaseForm / BaseField、按钮、加载、空态与共享反馈；保留方言级联、枚举 Picker、录音及草稿业务，见下方验收记录 |
 | `pages/pronunciations/create` | done | [#234](https://github.com/e-dialect/xiangsheng-box/issues/234)：PageShell + BaseForm/BaseField/BaseButton、统一加载/重试/反馈；保留写法 Picker、方言级联、联合校验、字段错误定位与成功返回 |
@@ -273,13 +274,12 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 ## 地方工具（#675、#700、#701）
 
 地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
-
 ## 录音投稿审核（#702）
 
-重新送审和下架均经 BaseForm 校验。校验期间按钮锁定，切换账号后旧操作不会提交。
-
-投稿页使用“同意并提交审核”按钮记录公开展示许可。录音详情复用 BaseField、BaseButton 和确认对话框，让本人查看退回理由、修改大意、换音频、重投或撤回。地区审核员在整理工作台切换“仅看录音审核队列”，试听后给出审核结论，已公开投稿可从详情填写理由并下架。
+投稿页使用“同意并提交审核”按钮记录公开展示许可。录音详情的重投和下架表单在共享 BaseForm 校验通过后才能提交，校验等待时锁定操作。详情复用 BaseField、BaseButton 和确认对话框，让本人查看退回理由、修改大意、换音频、重投或撤回。地区审核员在整理工作台切换“仅看录音审核队列”，试听后给出审核结论，已公开投稿可从详情填写理由并下架。
 
 新音频由 `POST /files` 转码为 MP3，编码过程使用临时文件，输入和输出各上限 5 MB。音频字节随数据库备份，受控播放地址位于 `/files/recording-media/<uuid>/`。H5 使用带登录凭证的临时 Blob 试听，微信使用带凭证的临时下载。匿名公开播放、审核员试听和撤回均使用同一权限判定。网关需将该前缀转发到 Django 并保留 `Cache-Control: private, no-store`，不得以静态文件或 CDN 缓存命中。
 
 上线前由站点负责人指定实际地区值班人，使用普通账号和地区审核账号在两站校验待审、退回、重投、公开和撤回，记录审核员撤权后的结果。迁移 0029 保留原有录音 URL 和可见性，已外发的旧 COS 地址或下载副本须单独清点。#479 继续跟踪上传后未提交的孤立音频。回退旧后端前需暂停投稿、审核与录音媒体访问，旧写入路径会立即公开录音。保留 0029 和新增数据，恢复支持审核的应用后再开放写入。
+
+长辈代录可选择发声人口头同意或书面同意，选填“家中长辈”等称呼或关系。登录账号作为提交人，公开详情仅展示本人发声或代录关系。审核员和提交人可查看同意来源与选填称呼。换音频后需再次选择，本地草稿和退回件保留原先已记录的选择。历史空值表示未记录，旧待审投稿需退回补充后批准。此处的声明仅适用于试听审核和公开展示。

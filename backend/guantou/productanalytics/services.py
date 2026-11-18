@@ -9,6 +9,8 @@ from django.db.models import Count
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
+from siteconfig.product_profiles import GENERAL_KEY, registered_request_profile
+
 from .models import ProductEvent, ProductEventDailySummary
 
 logger = logging.getLogger(__name__)
@@ -28,8 +30,14 @@ def daily_session_hash(session_id, received_at=None):
     ).hexdigest()
 
 
-def create_product_event(validated_data):
-    data = dict(validated_data)
+def share_site(request):
+    profile, _ = registered_request_profile(request)
+    return profile.pk if profile else GENERAL_KEY
+
+
+def create_product_event(validated_data, *, site=""):
+
+    data = {**validated_data, "site": site}
     session_id = data.pop("session_id")
     data["session_hash"] = daily_session_hash(session_id)
     return ProductEvent.objects.create(**data)
@@ -41,7 +49,9 @@ def aggregate_and_prune_product_events(now=None):
     today = timezone.localdate(now)
     grouped = (
         ProductEvent.objects.filter(received_at__date__lt=today)
-        .values("event_name", "platform", "surface", "result", "received_at__date")
+        .values(
+            "event_name", "platform", "site", "surface", "result", "received_at__date"
+        )
         .annotate(
             event_count=Count("id"),
             unique_sessions=Count("session_hash", distinct=True),
@@ -53,6 +63,7 @@ def aggregate_and_prune_product_events(now=None):
             date=row["received_at__date"],
             event_name=row["event_name"],
             platform=row["platform"],
+            site=row["site"],
             surface=row["surface"],
             result=row["result"],
             defaults={

@@ -147,3 +147,50 @@ viewports.forEach((viewport) => {
     }
   });
 });
+
+test('landscape keeps home sections reachable above a stable feed and tab bar', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await routeStableShellData(page);
+  let sections = ['tools', 'entries'];
+  await page.route('**/site-settings/product-profile', (route) => route.fulfill({
+    json: {
+      profile: {
+        key: 'pxm',
+        name: '兴化语记 2.0 内测版',
+        credit: 'powered by 乡声集盒',
+        home_sections: sections,
+        enabled_tools: ['pinyin'],
+        featured: [],
+      },
+      switch_targets: [{
+        key: 'box', name: '乡声集盒内测版', origin: 'https://box.test.edialect.top',
+      }],
+    },
+  }));
+
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '切换到乡声集盒内测版' })).toBeVisible();
+  const toggle = page.getByRole('button', { name: '首页栏目' });
+  const tool = page.getByRole('button', { name: '拼音方案' });
+  const tabBar = page.locator('.home-tab-bar');
+  const feed = page.locator('.recording-feed');
+  await expect(feed).toBeVisible();
+  const before = await feed.boundingBox();
+  expect(before.height).toBeGreaterThanOrEqual(250);
+  await expect(tool).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(tool).toBeVisible();
+  await expect(tabBar).toBeInViewport({ ratio: 1 });
+  expect((await feed.boundingBox()).height).toBe(before.height);
+  await tool.click();
+  await expect(page).toHaveURL(/\/pages\/tools\/local\?tool=pinyin$/);
+
+  sections = ['entries', 'recordings', 'collections'];
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '切换到乡声集盒内测版' })).toBeVisible();
+  await expect(toggle).toBeHidden();
+  await expect(tabBar).toBeInViewport({ ratio: 1 });
+  await expect(feed).toBeVisible();
+  expect((await feed.boundingBox()).height).toBeGreaterThanOrEqual(250);
+});

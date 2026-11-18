@@ -1,4 +1,6 @@
 import { notify } from '@/services/feedback';
+import { PRODUCT_EVENTS } from '@/services/productAnalytics';
+import { markWebShareUrl, trackShareObservation } from '@/services/shareObservation';
 
 export const WECHAT_SHARE_IMAGE = '/static/share-cover.png';
 
@@ -30,11 +32,17 @@ export function canUseSystemShare() {
   return typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 }
 
-function copyPageUrl(url, copiedTitle) {
+function copyPageUrl(url, copiedTitle, kind) {
   uni.setClipboardData({
     data: url,
-    success: () => notify({ title: copiedTitle }),
-    fail: () => notify({ title: '复制失败，请重试' }),
+    success() {
+      trackShareObservation(PRODUCT_EVENTS.SHARE_CLIPBOARD, kind, 'success');
+      notify({ title: copiedTitle });
+    },
+    fail() {
+      trackShareObservation(PRODUCT_EVENTS.SHARE_CLIPBOARD, kind, 'error');
+      notify({ title: '复制失败，请重试' });
+    },
   });
 }
 
@@ -60,15 +68,24 @@ export async function sharePage(message, copiedTitle) {
 
   if (typeof window === 'undefined') return;
   const mount = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const url = `${window.location.origin}${mount}${message.path}`;
+  const { url, kind } = markWebShareUrl(
+    `${window.location.origin}${mount}${message.path}`,
+    import.meta.env.BASE_URL,
+  );
   const payload = { title: message.title, url };
   if (canUseSystemShare() && (!navigator.canShare || navigator.canShare(payload))) {
     try {
+      trackShareObservation(PRODUCT_EVENTS.SHARE_SYSTEM, kind, 'attempt');
       await navigator.share(payload);
+      trackShareObservation(PRODUCT_EVENTS.SHARE_SYSTEM, kind, 'success');
       return;
     } catch (error) {
-      if (error?.name === 'AbortError') return;
+      if (error?.name === 'AbortError') {
+        trackShareObservation(PRODUCT_EVENTS.SHARE_SYSTEM, kind, 'cancelled');
+        return;
+      }
+      trackShareObservation(PRODUCT_EVENTS.SHARE_SYSTEM, kind, 'error');
     }
   }
-  copyPageUrl(url, copiedTitle);
+  copyPageUrl(url, copiedTitle, kind);
 }

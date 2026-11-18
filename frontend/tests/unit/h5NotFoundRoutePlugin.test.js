@@ -25,7 +25,14 @@ describe('H5 not-found route plugin', () => {
 
     expect(transformed).toContain("path: '/:pathMatch(.*)*'");
     expect(transformed).toContain("path: '/pages/error/not-found'");
-    expect(transformed).toContain('query: { path: to.path }');
+    expect(transformed).toContain('path: to.path');
+    const state = { __uniRoutes: [] };
+    const apply = new Function('window', 'globalThis', transformed);
+    apply(state, state);
+    const route = state.__uniRoutes[0];
+    expect(route.redirect({ path: '/pages/words/details', query: { id: '14', token: 'secret' } }).query)
+      .toEqual({ path: '/pages/words/details', legacyWord: '14' });
+    expect(route.redirect({ path: '/other', query: { key: 'hidden' } }).query).toEqual({ path: '/other' });
     expect(transformed.match(/guantouH5Routes\.push/g)).toHaveLength(1);
   });
 

@@ -344,3 +344,126 @@ class GovernanceApiTests(APITestCase):
         )
         response = self.client_for(expired).get("/curation/tasks/")
         self.assertEqual(response.status_code, 403)
+
+
+class PrivateSubmissionCurationTests(APITestCase):
+    client_for = GovernanceApiTests.client_for
+
+    def setUp(self):
+        GovernanceApiTests.setUp(self)
+        from .models import RecordingMedia
+
+        entry = Entry.objects.create(
+            summary="private submission",
+            visibility=False,
+            created_by=self.user,
+            usage_dialect=self.puxian,
+        )
+        media = RecordingMedia.objects.create(
+            owner=self.user, content=b"audio", duration_ms=800, generated_entry=entry
+        )
+        self.private_recording = Recording.objects.create(
+            media=media,
+            status=Recording.Status.DRAFT,
+            publication_consent="public-display-v1",
+            recorder=self.user,
+            original_gloss="private submission",
+            usage_dialect=self.puxian,
+            visibility=False,
+        )
+        self.private_entry = entry
+
+    def test_private_submission_cannot_be_reviewed_by_lexical_curator(self):
+        entry = self.private_entry
+        client = self.client_for(self.lexical)
+        self.assertEqual(client.get(f"/entries/{entry.id}/").status_code, 404)
+        response = client.post(
+            "/curation/actions/",
+            {
+                "action_type": "review",
+                "target_type": "entry",
+                "target_id": entry.id,
+                "reason": "核对条目",
+                "changes": {"status": "reviewed"},
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        entry.refresh_from_db()
+        self.assertNotEqual(entry.status, Entry.Status.REVIEWED)
+        self.assertFalse(CurationAction.objects.filter(actor=self.lexical).exists())
+
+    def test_private_sources_and_competing_targets_are_inaccessible(self):
+        public = Entry.objects.create(
+            summary="public", visibility=True, usage_dialect=self.puxian
+        )
+        public_recording = Recording.objects.create(
+            original_gloss="public", visibility=True, usage_dialect=self.puxian
+        )
+        requests = [
+            (
+                "merge_entries",
+                "entry",
+                public.id,
+                {"source_entry_ids": [self.private_entry.id]},
+            ),
+            (
+                "preserve_competing",
+                "recording",
+                self.private_recording.id,
+                {"entry_id": public.id},
+            ),
+            (
+                "preserve_competing",
+                "recording",
+                public_recording.id,
+                {"entry_id": self.private_entry.id},
+            ),
+        ]
+        for action, target, target_id, changes in requests:
+            with self.subTest(action=action, changes=changes):
+                response = self.client_for(self.lexical).post(
+                    "/curation/actions/",
+                    {
+                        "action_type": action,
+                        "target_type": target,
+                        "target_id": target_id,
+                        "reason": "核对资料",
+                        "evidence_ids": [self.evidence.id],
+                        "changes": changes,
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400, response.data)
+        self.assertFalse(CurationAction.objects.filter(actor=self.lexical).exists())
+        self.private_entry.refresh_from_db()
+        self.assertNotEqual(self.private_entry.status, Entry.Status.REDIRECTED)
+
+    def test_visible_public_and_authorized_private_reviews_remain_allowed(self):
+        CuratorGrant.objects.create(
+            user=self.user,
+            role=CuratorGrant.Role.LEXICAL,
+            granted_by=self.staff,
+            reason="授权整理",
+        )
+        public = Entry.objects.create(
+            summary="public", visibility=True, usage_dialect=self.puxian
+        )
+        for actor, entry in [
+            (self.lexical, public),
+            (self.user, self.private_entry),
+            (self.staff, self.private_entry),
+        ]:
+            with self.subTest(actor=actor.username):
+                response = self.client_for(actor).post(
+                    "/curation/actions/",
+                    {
+                        "action_type": "review",
+                        "target_type": "entry",
+                        "target_id": entry.id,
+                        "reason": "核对条目",
+                        "changes": {"status": "reviewed"},
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 201, response.data)

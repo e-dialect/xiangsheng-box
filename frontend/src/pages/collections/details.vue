@@ -378,6 +378,7 @@
   </PageShell>
 </template>
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import TSwitch from '@tdesign/uniapp/switch/switch.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
@@ -529,6 +530,7 @@ export default {
       this.error = '';
       try {
         this.box = await getCollection(this.id);
+        observeSharedOpen(collectionShareMessage(this.box)?.path);
         this.form = {
           title: this.box.title,
           description: this.box.description,

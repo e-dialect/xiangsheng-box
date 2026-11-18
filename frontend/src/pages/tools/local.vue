@@ -1,7 +1,10 @@
 <template>
   <PageShell title="地方工具">
     <view class="tools-wrap">
-      <view class="tools-selector">
+      <view
+        v-if="tools.length && tool"
+        class="tools-selector"
+      >
         <view>
           <text class="tools-caption">
             当前方言
@@ -24,7 +27,10 @@
         @action="openSelector"
       />
 
-      <view class="tools-nav">
+      <view
+        v-if="tools.length && tool"
+        class="tools-nav"
+      >
         <BaseButton
           v-for="item in tools"
           :key="item.id"
@@ -40,6 +46,11 @@
         text="正在加载地方资料…"
       />
       <EmptyState
+        v-else-if="!toolEnabled"
+        title="当前站点暂未启用这项工具"
+        :description="tools.length ? '还可以使用上方其他工具。' : '可以返回继续查词或听乡音。'"
+      />
+      <EmptyState
         v-else-if="error"
         title="无法加载地方资料"
         description="请检查网络后重试。"
@@ -50,6 +61,8 @@
         v-else-if="!material"
         :title="missingTitle"
         :description="missingDescription"
+        :action-text="tool === 'kinship' && dialect ? '补充当地称谓' : ''"
+        @action="suggestKinship"
       />
       <view
         v-else
@@ -99,6 +112,7 @@
 </template>
 
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
@@ -108,20 +122,18 @@ import LocalQuiz from '@/components/localtools/LocalQuiz.vue';
 import MaterialSource from '@/components/localtools/MaterialSource.vue';
 import PinyinGuide from '@/components/localtools/PinyinGuide.vue';
 import PageShell from '@/components/PageShell.vue';
+import { requireAuth } from '@/services/authGuard';
+import { contentFeedbackParams } from '@/services/contentFeedback';
 import { listAllDialects } from '@/services/guantou';
 import {
   loadLocalMaterials, quizShareMessage, readLocalParam, resolveLocalDialect,
 } from '@/services/localTools';
 import { hasShareTarget, sharePage, showWechatShareMenu } from '@/services/pageShare';
+import { openPage, ROUTES } from '@/services/navigation';
 import { isWechatMiniProgram } from '@/services/platform';
+import { enabledLocalTools, loadProductProfile, LOCAL_TOOL_OPTIONS } from '@/services/productProfile';
 import { resolveSessionUserId } from '@/services/session';
 import { getUserInfo } from '@/services/user';
-
-const TOOLS = Object.freeze([
-  { id: 'pinyin', label: '拼音方案' },
-  { id: 'quiz', label: '聪明花开' },
-  { id: 'kinship', label: '亲戚计算器' },
-]);
 
 export default {
   components: {
@@ -137,8 +149,7 @@ export default {
   },
   data() {
     return {
-      tools: TOOLS,
-      tool: 'pinyin',
+      tool: '',
       routeDialect: '',
       selectedDialect: '',
       profileDialect: '',
@@ -157,6 +168,10 @@ export default {
     };
   },
   computed: {
+    tools: enabledLocalTools,
+    toolEnabled() {
+      return this.tools.some(({ id }) => id === this.tool);
+    },
     dialect() {
       return resolveLocalDialect({
         chosen: this.selectedDialect,
@@ -166,7 +181,7 @@ export default {
       });
     },
     material() {
-      return this.packs[this.tool];
+      return this.toolEnabled ? this.packs[this.tool] : null;
     },
     shareMessage() {
       return this.tool === 'quiz'
@@ -191,21 +206,26 @@ export default {
     },
   },
   async onLoad(query = {}) {
+    const { generation } = this;
     this.routeDialect = readLocalParam(query.dialect);
     this.quizVersion = readLocalParam(query.quiz);
-    this.tool = TOOLS.some((item) => item.id === query.tool) ? query.tool : 'pinyin';
+    await loadProductProfile();
+    if (generation !== this.generation) return;
+    this.tool = LOCAL_TOOL_OPTIONS.some((item) => item.id === query.tool)
+      ? query.tool : (this.tools[0]?.id || '');
     this.userId = resolveSessionUserId();
     if (this.userId && !this.quizVersion && query.tool !== 'pinyin') {
       const cachedUser = getApp().globalData.userInfo;
       try {
         const user = cachedUser?.id === this.userId
           ? cachedUser : (await getUserInfo(this.userId, true)).user;
+        if (generation !== this.generation) return;
         this.profileDialect = user?.primary_dialect?.qualified_code || '';
       } catch {
         // The requested station dialect still works if the profile is unavailable.
       }
     }
-    await this.refresh();
+    if (generation === this.generation) await this.refresh();
   },
   onShow() {
     this.syncShareMenu();
@@ -221,6 +241,10 @@ export default {
     return message ? { title: message.title, query: message.path.split('?')[1] } : null;
   },
   methods: {
+    suggestKinship() {
+      const params = contentFeedbackParams('kinship', this.dialect);
+      if (params && requireAuth('content_feedback', params)) openPage(ROUTES.mailSend, params);
+    },
     syncShareMenu() {
       if (!this.wechat) return;
       if (this.shareMessage) showWechatShareMenu();
@@ -233,14 +257,18 @@ export default {
       this.packs = {};
       this.quizUnavailable = false;
       this.error = false;
-      this.loading = Boolean(this.dialect);
-      if (!this.dialect) return;
+      this.loading = Boolean(this.dialect && this.tools.length);
+      if (!this.loading) return;
       try {
         const response = await loadLocalMaterials(this.dialect, this.quizVersion);
         if (request !== this.generation) return;
         this.currentDialect = response.dialect;
         this.packs = response.packs || {};
         this.quizUnavailable = response.quiz_unavailable;
+        if (this.quizVersion && this.tool === 'quiz' && this.toolEnabled && this.packs.quiz) {
+          const shared = quizShareMessage(this.currentDialect.qualified_code, this.packs.quiz);
+          observeSharedOpen(shared?.path);
+        }
       } catch {
         if (request === this.generation) this.error = true;
       } finally {

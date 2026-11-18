@@ -4,6 +4,7 @@ import {
 } from 'vitest';
 import BaseButton from '@/components/BaseButton.vue';
 import LoginPage from '@/pages/login/login.vue';
+import WechatConfirm from '@/pages/login/wechat-confirm.vue';
 import { isCapabilityEnabled } from '@/services/capabilities';
 import { mpLogin, normalLogin } from '@/services/login';
 import { peekInterceptIntent } from '@/services/authGuard';
@@ -38,6 +39,17 @@ function findButton(wrapper, text) {
 }
 
 describe('WeChat-first login', () => {
+  it('opens the account page for an existing user who selects binding', async () => {
+    uni.navigateTo = vi.fn();
+    const wrapper = mount(WechatConfirm, {
+      global: { stubs: { PageShell: { template: '<main><slot /></main>' } } },
+    });
+    await wrapper.setData({ details: { reference: '123456' } });
+    findButton(wrapper, '已有账号，先绑定微信').vm.$emit('click');
+    expect(uni.navigateTo).toHaveBeenCalledWith({ url: '/pages/users/me' });
+    wrapper.unmount();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.uni = { getStorageSync: vi.fn(() => '') };

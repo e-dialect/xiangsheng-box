@@ -19,7 +19,7 @@ function pageContext(refName, validate) {
     ...RecordingDetails.methods,
     id: 42,
     recording: { updated_at: 'revision-before-review' },
-    revision: { original_gloss: ' 修订含义 ' },
+    revision: { original_gloss: ' 修订含义 ', speaker_consent_source: 'self', speaker_label: '' },
     replacement: { path: '/replacement.wav' },
     takedown: { reason: ' 说明为何下架 ' },
     sessionToken,
@@ -67,6 +67,8 @@ describe.each([
       expect(resubmitRecording).toHaveBeenCalledWith(42, {
         original_gloss: '修订含义',
         publication_consent: 'public-display-v1',
+        speaker_consent_source: 'self',
+        speaker_label: '',
         audio_url: '/replacement-media',
       });
     } else {

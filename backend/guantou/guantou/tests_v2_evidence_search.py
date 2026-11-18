@@ -1,7 +1,14 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Entry, EvidenceLink, EvidenceRecord
+from .models import (
+    Dialect,
+    Entry,
+    EvidenceLink,
+    EvidenceRecord,
+    Recording,
+    RecordingEntryLink,
+)
 
 
 class EntryEvidenceSearchTests(TestCase):
@@ -64,6 +71,48 @@ class EntryEvidenceSearchTests(TestCase):
             },
             [self.split],
         )
+
+    def test_recording_only_and_link_only_evidence_follow_current_entry_links(self):
+        dialect = Dialect.objects.create(name="地区示例", code="example")
+        recording = Recording.objects.create(usage_dialect=dialect, visibility=True)
+        link = RecordingEntryLink.objects.create(
+            recording=recording, entry=self.no_evidence
+        )
+        for target, text in (
+            ({"recording": recording}, "录音修订"),
+            ({"recording_entry_link": link}, "词条对读"),
+        ):
+            evidence = EvidenceRecord.objects.create(
+                source_type="archive", original_gloss=text
+            )
+            EvidenceLink.objects.create(evidence=evidence, **target)
+            self.assert_results({"q": text}, [self.no_evidence])
+
+        def assert_count(expected):
+            self.assert_results(
+                {"source_type": "archive"}, [self.no_evidence] if expected else []
+            )
+            self.assertEqual(
+                self.client.get(f"/entries/{self.no_evidence.pk}/").data[
+                    "evidence_count"
+                ],
+                expected,
+            )
+            self.assertEqual(
+                self.client.get(
+                    "/evidence-records/", {"entry_id": self.no_evidence.pk}
+                ).data["count"],
+                expected,
+            )
+
+        assert_count(2)
+        link.status = RecordingEntryLink.Status.REJECTED
+        link.save()
+        assert_count(0)
+        link.status = RecordingEntryLink.Status.ACCEPTED
+        link.is_current = False
+        link.save()
+        assert_count(0)
 
     def test_without_source_filters_entries_without_evidence_remain(self):
         self.assert_results({}, [self.split, self.match, self.oral, self.no_evidence])

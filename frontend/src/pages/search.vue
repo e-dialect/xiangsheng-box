@@ -170,7 +170,7 @@
           size="small"
           variant="ghost"
           :open-type="shareType"
-          :text="shareType || canSystemShare ? '分享查词结果' : '复制关键词链接'"
+          :text="shareButtonText"
           @click="shareKeyword"
         />
       </view>
@@ -425,6 +425,10 @@
 </template>
 
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
+import {
+  publicSearchShareParams, readPublicSearchFilters, SOURCE_TYPES, WRITING_TYPES,
+} from '@/services/publicSearchFilters';
 import TCell from '@tdesign/uniapp/cell/cell.vue';
 import TCollapse from '@tdesign/uniapp/collapse/collapse.vue';
 import TCollapsePanel from '@tdesign/uniapp/collapse-panel/collapse-panel.vue';
@@ -469,29 +473,6 @@ const SWITCH_FILTERS = {
   source: 'source',
   concept: 'concept',
 };
-
-const WRITING_TYPES = [
-  { label: '不限', value: '' },
-  { label: '汉字正字', value: 'orthographic' },
-  { label: '俗写', value: 'popular' },
-  { label: '借字', value: 'loan' },
-  { label: '拟音', value: 'phonetic' },
-  { label: '罗马字', value: 'romanization' },
-  { label: '待考写法', value: 'uncertain' },
-];
-
-const SOURCE_TYPES = [
-  { label: '不限', value: '' },
-  { label: '用户原话', value: 'user_statement' },
-  { label: '口述', value: 'oral' },
-  { label: '田野记录', value: 'fieldwork' },
-  { label: '书籍', value: 'book' },
-  { label: '论文或文章', value: 'article' },
-  { label: '档案', value: 'archive' },
-  { label: '网页', value: 'web' },
-  { label: '旧库原文', value: 'legacy' },
-  { label: '其他', value: 'other' },
-];
 
 function defaultFilters() {
   return {
@@ -601,19 +582,23 @@ export default {
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
-      if (!hasShareTarget() || this.loading || this.errorMessage
-        || !this.entries.length || !this.submittedKeyword) {
-        return null;
-      }
+      const params = publicSearchShareParams(this.submittedKeyword, this.appliedFilters);
+      const filtered = Boolean(params.filters);
+      if (!hasShareTarget() || this.loading || this.errorMessage || !this.entries.length
+        || (!this.submittedKeyword && !filtered)) return null;
       const characters = Array.from(this.submittedKeyword);
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
-      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      const path = pageUrl(ROUTES.search, params);
+      const query = pageUrl('', { sharedKeyword: params.key, filters: params.filters }).slice(1);
       return {
-        title: `查词｜${keyword} · ${currentProductName()}`,
-        path,
-        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+        title: `查词｜${keyword || '筛选结果'} · ${currentProductName()}`, path, query, filtered,
       };
+    },
+    shareButtonText() {
+      const action = this.shareType || this.canSystemShare ? '分享' : '复制';
+      const subject = this.keywordShare?.filtered ? '查词结果' : '关键词';
+      return `${action}${subject}${action === '复制' ? '链接' : ''}`;
     },
     productSwitchParams() {
       const { filters } = this;
@@ -704,8 +689,11 @@ export default {
       }
     }
     // #endif
-    this.siteScopeReady = this.initializeSiteScope(options);
-    if (!this.filters.keyword) {
+    const sharedFilters = readPublicSearchFilters(options.filters);
+    Object.assign(this.filters, sharedFilters);
+    const filtered = Object.keys(sharedFilters).length > 0;
+    this.siteScopeReady = this.initializeSiteScope(options, filtered);
+    if (!this.filters.keyword && !filtered) {
       const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
       if (!switchKeys.some((key) => options[key])) return;
       await this.siteScopeReady;
@@ -725,9 +713,10 @@ export default {
   },
   // #endif
   methods: {
-    async initializeSiteScope(options) {
+    async initializeSiteScope(options, filtered = false) {
       const explicitDialect = typeof options.dialect === 'string';
-      const legacyShare = typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
+      const sharedSearch = filtered
+        || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
       Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
         if (typeof options[key] === 'string') this.filters[field] = options[key];
       });
@@ -740,7 +729,7 @@ export default {
         this.filters.dialectMatch = options.dialect_scope === 'exact' ? 'exact' : 'subtree';
         return;
       }
-      if (legacyShare && !explicitDialect) return;
+      if (sharedSearch && !explicitDialect) return;
       const code = explicitDialect
         ? options.dialect : (await loadProductProfile()).default_dialect;
       if (!code || code === 'all') return;
@@ -778,7 +767,7 @@ export default {
     goCollections,
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
-      return sharePage(this.keywordShare, '关键词链接已复制');
+      return sharePage(this.keywordShare, this.keywordShare?.filtered ? '查词结果链接已复制' : '关键词链接已复制');
       // #endif
     },
     clearHistory() { clearSearchHistory(); this.history = []; },
@@ -867,6 +856,9 @@ export default {
         this.next = response?.next || null;
         this.page = 1;
         this.appliedFilters = filters;
+        observeSharedOpen(
+          pageUrl(ROUTES.search, publicSearchShareParams(this.submittedKeyword, filters)),
+        );
         trackProductEvent(PRODUCT_EVENTS.ENTRY_SEARCH, {
           surface: 'search',
           result: this.total ? 'success' : 'empty',

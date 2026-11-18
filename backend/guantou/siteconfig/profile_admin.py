@@ -8,13 +8,32 @@ from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.views.decorators.http import require_http_methods
 
+from localtools.models import MaterialPack
+
 from .models import ProductProfile, ProductProfileRevision
 from .product_profiles import MAX_FEATURED, publish_revision, revision_payload
+from .profile_layout import HOME_SECTION_LABELS
 
 FEATURE_LABELS = {"词条": "entry", "录音": "recording", "集盒": "collection"}
+SECTION_BY_LABEL = {label: key for key, label in HOME_SECTION_LABELS.items()}
 
 
 class ProductProfileRevisionForm(forms.ModelForm):
+    home_sections = forms.CharField(
+        label="首页栏目",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 5}),
+        help_text="每行填写一个栏目名称，按行序展示。可选："
+        + "、".join(SECTION_BY_LABEL)
+        + "。留空时隐藏可选栏目。",
+    )
+    enabled_tools = forms.MultipleChoiceField(
+        label="启用工具",
+        required=False,
+        choices=MaterialPack.Kind.choices,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="供本站入口、地方工具页和词条快捷链接使用。",
+    )
     featured = forms.CharField(
         label="精选",
         required=False,
@@ -31,17 +50,33 @@ class ProductProfileRevisionForm(forms.ModelForm):
             "credit",
             "default_dialect",
             "local_tools_dialect",
+            "home_sections",
+            "enabled_tools",
             "featured",
         )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if "home_sections" in self.fields:
+            self.initial["home_sections"] = "\n".join(
+                HOME_SECTION_LABELS[item] for item in self.instance.home_sections
+            )
         if "featured" in self.fields:
             labels = {value: label for label, value in FEATURE_LABELS.items()}
             self.initial["featured"] = "\n".join(
                 f"{labels[item['type']]} {item['id']}"
                 for item in self.instance.featured
             )
+
+    def clean_home_sections(self):
+        lines = [
+            line.strip()
+            for line in self.cleaned_data["home_sections"].splitlines()
+            if line.strip()
+        ]
+        if any(label not in SECTION_BY_LABEL for label in lines):
+            raise ValidationError("请使用表单提示中的栏目名称。")
+        return [SECTION_BY_LABEL[label] for label in lines]
 
     def clean_featured(self):
         features = []
@@ -197,6 +232,8 @@ class ProductProfileRevisionAdmin(admin.ModelAdmin):
                     credit=revision.credit,
                     default_dialect=revision.default_dialect,
                     local_tools_dialect=revision.local_tools_dialect,
+                    home_sections=revision.home_sections,
+                    enabled_tools=revision.enabled_tools,
                     featured=revision.featured,
                 )
                 self.log_addition(request, draft, f"从版本 {revision.pk} 复制")
@@ -227,6 +264,7 @@ class ProductProfileRevisionAdmin(admin.ModelAdmin):
                     request, "；".join(error.messages), level=messages.ERROR
                 )
             return redirect("admin:siteconfig_revision_preview", revision.pk)
+        profile = revision_payload(revision)
         return TemplateResponse(
             request,
             "siteconfig/revision_preview.html",
@@ -235,7 +273,15 @@ class ProductProfileRevisionAdmin(admin.ModelAdmin):
                 "opts": self.model._meta,
                 "title": f"预览 {revision}",
                 "revision": revision,
-                "profile": revision_payload(revision),
+                "profile": profile,
+                "home_section_labels": [
+                    HOME_SECTION_LABELS[key] for key in profile["home_sections"]
+                ],
+                "enabled_tool_labels": [
+                    label
+                    for key, label in MaterialPack.Kind.choices
+                    if key in profile["enabled_tools"]
+                ],
                 "status": self.state(revision),
                 "can_publish": can_publish
                 and revision.pk != revision.profile.active_revision_id,

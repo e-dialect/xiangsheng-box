@@ -2,6 +2,7 @@ import { contentFeedbackParams } from '@/services/contentFeedback';
 import { toLoginPage } from '@/routers/login';
 import {
   clearInterceptIntent,
+  peekInterceptIntent,
   saveInterceptIntent,
 } from '@/services/authGuard';
 import {
@@ -23,6 +24,7 @@ const GUEST_RETURN_ROUTES = new Set([
   ROUTES.entryDetail,
   ROUTES.recordingDetail,
   ROUTES.collectionDetail,
+  ROUTES.localTools,
   ROUTES.circleList,
   ROUTES.circleDetail,
   ROUTES.userDetail,
@@ -37,7 +39,7 @@ export function resolveAuthDestination(intent) {
     return routeDestination(ROUTES.mine);
   }
 
-  if (intent.action === 'interact_entry' && context.entryId) {
+  if (['interact_entry', 'bookmark_entry'].includes(intent.action) && context.entryId) {
     return routeDestination(ROUTES.entryDetail, { id: context.entryId });
   }
   if (intent.action === 'interact_recording' && context.recordingId) {
@@ -99,13 +101,51 @@ export function canReturnToGuestPage() {
   return GUEST_RETURN_ROUTES.has(`/${route}`);
 }
 
-export function cancelLogin() {
+function validGuestObjectId(id) {
+  if (typeof id === 'number') return Number.isSafeInteger(id) && id > 0;
+  return typeof id === 'string' && /^[1-9]\d{0,18}$/.test(id);
+}
+
+export function guestReturnDestination(intent) {
+  const context = intent?.context;
+  if (intent?.action === 'content_feedback') {
+    const params = contentFeedbackParams(context?.object_type, context?.object_id);
+    if (!params?.object_id) return null;
+    if (params.object_type === 'kinship') {
+      return routeDestination(ROUTES.localTools, { tool: 'kinship', dialect: params.object_id });
+    }
+    const routes = {
+      entry: ROUTES.entryDetail,
+      recording: ROUTES.recordingDetail,
+      collection: ROUTES.collectionDetail,
+    };
+    return routeDestination(routes[params.object_type], { id: params.object_id });
+  }
+  if (intent?.action === 'record_recording') {
+    return validGuestObjectId(context?.entryId)
+      ? routeDestination(ROUTES.entryDetail, { id: context.entryId }) : null;
+  }
+  const destination = resolveAuthDestination(intent);
+  const route = `/${destination.route}`;
+  const objectIds = {
+    [ROUTES.entryDetail]: context?.entryId,
+    [ROUTES.recordingDetail]: context?.recordingId,
+    [ROUTES.userDetail]: context?.userId,
+    [ROUTES.circleDetail]: context?.circleId,
+  };
+  if (Object.prototype.hasOwnProperty.call(objectIds, route)
+    && !validGuestObjectId(objectIds[route])) return null;
+  return GUEST_RETURN_ROUTES.has(route) ? destination : null;
+}
+
+export function cancelLogin(intent = peekInterceptIntent()) {
+  const destination = guestReturnDestination(intent);
   clearInterceptIntent();
   if (canReturnToGuestPage()) {
     goBack(ROUTES.search);
     return;
   }
-  openPage(ROUTES.search, {}, { reset: true });
+  openPage(destination?.url || ROUTES.search, {}, { reset: true });
 }
 
 export default {

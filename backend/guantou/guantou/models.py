@@ -1644,6 +1644,30 @@ class Recording(models.Model):
         on_delete=models.PROTECT,
         related_name="recording",
     )
+
+    class SpeakerConsent(models.TextChoices):
+        SELF = "self", "本人发声并确认"
+        ORAL = "speaker_oral", "发声人口头同意"
+        WRITTEN = "speaker_written", "发声人书面同意"
+
+    speaker_consent_source = models.CharField(
+        max_length=24, choices=SpeakerConsent.choices, blank=True
+    )
+    speaker_label = models.CharField(
+        max_length=40, blank=True, verbose_name="发声人称呼或关系"
+    )
+
+    @property
+    def speaker_role(self):
+        if self.speaker_consent_source == self.SpeakerConsent.SELF:
+            return "self"
+        if self.speaker_consent_source in (
+            self.SpeakerConsent.ORAL,
+            self.SpeakerConsent.WRITTEN,
+        ):
+            return "other"
+        return "unknown"
+
     review_reason = models.TextField(blank=True)
     publication_consent = models.CharField(max_length=40, blank=True)
     audio_url = models.URLField(verbose_name="音频")
