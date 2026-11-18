@@ -273,18 +273,16 @@ class DependentScopeTests(TestCase):
         self.assertEqual(response.status_code, 200, response.data)
 
     def test_initial_authored_link_allows_draft_edit_until_actual_review(self):
-        response = self.client_for(self.owner).post(
-            "/recordings/",
-            {
-                "original_gloss": "clip",
-                "usage_dialect_id": self.root.id,
-                "audio_url": "https://example.test/a.wav",
-            },
-            format="json",
+        # Existing draft records retain their pre-moderation scope-edit rules.
+        recording = self.make_recording()
+        link = RecordingEntryLink.objects.create(
+            recording=recording,
+            entry=self.entry,
+            role="primary",
+            status="accepted",
+            created_by=self.owner,
+            review_reason="录制者初始著录",
         )
-        self.assertEqual(response.status_code, 201, response.data)
-        recording = Recording.objects.get(pk=response.data["id"])
-        link = recording.entry_links.get()
         self.assertEqual(link.review_reason, "录制者初始著录")
         response = self.client_for(self.owner).patch(
             f"/recordings/{recording.id}/",

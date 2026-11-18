@@ -369,7 +369,7 @@
             提交前，请确认公开范围
           </view>
           <view class="record-submit__note">
-            提交后将公开为初稿，其他用户可以收听，审核状态为待核对。写法和专业读音可以由你或整理员继续补充；保存草稿仅保留在当前设备的浏览器中。
+            请确认已取得说话人同意。点击下方按钮即同意审核员试听，以及审核通过后在本站公开录音和所填资料。审核前仅你和有权限的审核员可听，你可在详情中撤回。
           </view>
           <view
             class="record-submit__status"
@@ -382,7 +382,7 @@
             size="large"
             :loading="submitting || validatingSubmission"
             :disabled="!draftReady || submitted || isSubmissionLocked() || savingDraft"
-            :text="submitted ? '已提交' : '提交并公开'"
+            :text="submitted ? '已提交' : '同意并提交审核'"
             @click="submit"
           />
           <text class="record-section__help">
@@ -714,6 +714,7 @@ export default {
         return {
           restorable: unchanged && !draft.audioError,
           message,
+          sourceAudioPath: audioPath,
           audioPath: draft.audio?.path || audioPath,
         };
       } catch (error) {
@@ -727,6 +728,7 @@ export default {
         return {
           restorable: false,
           message: error.message,
+          sourceAudioPath: audioPath,
           audioPath: error.persistedAudio?.path || audioPath,
         };
       } finally { this.savingDraft = false; }
@@ -880,13 +882,13 @@ export default {
         const savedDraft = await this.saveDraft({ silent: true, canPresent });
         if (!hasCurrentOwner()) return;
         // Native saveFile moves the temporary file; use its persisted location.
-        const uploaded = await uploadFile(
-          savedDraft?.audioPath || submission.audio.path,
-          requestOptions,
-        );
+        const persistedPath = savedDraft?.sourceAudioPath === submission.audio.path
+          ? savedDraft.audioPath : submission.audio.path;
+        const uploaded = await uploadFile(persistedPath, requestOptions);
         if (!hasCurrentOwner()) return;
         const payload = {
           audio_url: uploaded.url,
+          publication_consent: 'public-display-v1',
           usage_dialect_id: Number(submission.form.usage_dialect_id),
           recording_type: submission.form.recording_type || 'word',
           original_gloss: String(submission.form.original_gloss).trim(),

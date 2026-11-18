@@ -1,6 +1,8 @@
 from django.db import transaction
 from rest_framework import serializers
 
+from files.recording_media import submission_asset
+
 from .models import (
     Concept,
     CurationAction,
@@ -466,6 +468,10 @@ class EntrySerializer(ProtectedScopeUpdateMixin, EntryCardSerializer):
         return entry
 
     def update(self, instance, validated_data):
+        if "visibility" in validated_data and hasattr(instance, "submission_media"):
+            raise serializers.ValidationError(
+                {"visibility": "投稿生成的词条随录音审核和撤回更新"}
+            )
         raw_summary = validated_data.pop("summary", None)
         raw_writing = str(validated_data.pop("initial_writing", "") or "")
         writing_type = validated_data.pop(
@@ -526,6 +532,10 @@ class RecordingEntryLinkRefSerializer(serializers.ModelSerializer):
 
 
 class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer):
+    publication_consent = serializers.ChoiceField(
+        choices=["public-display-v1"], write_only=True, required=False
+    )
+    media_id = serializers.UUIDField(read_only=True, allow_null=True)
     scope_field = "usage_dialect"
     scope_target_type = "recording"
     usage_dialect = DialectRefSerializer(read_only=True)
@@ -565,6 +575,8 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
         fields = [
             "id",
             "audio_url",
+            "media_id",
+            "publication_consent",
             "usage_dialect",
             "usage_dialect_id",
             "recorder",
@@ -587,6 +599,7 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
         read_only_fields = [
             "id",
             "recorder",
+            "visibility",
             "status",
             "evidence_count",
             "created_at",
@@ -595,6 +608,10 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
+        if not self.instance and not attrs.get("publication_consent"):
+            raise serializers.ValidationError(
+                {"publication_consent": "请确认同意审核通过后公开展示"}
+            )
         gloss = attrs.get("original_gloss")
         if gloss is not None and not str(gloss).strip():
             raise serializers.ValidationError(
@@ -628,12 +645,16 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
         request = self.context["request"]
         dialect = validated_data["usage_dialect"]
         with transaction.atomic():
+            asset = submission_asset(validated_data["audio_url"], request.user)
             if entry is None:
                 entry = Entry.objects.create(
+                    visibility=False,
                     summary=raw_gloss.strip(),
                     usage_dialect=dialect,
                     created_by=request.user,
                 )
+                asset.generated_entry = entry
+                asset.save(update_fields=["generated_entry"])
                 sense = EntrySense.objects.create(
                     entry=entry,
                     gloss=raw_gloss.strip(),
@@ -651,11 +672,11 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
                         relation_type=EntryWriting.RelationType.PRIMARY,
                         created_by=request.user,
                     )
-            # Submitted evidence is public before review (ADR-0006). Keep the
-            # model default private for imports and preserve explicit hiding.
-            validated_data.setdefault("visibility", True)
+            validated_data["visibility"] = False
+            validated_data["duration_ms"] = asset.duration_ms
             recording = Recording.objects.create(
                 original_gloss=raw_gloss.strip(),
+                media=asset,
                 recorder=request.user,
                 **validated_data,
             )
@@ -680,20 +701,12 @@ class RecordingSerializer(ProtectedScopeUpdateMixin, serializers.ModelSerializer
             for target in (
                 {"recording": recording},
                 {"recording_entry_link": link},
-                {"entry": entry},
             ):
                 EvidenceLink.objects.create(
                     evidence=evidence,
                     relation_type=EvidenceLink.RelationType.SUBMITTED,
                     created_by=request.user,
                     **target,
-                )
-            if sense:
-                EvidenceLink.objects.create(
-                    evidence=evidence,
-                    sense=sense,
-                    relation_type=EvidenceLink.RelationType.SUBMITTED,
-                    created_by=request.user,
                 )
         return recording
 

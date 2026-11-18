@@ -46,6 +46,14 @@ export function createRecording(payload, options) {
   return request.post('/recordings/', payload, false, options);
 }
 
+export function resubmitRecording(id, payload) {
+  return request.post(`/recordings/${id}/resubmit/`, payload);
+}
+
+export function withdrawRecording(id) {
+  return request.post(`/recordings/${id}/withdraw/`, {});
+}
+
 export function createUsageAttestation(entryId, dialectId, note = '') {
   return request.post('/usage-attestations/', {
     entry_id: Number(entryId),

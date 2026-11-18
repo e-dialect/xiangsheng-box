@@ -36,7 +36,7 @@ for (const theme of ['light', 'dark']) {
         const recordButton = await page.locator('.record-primary.t-button').boundingBox();
         expect(recordButton.width).toBeGreaterThanOrEqual(88);
         expect(Math.abs(recordButton.width - recordButton.height)).toBeLessThanOrEqual(1);
-        await page.getByRole('button', { name: '提交并公开', exact: true }).scrollIntoViewIfNeeded();
+        await page.getByRole('button', { name: '同意并提交审核', exact: true }).scrollIntoViewIfNeeded();
         await expect(page.getByText('草稿仅保存在当前设备，不会公开。')).toBeVisible();
         await expect(page.getByRole('button', { name: '保存草稿', exact: true })).toHaveCount(1);
       }
