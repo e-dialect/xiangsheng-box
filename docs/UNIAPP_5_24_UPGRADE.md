@@ -1,6 +1,16 @@
 # UniApp 5.24 成组升级记录
 
-更新时间：2026-09-24；跟踪 Issue：#353。文件名保留 5.24 是因为它记录了那次成组升级的决策口径，当前生效批次见下方「锁定矩阵」。
+升级记录截至 2026-09-24，跟踪 Issue 为 #353。当前批次及工具链版本以 [`frontend/package.json`](../frontend/package.json) 和 [`frontend/yarn.lock`](../frontend/yarn.lock) 为准。下方锁定矩阵记录当时的验证基线。
+
+## DCloud / Vue 工具链依赖维护
+
+常规更新中，Dependabot 按批次提出 DCloud 编译器、运行时和平台包的更新。`@vitejs/plugin-vue`、`vue`、`@vue/compiler-dom`、`@vue/runtime-core` 的 major、minor、patch 版本交由维护者协调升级。某个包的独立升级通过下方锁文件和双端构建检查后，可以移除该包的规则并恢复自动更新。配置合入默认分支后，查看下一次成功完成的 `/frontend` 每日版本更新任务，确认四个包没有新增独立版本更新 PR。有可更新版本时才有实际过滤结果可核对。
+
+四条规则只设置 `version-update:semver-*` 更新类型，安全更新仍可进入维护流程。安全更新分组只会合并组内当时需要修复的依赖。引入 `applies-to: security-updates` 分组前，需用真实公告或等价的可复现实验确认生成的 PR 能满足批次一致性要求。保持 Dependabot 安全告警和安全更新开启。[Dependabot 配置参考](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference#ignore) · [安全更新配置](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates)
+
+1. 收到告警或单包安全 PR 后，先核对 `frontend/yarn.lock` 中受影响的版本、依赖路径、使用场景和可用修复版本。暂缓直接合入单包 PR。
+2. 确认需要修复后，优先开协调升级 PR 并关联安全告警。将 DCloud 编译器、运行时和目标平台包对齐到同一批次，同时核对 `vue`、相关 `@vue/*`（包括 `compiler-dom` 和 `runtime-core`）、`@vitejs/plugin-vue`、Vite、Rollup、Vitest 与 `@dcloudio/vite-plugin-uni` 的兼容版本及 `resolutions`。若暂无兼容修复，在告警中记录受影响范围、临时缓解措施和复查安排。
+3. 在协调升级 PR 中附上 `yarn install --frozen-lockfile`、`yarn lint`、`yarn test:unit`、`yarn build:h5:checked` 和 `yarn build:mp-weixin:checked` 的结果。核对锁文件中 DCloud 直接与传递依赖仍属同一批次，Vue/Vite 相关解析符合预期，且受影响的依赖路径已解析到修复版本。
 
 ## 决策
 
