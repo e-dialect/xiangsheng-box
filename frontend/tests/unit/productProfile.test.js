@@ -1,3 +1,4 @@
+import { resolveLocalDialect } from '@/services/localTools';
 import { mount } from '@vue/test-utils';
 import ProductHighlights from '@/components/home/ProductHighlights.vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,25 @@ afterEach(() => {
 });
 
 describe('product profile routing', () => {
+  it.each(['v1', 'v2'])('preserves pinned quiz %s across stations without private state', (version) => {
+    const query = { dialect: '闽.莆仙', tool: 'quiz', quiz: version, answers: '0', score: '10', token: 'secret' };
+    for (const target of [box, pxm]) {
+      for (const params of [null, query]) {
+        const switched = new URL(productSwitchUrl(target, {
+          pathname: '/pages/tools/local', search: `?${new URLSearchParams(query)}`,
+        }, '/', params));
+        expect(Object.fromEntries(switched.searchParams)).toEqual({
+          dialect: query.dialect, tool: 'quiz', quiz: version,
+        });
+        // The local-tools page treats a versioned share as authoritative over the user's dialect.
+        expect(resolveLocalDialect({
+          shared: switched.searchParams.get('quiz') ? switched.searchParams.get('dialect') : '',
+          profile: '粤.广州', route: '闽.厦门', chosen: '',
+        })).toBe(query.dialect);
+      }
+    }
+  });
+
   it('keeps the registered local brand while the profile API loads or fails', () => {
     expect(fallbackProductProfile('PXM.TEST.EDIALECT.TOP')).toMatchObject({
       key: pxm.key,

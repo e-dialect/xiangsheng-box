@@ -167,7 +167,7 @@ function publicQueryKeys(path) {
     [ROUTES.collections]: ['search'],
     [ROUTES.circleDetail]: ['id'],
     [ROUTES.userDetail]: ['id'],
-    [LOCAL_TOOLS_ROUTE]: ['dialect', 'tool'],
+    [LOCAL_TOOLS_ROUTE]: ['dialect', 'tool', 'quiz'],
   };
   return keys[path] || [];
 }
