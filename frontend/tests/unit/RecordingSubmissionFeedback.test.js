@@ -40,6 +40,7 @@ function pageContext() {
     ...RecordingCreate.data(),
     ...RecordingCreate.methods,
     ownerScope: 'user:1',
+    draftReady: true,
     $refs: { form: { validate: vi.fn(async () => true) } },
   };
   page.audio = { path: 'blob:recording', durationMs: 2300 };
@@ -67,14 +68,43 @@ describe('recording submission feedback', () => {
     });
     const page = pageContext();
     await page.submit();
-    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3');
+    const requestOptions = expect.objectContaining({
+      canPresent: expect.any(Function),
+      loading: false,
+    });
+    expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3', requestOptions);
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       publication_consent: 'public-display-v1',
-      speaker_consent_source: 'speaker_oral', speaker_label: '家中长辈',
-    }));
+      speaker_consent_source: 'speaker_oral',
+      speaker_label: '家中长辈',
+    }), requestOptions);
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);
+  });
+
+  it('submits the original audio and speaker statement throughout validation and upload', async () => {
+    const page = pageContext();
+    page.$refs.form.validate.mockImplementation(async () => {
+      page.onAudioChange({ path: '/other.wav' });
+      page.setSpeakerConsent('self');
+      page.updateFormField('speaker_label', '其他称呼');
+      expect(page.audio.path).toBe('blob:recording');
+      expect(page.form.speaker_consent_source).toBe('speaker_oral');
+      expect(page.form.speaker_label).toBe('家中长辈');
+      return true;
+    });
+    uploadFile.mockImplementation(async () => {
+      // Even a late form update cannot change the statement attached to this upload.
+      page.form.speaker_consent_source = 'self';
+      page.form.speaker_label = '';
+      return { url: '/files/voice.mp3', duration_ms: 2300 };
+    });
+    createRecording.mockResolvedValue({ id: 12 });
+    await page.submit();
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      speaker_consent_source: 'speaker_oral', speaker_label: '家中长辈',
+    }), expect.objectContaining({ loading: false }));
   });
 
   it('clears the last speaker declaration when a contributor changes the audio', () => {
