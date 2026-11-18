@@ -24,6 +24,7 @@ const GUEST_RETURN_ROUTES = new Set([
   ROUTES.entryDetail,
   ROUTES.recordingDetail,
   ROUTES.collectionDetail,
+  ROUTES.localTools,
   ROUTES.circleList,
   ROUTES.circleDetail,
   ROUTES.userDetail,
@@ -110,6 +111,9 @@ export function guestReturnDestination(intent) {
   if (intent?.action === 'content_feedback') {
     const params = contentFeedbackParams(context?.object_type, context?.object_id);
     if (!params?.object_id) return null;
+    if (params.object_type === 'kinship') {
+      return routeDestination(ROUTES.localTools, { tool: 'kinship', dialect: params.object_id });
+    }
     const routes = {
       entry: ROUTES.entryDetail,
       recording: ROUTES.recordingDetail,

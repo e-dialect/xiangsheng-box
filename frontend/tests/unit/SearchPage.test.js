@@ -22,7 +22,7 @@ const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
 const {
-  fallbackProductProfile, productProfile,
+  fallbackProductProfile, productProfile, productSwitchUrl,
 } = await import('@/services/productProfile');
 
 function deferred() {
@@ -94,6 +94,27 @@ describe('entry-first search page orchestration', () => {
       catalog.resolve(dialects);
       await ready;
       expect(opened.filters.dialectId).toBe('');
+    } finally {
+      Object.assign(productProfile, fallbackProductProfile());
+    }
+  });
+
+  it.each(['', '23'])('preserves the source region "%s" when switching to a local site before the catalog loads', async (dialectId) => {
+    const source = pageContext();
+    Object.assign(source.filters, { keyword: '红团', dialectId, dialectMatch: 'exact' });
+    const target = { key: 'pxm', name: '兴化语记', origin: 'https://pxm.test.edialect.top' };
+    const params = SearchPage.computed.productSwitchParams.call(source);
+    const url = productSwitchUrl(target, { pathname: '/pages/search' }, '/', params);
+    const query = Object.fromEntries(new URL(url).searchParams);
+    expect(query.keywords).toBe('红团');
+    expect(dialectId ? query.dialect_id : query.dialect).toBe(dialectId || 'all');
+    Object.assign(productProfile, fallbackProductProfile('pxm.test.edialect.top'));
+    try {
+      listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+      const destination = pageContext();
+      await destination.initializeSiteScope(query);
+      expect(destination.filters.dialectId).toBe(dialectId);
+      if (dialectId) expect(destination.filters.dialectMatch).toBe('exact');
     } finally {
       Object.assign(productProfile, fallbackProductProfile());
     }
@@ -192,24 +213,32 @@ describe('entry-first search page orchestration', () => {
     sender.entries = [{ id: 8 }];
     sender.submittedKeyword = '菜名';
     sender.appliedFilters = {
-      ...sender.filters, dialectId: 21, dialectMatch: 'exact', hasRecording: false,
-      source: '资料 & 50% / 1', status: 'reviewed', owner: 'private',
+      ...sender.filters,
+      dialectId: 21,
+      dialectMatch: 'exact',
+      hasRecording: false,
+      source: '资料 & 50% / 1',
+      status: 'reviewed',
+      owner: 'private',
     };
     sender.filters.dialectId = 99;
     const shared = SearchPage.computed.keywordShare.call(sender);
     const h5 = Object.fromEntries(new URL(shared.path, 'https://example.com').searchParams);
     const wechat = Object.fromEntries(shared.query.split('&').map((part) => part.split('=')));
     request.get.mockResolvedValue({ results: [] });
-    for (const options of [h5, wechat]) {
+    await Promise.all([h5, wechat].map(async (options) => {
       const recipient = pageContext();
-      // eslint-disable-next-line no-await-in-loop
       await SearchPage.onLoad.call(recipient, options);
       expect(recipient.filters).toMatchObject({
-        keyword: '菜名', dialectId: '21', dialectMatch: 'exact', hasRecording: false,
-        source: '资料 & 50% / 1', status: 'reviewed',
+        keyword: '菜名',
+        dialectId: '21',
+        dialectMatch: 'exact',
+        hasRecording: false,
+        source: '资料 & 50% / 1',
+        status: 'reviewed',
       });
       expect(recipient.filters).not.toHaveProperty('owner');
-    }
+    }));
     expect(shared.filtered).toBe(true);
   });
 

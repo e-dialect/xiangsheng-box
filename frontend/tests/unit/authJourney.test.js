@@ -28,9 +28,12 @@ describe('auth journey', () => {
   });
 
   it('returns a signed-in reporter to the administrator draft for the same public object', () => {
-    const destination = resolveAuthDestination({ action: 'content_feedback', context: {
-      object_type: 'recording', object_id: '52', id: 7, token: 'ignored',
-    } });
+    const destination = resolveAuthDestination({
+      action: 'content_feedback',
+      context: {
+        object_type: 'recording', object_id: '52', id: 7, token: 'ignored',
+      },
+    });
     expect(destination.url).toBe('/pages/mails/send?id=-1&object_type=recording&object_id=52');
     expect(resolveAuthDestination({ action: 'content_feedback', context: { object_type: 'invalid' } }).kind)
       .toBe('fallback');
@@ -58,6 +61,7 @@ describe('auth journey', () => {
     ['bookmark_entry', { entryId: 42 }, '/pages/entries/details?id=42'],
     ['interact_recording', { recordingId: 42 }, '/pages/recordings/details?id=42'],
     ['content_feedback', { object_type: 'collection', object_id: '42' }, '/pages/collections/details?id=42'],
+    ['content_feedback', { object_type: 'kinship', object_id: '闽.莆仙' }, `/pages/tools/local?tool=kinship&dialect=${encodeURIComponent('闽.莆仙')}`],
   ])('restores a cold cancelled %s to the same-origin public object', (action, context, url) => {
     peekInterceptIntent.mockReturnValueOnce({ action, context });
     cancelLogin();

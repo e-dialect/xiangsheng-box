@@ -61,6 +61,8 @@
         v-else-if="!material"
         :title="missingTitle"
         :description="missingDescription"
+        :action-text="tool === 'kinship' && dialect ? '补充当地称谓' : ''"
+        @action="suggestKinship"
       />
       <view
         v-else
@@ -120,11 +122,14 @@ import LocalQuiz from '@/components/localtools/LocalQuiz.vue';
 import MaterialSource from '@/components/localtools/MaterialSource.vue';
 import PinyinGuide from '@/components/localtools/PinyinGuide.vue';
 import PageShell from '@/components/PageShell.vue';
+import { requireAuth } from '@/services/authGuard';
+import { contentFeedbackParams } from '@/services/contentFeedback';
 import { listAllDialects } from '@/services/guantou';
 import {
   loadLocalMaterials, quizShareMessage, readLocalParam, resolveLocalDialect,
 } from '@/services/localTools';
 import { hasShareTarget, sharePage, showWechatShareMenu } from '@/services/pageShare';
+import { openPage, ROUTES } from '@/services/navigation';
 import { isWechatMiniProgram } from '@/services/platform';
 import { enabledLocalTools, loadProductProfile, LOCAL_TOOL_OPTIONS } from '@/services/productProfile';
 import { resolveSessionUserId } from '@/services/session';
@@ -236,6 +241,10 @@ export default {
     return message ? { title: message.title, query: message.path.split('?')[1] } : null;
   },
   methods: {
+    suggestKinship() {
+      const params = contentFeedbackParams('kinship', this.dialect);
+      if (params && requireAuth('content_feedback', params)) openPage(ROUTES.mailSend, params);
+    },
     syncShareMenu() {
       if (!this.wechat) return;
       if (this.shareMessage) showWechatShareMenu();
