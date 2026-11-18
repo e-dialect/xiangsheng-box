@@ -225,6 +225,20 @@ function successPayload(pathname, method, {
       public_recording_count: 16,
     }]);
   }
+  if (pathname === '/local-tools/') {
+    return {
+      dialect: DIALECTS[1],
+      packs: {
+        pinyin: {
+          title: '莆仙话拼音 · 莆田城里入门',
+          accent: '莆田城里口音',
+          version: 'visual-fixture-1',
+          source: '视觉验收资料',
+          content: { sections: [{ title: '声母', rows: [{ form: 'b', ipa: 'p', example: '布 bou4' }] }] },
+        },
+      },
+    };
+  }
   if (pathname === '/dialects/resolve/') return DIALECTS[1];
   if (pathname === '/dialects/') return paged(empty ? [] : DIALECTS);
   if (pathname === '/entries/suggestions/' || pathname === '/entries/popular/') return [ENTRY];

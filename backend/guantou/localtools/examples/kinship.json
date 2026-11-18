@@ -1,0 +1,168 @@
+{
+  "dialect": "闽.莆仙",
+  "kind": "kinship",
+  "version": "putian-kinship-basic-1",
+  "title": "莆田亲属称谓 · 基础关系",
+  "accent": "莆田腔公开资料举例（家庭和地区用法有差异）",
+  "source": "兴化语记公开亲属关系表与项目自编关系映射",
+  "source_url": "https://github.com/e-dialect/hinghwa-dict-web/blob/a84cbd7eabacfd31ad1727fc77ca96c5f471ecf7/src/data/kinship/v1/kinship.json",
+  "rights": "旧 Web ASSET_BOUNDARIES.md 确认项目原编关系图。仅摘取少量可追溯的独立称谓事实，用新的有限图表达；不导入词库快照、旧记录编号、原图或未确认的词形与录音。",
+  "payload": {
+    "schema": 1,
+    "selfId": "self",
+    "nodes": [
+      {
+        "id": "self",
+        "label": "本人",
+        "sex": "unknown",
+        "relations": {
+          "fa": "father",
+          "mu": "mother",
+          "fu": "husband",
+          "qi": "wife"
+        },
+        "terms": []
+      },
+      {
+        "id": "father",
+        "label": "父亲",
+        "sex": "male",
+        "relations": {
+          "fa": "paternal-grandfather",
+          "xiong": "elder-uncle",
+          "di": "younger-uncle",
+          "qi": "mother"
+        },
+        "terms": [
+          {
+            "text": "郎罢",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "mother",
+        "label": "母亲",
+        "sex": "female",
+        "relations": {
+          "xiong": "maternal-uncle",
+          "di": "maternal-uncle",
+          "fu": "father"
+        },
+        "terms": [
+          {
+            "text": "娘妳",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "paternal-grandfather",
+        "label": "祖父",
+        "sex": "male",
+        "relations": {
+          "zi": [
+            "father",
+            "elder-uncle",
+            "younger-uncle"
+          ]
+        },
+        "terms": [
+          {
+            "text": "阿公",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "elder-uncle",
+        "label": "伯父",
+        "sex": "male",
+        "relations": {
+          "fa": "paternal-grandfather"
+        },
+        "terms": [
+          {
+            "text": "阿伯",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "younger-uncle",
+        "label": "叔父",
+        "sex": "male",
+        "relations": {
+          "fa": "paternal-grandfather",
+          "qi": "younger-aunt"
+        },
+        "terms": [
+          {
+            "text": "阿叔",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "younger-aunt",
+        "label": "叔母",
+        "sex": "female",
+        "relations": {
+          "fu": "younger-uncle"
+        },
+        "terms": [
+          {
+            "text": "阿婶",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "maternal-uncle",
+        "label": "舅父",
+        "sex": "male",
+        "relations": {
+          "qi": "maternal-aunt"
+        },
+        "terms": [
+          {
+            "text": "阿舅",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "maternal-aunt",
+        "label": "舅母",
+        "sex": "female",
+        "relations": {
+          "fu": "maternal-uncle"
+        },
+        "terms": [
+          {
+            "text": "阿妗",
+            "usage": "旧兴化语记公开称谓举例；具体家庭说法可能不同。"
+          }
+        ]
+      },
+      {
+        "id": "husband",
+        "label": "丈夫",
+        "sex": "male",
+        "relations": {
+          "qi": "self"
+        },
+        "terms": []
+      },
+      {
+        "id": "wife",
+        "label": "妻子",
+        "sex": "female",
+        "relations": {
+          "fu": "self"
+        },
+        "terms": []
+      }
+    ]
+  }
+}

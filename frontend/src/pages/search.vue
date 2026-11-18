@@ -598,6 +598,7 @@ export default {
       dialectsLoading: false,
       siteScopeReady: null,
       dialectTouched: false,
+      pendingSiteScope: null,
       dialectsError: '',
       dialectPickerVisible: false,
       writingPickerVisible: false,
@@ -653,12 +654,14 @@ export default {
     },
     productSwitchParams() {
       const { filters } = this;
+      const pending = !this.dialectTouched && !filters.dialectId ? this.pendingSiteScope : null;
+      const pendingMatch = pending?.exact ? 'exact' : '';
       const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
       return {
         keywords: filters.keyword,
-        dialect: dialect?.qualified_code || (filters.dialectId ? '' : 'all'),
+        dialect: dialect?.qualified_code || pending?.code || (filters.dialectId ? '' : 'all'),
         dialect_id: dialect ? '' : filters.dialectId,
-        dialect_scope: filters.dialectId ? filters.dialectMatch : '',
+        dialect_scope: filters.dialectId ? filters.dialectMatch : pendingMatch,
         ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
           [key, filters[field]]
         ))),
@@ -746,7 +749,7 @@ export default {
       const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
       if (!switchKeys.some((key) => options[key])) return;
       await this.siteScopeReady;
-      if (!activeFilterCount(this.filters)) return;
+      if (!activeFilterCount(this.filters) && !this.pendingSiteScope) return;
     }
     await this.search();
   },
@@ -782,11 +785,22 @@ export default {
       const code = explicitDialect
         ? options.dialect : (await loadProductProfile()).default_dialect;
       if (!code || code === 'all') return;
+      this.pendingSiteScope = { code, exact: options.dialect_scope === 'exact' };
       await catalog;
-      if (this.filters.dialectId || this.dialectTouched) return;
+      this.resolveSiteScope();
+    },
+    resolveSiteScope() {
+      if (!this.pendingSiteScope) return;
+      if (this.filters.dialectId || this.dialectTouched) {
+        this.pendingSiteScope = null;
+        return;
+      }
+      const { code, exact } = this.pendingSiteScope;
       const dialect = this.dialects.find(({ qualified_code: value }) => value === code);
-      if (dialect) this.filters.dialectId = dialect.id;
-      if (options.dialect_scope === 'exact' && dialect) this.filters.dialectMatch = 'exact';
+      if (!dialect) return;
+      this.filters.dialectId = dialect.id;
+      this.filters.dialectMatch = exact ? 'exact' : 'subtree';
+      this.pendingSiteScope = null;
     },
     async loadDialects() {
       if (this.dialectsLoading) return;
@@ -838,18 +852,31 @@ export default {
       this.openSections = [];
       return this.search();
     },
-    handleErrorAction() {
+    async handleErrorAction() {
       if (this.searchUnavailable) {
         goHome(true);
         return;
       }
-      this.search();
+      if (this.pendingSiteScope) await this.loadDialects();
+      await this.search();
     },
     async search() {
       const requestId = this.searchRequestId + 1;
       this.searchRequestId = requestId;
       if (this.siteScopeReady) await this.siteScopeReady;
       if (requestId !== this.searchRequestId) return;
+      this.resolveSiteScope();
+      if (this.pendingSiteScope) {
+        this.searched = true;
+        this.searchUnavailable = false;
+        this.loading = false;
+        this.loadingMore = false;
+        this.entries = [];
+        this.total = 0;
+        this.next = null;
+        this.errorMessage = '指定的地区暂时无法读取，请重试或手动选择地区';
+        return;
+      }
       const filters = { ...this.filters };
       this.loadingMore = false;
       this.submittedKeyword = String(filters.keyword || '').trim();

@@ -1,3 +1,5 @@
+from files.recording_media import media_url
+from guantou.models import RecordingMedia
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
@@ -195,7 +197,12 @@ class ObjectChangeLogTests(TestCase):
         response = self.client.post(
             "/recordings/",
             data={
-                "audio_url": "https://example.com/audio.mp3",
+                "audio_url": media_url(
+                    RecordingMedia.objects.create(
+                        owner=self.user, content=b"voice", duration_ms=123
+                    ).pk
+                ),
+                "publication_consent": "public-display-v1",
                 "usage_dialect_id": self.dialect.id,
                 "original_gloss": "moon",
             },
@@ -215,9 +222,9 @@ class ObjectChangeLogTests(TestCase):
         self.assertIsNotNone(create_log.actor_visitor)
         self.assertEqual(create_log.request_id, "audit-create")
 
-        response = self.client.patch(
-            f"/recordings/{recording_id}/",
-            data={"rights_statement": "speaker consent recorded"},
+        response = self.client.post(
+            f"/recordings/{recording_id}/withdraw/",
+            data={},
             format="json",
             HTTP_AUTHORIZATION=bearer(self.user),
             HTTP_X_VISITOR_ID=str(create_log.actor_visitor_id),
@@ -230,7 +237,7 @@ class ObjectChangeLogTests(TestCase):
             object_id=str(recording_id),
             content_type__model="recording",
         ).latest("id")
-        self.assertIn("rights_statement", update_log.changed_fields)
+        self.assertIn("status", update_log.changed_fields)
         self.assertEqual(update_log.actor_user, self.user)
         self.assertEqual(update_log.actor_visitor_id, create_log.actor_visitor_id)
         self.assertEqual(update_log.request_id, "audit-update")

@@ -154,6 +154,14 @@ const STATUS_MAP = Object.freeze({
     }),
   }),
   recording: Object.freeze({
+    withdrawn: Object.freeze({
+      phase: '暂不能处理',
+      label: '已撤回',
+      description: '这段录音已经被投稿人撤回。',
+      nextStep: '可以查看自己的投稿记录。',
+      source: 'Recording.status',
+      tone: 'muted',
+    }),
     draft: Object.freeze({
       phase: '待补充',
       label: '初稿',
@@ -275,6 +283,17 @@ export function contributionStatus(objectType, status) {
   }
   const key = String(normalizedStatus || '').trim();
   return STATUS_MAP[objectType]?.[key] || UNKNOWN_STATUS;
+}
+
+export function recordingStatusLabel(recording) {
+  const { label } = contributionStatus('recording', recording.status);
+  if (recording.media_id) {
+    return { draft: '待审核', rejected: '已退回' }[recording.status] || label;
+  }
+  if (recording.status === 'draft') {
+    return recording.visibility === false ? '未公开初稿' : `${label}·待核对`;
+  }
+  return label;
 }
 
 export function contributionSuccessMessage() {

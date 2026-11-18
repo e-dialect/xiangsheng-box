@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "inbox",
     "themes",
     "productanalytics",
+    "localtools",
     "corsheaders",
 ]
 

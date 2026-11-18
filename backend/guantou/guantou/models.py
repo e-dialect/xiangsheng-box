@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import User
@@ -1602,6 +1603,23 @@ class PronunciationVariant(models.Model):
         verbose_name_plural = "地区读音"
 
 
+class RecordingMedia(models.Model):
+    """Normalized submissions stay in our database, outside all static/COS routes."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+    content = models.BinaryField()
+    duration_ms = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    generated_entry = models.OneToOneField(
+        Entry,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="submission_media",
+    )
+
+
 class Recording(models.Model):
     """One audio object with a claimed usage range, never device location."""
 
@@ -1617,6 +1635,17 @@ class Recording(models.Model):
         DISPUTED = "disputed", "有分歧"
         REJECTED = "rejected", "不采用"
 
+        WITHDRAWN = "withdrawn", "已撤回"
+
+    media = models.OneToOneField(
+        RecordingMedia,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="recording",
+    )
+    review_reason = models.TextField(blank=True)
+    publication_consent = models.CharField(max_length=40, blank=True)
     audio_url = models.URLField(verbose_name="音频")
     usage_dialect = models.ForeignKey(
         Dialect,
@@ -1674,6 +1703,22 @@ class Recording(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                name="recording_submission_visibility",
+                condition=models.Q(media__isnull=True)
+                | (
+                    models.Q(publication_consent="public-display-v1")
+                    & (
+                        models.Q(status="published", visibility=True)
+                        | models.Q(
+                            status__in=["draft", "rejected", "withdrawn"],
+                            visibility=False,
+                        )
+                    )
+                ),
+            )
+        ]
         indexes = [
             models.Index(
                 fields=["usage_dialect", "status"], name="recording_dialect_status_idx"

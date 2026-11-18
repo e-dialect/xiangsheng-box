@@ -937,6 +937,41 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/PronunciationVariantV2" } } }
       responses:
         "200": { description: 已更新, content: { application/json: { schema: { $ref: "#/components/schemas/PronunciationVariantV2" } } } }
+  /files:
+    post:
+      tags: [Recordings]
+      operationId: uploadSubmissionFile
+      summary: 登录后上传文件，音频转码后得到本人可访问的受控媒体地址
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: 上传完成，音频同时返回编码后的时长
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string, format: uri }
+                  duration_ms: { type: integer }
+  /files/recording-media/{asset_id}/:
+    parameters:
+      - { name: asset_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Recordings]
+      operationId: playSubmissionMedia
+      summary: 读取 MP3，待审媒体须由本人或有权限的地区审核员登录试听
+      security: [{}, { bearerAuth: [] }]
+      responses:
+        "200": { description: 音频禁止缓存, content: { audio/mpeg: { schema: { type: string, format: binary } } } }
+        "404": { description: 不存在或当前身份不可播放 }
   /recordings/:
     get:
       tags: [Recordings]
@@ -944,6 +979,7 @@ paths:
       summary: 浏览录音流
       security: []
       parameters:
+        - { name: mine, in: query, description: 登录后查看本人的全部审核投稿, schema: { type: boolean } }
         - name: recorder_id
           in: query
           description: 仅返回指定贡献者的公开录音
@@ -954,10 +990,16 @@ paths:
     post:
       tags: [Recordings]
       operationId: createRecording
-      summary: 提交录音及原始大意
+      summary: 确认同意审核后公开，提交本人新上传的媒体及原始大意
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: "#/components/schemas/RecordingV2" } } }
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/RecordingV2"
+                - type: object
+                  required: [audio_url, original_gloss, usage_dialect_id, publication_consent]
       responses:
         "201": { description: 已创建, content: { application/json: { schema: { $ref: "#/components/schemas/RecordingV2" } } } }
   /recordings/{recording_id}/:
@@ -973,12 +1015,43 @@ paths:
     patch:
       tags: [Recordings]
       operationId: updateRecording
-      summary: 修订本人录音元数据
+      summary: 修订历史录音元数据，新投稿通过退回后的重投接口修订
       requestBody:
         required: true
         content: { application/json: { schema: { $ref: "#/components/schemas/RecordingV2" } } }
       responses:
         "200": { description: 已更新, content: { application/json: { schema: { $ref: "#/components/schemas/RecordingV2" } } } }
+  /recordings/{recording_id}/resubmit/:
+    parameters:
+      - { $ref: "#/components/parameters/RecordingId" }
+    post:
+      tags: [Recordings]
+      operationId: resubmitReturnedRecording
+      summary: 投稿人修订退回的录音并重新送审
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [original_gloss, publication_consent]
+              properties:
+                original_gloss: { type: string }
+                publication_consent: { type: string, enum: [public-display-v1] }
+                audio_url: { type: string, format: uri, description: 可选，替换为本人的新上传 }
+      responses:
+        "200": { description: 已重新进入待审队列 }
+        "400": { description: 当前状态或提交内容不允许重投 }
+  /recordings/{recording_id}/withdraw/:
+    parameters:
+      - { $ref: "#/components/parameters/RecordingId" }
+    post:
+      tags: [Recordings]
+      operationId: withdrawRecordingSubmission
+      summary: 投稿人撤回录音，重复撤回保持相同结果
+      responses:
+        "200": { description: 已撤回，停止公开提供录音 }
+        "404": { description: 找不到本人投稿 }
   /recording-entry-links/:
     get:
       tags: [Recordings]
@@ -1154,6 +1227,7 @@ paths:
       tags: [Curation]
       operationId: listCurationTasks
       summary: 获取整理待办
+      description: 新录音任务返回 revision。审核时需在 changes.revision 原样传回，版本已变化时重新试听。
       responses:
         "200": { description: 整理待办, content: { application/json: { schema: { type: object } } } }
   /contributions/me/:
@@ -1696,6 +1770,14 @@ components:
       properties:
         id: { type: integer, readOnly: true }
         audio_url: { type: string, format: uri }
+        publication_consent: { type: string, enum: [public-display-v1], writeOnly: true }
+        media_id: { type: string, format: uuid, nullable: true, readOnly: true }
+        usage_dialect_id: { type: integer, writeOnly: true }
+        review_reason: { type: string, readOnly: true, description: 仅本人或审核员详情返回 }
+        can_withdraw: { type: boolean, readOnly: true }
+        can_resubmit: { type: boolean, readOnly: true }
+        can_take_down: { type: boolean, readOnly: true }
+        updated_at: { type: string, format: date-time, readOnly: true }
         usage_dialect: { $ref: "#/components/schemas/DialectRef" }
         recorder: { $ref: "#/components/schemas/UserRef" }
         duration_ms: { type: integer, minimum: 0 }
@@ -1705,8 +1787,8 @@ components:
         comment_count: { type: integer, readOnly: true }
         original_gloss: { type: string }
         recording_type: { type: string, enum: [word, phrase, example, other] }
-        status: { type: string, enum: [draft, published, disputed, rejected] }
-        visibility: { type: boolean }
+        status: { type: string, readOnly: true, enum: [draft, published, disputed, rejected, withdrawn] }
+        visibility: { type: boolean, readOnly: true }
         entry_links: { type: array, items: { $ref: "#/components/schemas/RecordingEntryLinkRef" }, readOnly: true }
     RecordingEntryLinkRef:
       type: object

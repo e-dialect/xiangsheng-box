@@ -162,6 +162,14 @@ class PronunciationVariantAdmin(admin.ModelAdmin):
 
 @admin.register(Recording)
 class RecordingAdmin(admin.ModelAdmin):
+    def has_change_permission(self, request, obj=None):
+        # Managed audio changes require the audited moderation transitions.
+        if obj is not None and obj.media_id:
+            return False
+        return super().has_change_permission(request, obj)
+
+    exclude = ("media", "publication_consent", "review_reason")
+
     list_display = (
         "id",
         "original_gloss",
