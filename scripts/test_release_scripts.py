@@ -89,9 +89,38 @@ class AuthorizationTests(unittest.TestCase):
         self.assertEqual(production['with']['platforms'], 'linux/amd64')
         self.assertNotIn('push', production['with'])
         smoke = next(step for step in steps if step.get('name') == 'Check real production runtime without external services')
-        self.assertEqual(smoke['run'], 'python3 scripts/check-production-runtime.py')
+        self.assertEqual(smoke['shell'], 'bash')  # Explicit bash on Actions enables pipefail.
+        self.assertEqual(smoke['run'], 'python3 scripts/check-production-runtime.py | tee "${RUNNER_TEMP}/production-runtime.json"')
         self.assertLess(steps.index(production), steps.index(smoke))
         self.assertLess(steps.index(smoke), next(i for i, step in enumerate(steps) if step.get('name') == 'Upload Docker images'))
+
+    def test_branch_dispatch_exports_only_tested_archives_with_source_and_checksums(self):
+        steps = CI['jobs']['docker']['steps']
+        prepare = next(step for step in steps if step.get('id') == 'candidate')
+        upload = next(step for step in steps if step.get('name') == 'Upload accepted candidate images')
+        smoke = next(step for step in steps if step.get('name') == 'Check real production runtime without external services')
+        self.assertLess(steps.index(smoke), steps.index(prepare))
+        self.assertLess(steps.index(prepare), steps.index(upload))
+        self.assertEqual(prepare['if'], "github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' && github.ref_name != github.event.repository.default_branch")
+        self.assertEqual(upload['if'], "steps.candidate.outcome == 'success'")
+        self.assertIn('${{ github.sha }}', upload['with']['name'])
+        self.assertNotIn('overwrite', upload['with'])
+
+        with tempfile.TemporaryDirectory() as temp:
+            directory = pathlib.Path(temp)
+            names = ['guantou-backend.tar', 'guantou-frontend-production.tar', 'production-runtime.json']
+            for name in [*names, 'guantou-frontend.tar']:
+                (directory / name).write_bytes(name.encode())
+            for sha, should_pass in [('f' * 40, False), (SHA, True)]:
+                result = subprocess.run(['bash', '-eo', 'pipefail', '-c', prepare['run']], cwd=ROOT,
+                                        env={**os.environ, 'RUNNER_TEMP': temp, 'GITHUB_SHA': sha})
+                self.assertEqual(result.returncode == 0, should_pass)
+            archived = directory / 'candidate-images'
+            self.assertEqual({p.name for p in archived.iterdir()}, {*names, 'SOURCE_SHA', 'SHA256SUMS'})
+            self.assertEqual((archived / 'SOURCE_SHA').read_text(), SHA + '\n')
+            expected = [hashlib.sha256((archived / name).read_bytes()).hexdigest() + '  ' + name
+                        for name in [*names, 'SOURCE_SHA']]
+            self.assertEqual((archived / 'SHA256SUMS').read_text().splitlines(), expected)
 
     def test_release_smokes_before_any_publication_and_preserves_failure_receipt(self):
         steps = RELEASE['jobs']['publish']['steps']
