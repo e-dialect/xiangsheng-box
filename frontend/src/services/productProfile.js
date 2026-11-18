@@ -131,7 +131,7 @@ export const LOCAL_TOOLS_ROUTE = '/pages/tools/local';
 function publicQueryKeys(path) {
   const keys = {
     [ROUTES.search]: [
-      'keywords', 'key', 'q', 'dialect', 'usage_dialect_id', 'dialect_scope', 'scope',
+      'keywords', 'key', 'q', 'dialect', 'dialect_id', 'usage_dialect_id', 'dialect_scope', 'scope',
       'recorded', 'has_recording', 'has_evidence', 'status', 'sort',
       'writing_type', 'source_type', 'ipa', 'romanization', 'source', 'concept',
     ],

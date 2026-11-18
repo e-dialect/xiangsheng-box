@@ -170,7 +170,7 @@
           size="small"
           variant="ghost"
           :open-type="shareType"
-          :text="shareType || canSystemShare ? '分享查词结果' : '复制关键词链接'"
+          :text="shareButtonText"
           @click="shareKeyword"
         />
       </view>
@@ -546,7 +546,6 @@ export default {
       dialects: [],
       dialectsLoading: false,
       siteScopeReady: null,
-      explicitDialectScope: false,
       dialectTouched: false,
       dialectsError: '',
       dialectPickerVisible: false,
@@ -582,30 +581,32 @@ export default {
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
-      if (!hasShareTarget() || this.loading || this.errorMessage
-        || !this.entries.length || !this.submittedKeyword) {
-        return null;
-      }
+      const params = publicSearchShareParams(this.submittedKeyword, this.appliedFilters);
+      const filtered = Boolean(params.filters);
+      if (!hasShareTarget() || this.loading || this.errorMessage || !this.entries.length
+        || (!this.submittedKeyword && !filtered)) return null;
       const characters = Array.from(this.submittedKeyword);
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
-      const path = pageUrl(
-        ROUTES.search,
-        publicSearchShareParams(this.submittedKeyword, this.appliedFilters),
-      );
+      const path = pageUrl(ROUTES.search, params);
+      const query = pageUrl('', { sharedKeyword: params.key, filters: params.filters }).slice(1);
       return {
-        title: `查词｜${keyword} · ${currentProductName()}`,
-        path,
-        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+        title: `查词｜${keyword || '筛选结果'} · ${currentProductName()}`, path, query, filtered,
       };
+    },
+    shareButtonText() {
+      const action = this.shareType || this.canSystemShare ? '分享' : '复制';
+      const subject = this.keywordShare?.filtered ? '查词结果' : '关键词';
+      return `${action}${subject}${action === '复制' ? '链接' : ''}`;
     },
     productSwitchParams() {
       const { filters } = this;
       const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
       return {
         keywords: filters.keyword,
-        dialect: dialect?.qualified_code || (this.explicitDialectScope ? 'all' : ''),
-        dialect_scope: dialect ? filters.dialectMatch : '',
+        dialect: dialect?.qualified_code || (filters.dialectId ? '' : 'all'),
+        dialect_id: dialect ? '' : filters.dialectId,
+        dialect_scope: filters.dialectId ? filters.dialectMatch : '',
         ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
           [key, filters[field]]
         ))),
@@ -689,7 +690,13 @@ export default {
     Object.assign(this.filters, sharedFilters);
     const filtered = Object.keys(sharedFilters).length > 0;
     this.siteScopeReady = this.initializeSiteScope(options, filtered);
-    if (this.filters.keyword || filtered) await this.search();
+    if (!this.filters.keyword && !filtered) {
+      const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
+      if (!switchKeys.some((key) => options[key])) return;
+      await this.siteScopeReady;
+      if (!activeFilterCount(this.filters)) return;
+    }
+    await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
@@ -704,7 +711,7 @@ export default {
   // #endif
   methods: {
     async initializeSiteScope(options, filtered = false) {
-      this.explicitDialectScope = typeof options.dialect === 'string';
+      const explicitDialect = typeof options.dialect === 'string';
       const sharedSearch = filtered
         || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
       Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
@@ -714,8 +721,13 @@ export default {
         this.filters.hasRecording = options.has_recording === 'true';
       }
       const catalog = this.loadDialects();
-      if (sharedSearch && !this.explicitDialectScope) return;
-      const code = this.explicitDialectScope
+      if (!explicitDialect && /^[1-9]\d*$/.test(options.dialect_id || '')) {
+        this.filters.dialectId = options.dialect_id;
+        this.filters.dialectMatch = options.dialect_scope === 'exact' ? 'exact' : 'subtree';
+        return;
+      }
+      if (sharedSearch && !explicitDialect) return;
+      const code = explicitDialect
         ? options.dialect : (await loadProductProfile()).default_dialect;
       if (!code || code === 'all') return;
       await catalog;
@@ -741,7 +753,7 @@ export default {
     goCollections,
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
-      return sharePage(this.keywordShare, '关键词链接已复制');
+      return sharePage(this.keywordShare, this.keywordShare?.filtered ? '查词结果链接已复制' : '关键词链接已复制');
       // #endif
     },
     clearHistory() { clearSearchHistory(); this.history = []; },
@@ -766,7 +778,6 @@ export default {
     },
     resetAdvancedFilters() {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       const { keyword } = this.filters;
       this.filters = { ...defaultFilters(), keyword };
       this.search();
@@ -868,12 +879,10 @@ export default {
     },
     onDialectChange(context = {}) {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       this.filters.dialectId = context.value || '';
     },
     clearDialect() {
       this.dialectTouched = true;
-      this.explicitDialectScope = true;
       this.filters.dialectId = '';
       this.filters.dialectMatch = 'subtree';
     },

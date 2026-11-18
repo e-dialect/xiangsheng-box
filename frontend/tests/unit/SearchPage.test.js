@@ -22,7 +22,7 @@ const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
 const {
-  fallbackProductProfile, productProfile,
+  fallbackProductProfile, productProfile, productSwitchUrl,
 } = await import('@/services/productProfile');
 
 function deferred() {
@@ -99,6 +99,27 @@ describe('entry-first search page orchestration', () => {
     }
   });
 
+  it.each(['', '23'])('preserves the source region "%s" when switching to a local site before the catalog loads', async (dialectId) => {
+    const source = pageContext();
+    Object.assign(source.filters, { keyword: '红团', dialectId, dialectMatch: 'exact' });
+    const target = { key: 'pxm', name: '兴化语记', origin: 'https://pxm.test.edialect.top' };
+    const params = SearchPage.computed.productSwitchParams.call(source);
+    const url = productSwitchUrl(target, { pathname: '/pages/search' }, '/', params);
+    const query = Object.fromEntries(new URL(url).searchParams);
+    expect(query.keywords).toBe('红团');
+    expect(dialectId ? query.dialect_id : query.dialect).toBe(dialectId || 'all');
+    Object.assign(productProfile, fallbackProductProfile('pxm.test.edialect.top'));
+    try {
+      listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+      const destination = pageContext();
+      await destination.initializeSiteScope(query);
+      expect(destination.filters.dialectId).toBe(dialectId);
+      if (dialectId) expect(destination.filters.dialectMatch).toBe('exact');
+    } finally {
+      Object.assign(productProfile, fallbackProductProfile());
+    }
+  });
+
   it('reports a failed region catalog and retries without replacing search state', async () => {
     const page = pageContext();
     page.filters.keyword = '行';
@@ -124,6 +145,26 @@ describe('entry-first search page orchestration', () => {
     expect(page.entries).toEqual([{ id: 7 }]);
     expect(page.next).toBe('/entries/?page=2');
     expect(request.get).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ has_recording: 'false' }, { has_recording: false }],
+    [{ writing_type: 'phonetic', source_type: 'oral' }, { writing_type: 'phonetic', source_type: 'oral' }],
+    [{ dialect: '闽.莆仙', dialect_scope: 'exact' }, { dialect_id: 20, dialect_scope: 'exact' }],
+  ])('runs a filter-only station landing with the restored criteria %o', async (query, expected) => {
+    listAllDialects.mockResolvedValue([{ id: 20, qualified_code: '闽.莆仙' }]);
+    request.get.mockResolvedValue({ results: [{ id: 7 }], count: 1 });
+    const destination = pageContext();
+    await SearchPage.onLoad.call(destination, query);
+    expect(request.get).toHaveBeenCalledWith('/entries/', expect.objectContaining(expected), true, { loading: false });
+    expect(destination.entries).toEqual([{ id: 7 }]);
+  });
+
+  it.each([{}, { dialect: 'all' }])('keeps an empty station landing idle for %o', async (query) => {
+    const destination = pageContext();
+    destination.search = vi.fn();
+    await SearchPage.onLoad.call(destination, query);
+    expect(destination.search).not.toHaveBeenCalled();
   });
 
   it('makes an empty region catalog recoverable', async () => {
@@ -156,7 +197,7 @@ describe('entry-first search page orchestration', () => {
     expect(page.filters.dialectId).toBe(23);
   });
 
-  it('round-trips the submitted keyword in WeChat without the draft or filters', async () => {
+  it('round-trips the submitted keyword in WeChat without unsaved filters', async () => {
     const page = pageContext();
     page.submittedKeyword = '行 & hiŋ+? %2F';
     page.filters.keyword = '尚未提交';
@@ -185,6 +226,53 @@ describe('entry-first search page orchestration', () => {
     page.loading = true;
     expect(SearchPage.onShareAppMessage.call(page).path).toBe('/pages/search');
     expect(SearchPage.onShareTimeline.call(page).query).toBe('sharedKeyword=');
+  });
+
+  it('restores only the published filter snapshot for both H5 and WeChat', async () => {
+    const sender = pageContext();
+    sender.entries = [{ id: 8 }];
+    sender.submittedKeyword = '菜名';
+    sender.appliedFilters = {
+      ...sender.filters,
+      dialectId: 21,
+      dialectMatch: 'exact',
+      hasRecording: false,
+      source: '资料 & 50% / 1',
+      status: 'reviewed',
+      owner: 'private',
+    };
+    sender.filters.dialectId = 99;
+    const shared = SearchPage.computed.keywordShare.call(sender);
+    const h5 = Object.fromEntries(new URL(shared.path, 'https://example.com').searchParams);
+    const wechat = Object.fromEntries(shared.query.split('&').map((part) => part.split('=')));
+    request.get.mockResolvedValue({ results: [] });
+    await Promise.all([h5, wechat].map(async (options) => {
+      const recipient = pageContext();
+      await SearchPage.onLoad.call(recipient, options);
+      expect(recipient.filters).toMatchObject({
+        keyword: '菜名',
+        dialectId: '21',
+        dialectMatch: 'exact',
+        hasRecording: false,
+        source: '资料 & 50% / 1',
+        status: 'reviewed',
+      });
+      expect(recipient.filters).not.toHaveProperty('owner');
+    }));
+    expect(shared.filtered).toBe(true);
+  });
+
+  it('opens a filters-only share and ignores malformed filter payloads', async () => {
+    const page = pageContext();
+    page.search = vi.fn();
+    const options = { filters: JSON.stringify({ hasRecording: false, dialectMatch: 'bad' }) };
+    await SearchPage.onLoad.call(page, options);
+    expect(page.search).toHaveBeenCalledOnce();
+    expect(page.filters).toMatchObject({ hasRecording: false, dialectMatch: 'subtree' });
+    const broken = pageContext();
+    broken.search = vi.fn();
+    await SearchPage.onLoad.call(broken, { filters: '%7Bbroken' });
+    expect(broken.search).not.toHaveBeenCalled();
   });
 
   it('keeps same-writing results as separate entries', async () => {
