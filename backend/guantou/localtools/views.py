@@ -10,6 +10,30 @@ from .models import MaterialPack, MaterialRevision
 from .public import public_material
 
 
+def parent_pinyin_for(dialect):
+    # A guide may name specific dialect points served by the same revision.
+    ancestors = []
+    node = dialect.parent
+    while node and node.pk not in ancestors:
+        ancestors.append(node.pk)
+        node = node.parent
+    published = {
+        pack.dialect_id: pack.active_revision
+        for pack in MaterialPack.objects.filter(
+            dialect_id__in=ancestors,
+            kind=MaterialPack.Kind.PINYIN,
+            active_revision__available=True,
+            active_revision__published_at__isnull=False,
+        ).select_related("active_revision")
+    }
+    code = dialect.qualified_code
+    for pk in ancestors:
+        revision = published.get(pk)
+        if revision and code in revision.payload.get("also_for", []):
+            return revision
+    return None
+
+
 @method_decorator(never_cache, name="dispatch")
 class LocalToolPacks(APIView):
     authentication_classes = []
@@ -46,6 +70,10 @@ class LocalToolPacks(APIView):
                 ).first()
             if revision:
                 packs[pack.kind] = public_material(revision)
+        if MaterialPack.Kind.PINYIN not in packs:
+            guide = parent_pinyin_for(dialect)
+            if guide:
+                packs[MaterialPack.Kind.PINYIN] = public_material(guide)
         return Response(
             {
                 "dialect": {

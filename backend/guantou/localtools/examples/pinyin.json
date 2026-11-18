@@ -1,7 +1,7 @@
 {
   "dialect": "闽.莆仙",
   "kind": "pinyin",
-  "version": "putian-city-reference-1",
+  "version": "putian-city-reference-2",
   "title": "莆仙话拼音 · 莆田城里入门",
   "accent": "莆田城里口音",
   "source": "莆仙乡音社拼音方案（旧兴化语记），据公开版本整理",
@@ -9,6 +9,7 @@
   "rights": "旧 uni-app DATA_PROVENANCE.md 记载莆仙乡音社授权项目使用。这里独立撰写说明，仅列少量单项音系事实和例字；完整旧表、行文、录音和视频转载需要重新确认本产品的使用范围。",
   "payload": {
     "schema": 1,
+    "also_for": ["闽.莆仙.莆田.城里"],
     "sections": [
       {
         "title": "怎么读拼音",
@@ -27,7 +28,8 @@
           {
             "form": "p",
             "ipa": "pʰ",
-            "example": "破 pua4"
+            "example": "破 pua4",
+            "hinghwa_word_id": 4334
           },
           {
             "form": "m",
@@ -84,7 +86,8 @@
           {
             "form": "1 · 阴平",
             "ipa": "533",
-            "example": "枝 gi1"
+            "example": "枝 gi1",
+            "hinghwa_word_id": 2226
           },
           {
             "form": "2 · 阳平",

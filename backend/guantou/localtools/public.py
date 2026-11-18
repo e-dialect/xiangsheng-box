@@ -1,4 +1,5 @@
-from guantou.models import Entry, Recording
+from guantou.legacy_import import SOURCE_SYSTEM
+from guantou.models import Entry, LegacyImportRecord, Recording
 
 from .models import MaterialPack
 
@@ -16,7 +17,13 @@ def project_content(kind, payload):
                     **fields(section, "title", "text"),
                     "rows": [
                         fields(
-                            row, "form", "ipa", "example", "entry_id", "recording_id"
+                            row,
+                            "form",
+                            "ipa",
+                            "example",
+                            "entry_id",
+                            "recording_id",
+                            "hinghwa_word_id",
                         )
                         for row in section.get("rows", [])
                     ],
@@ -52,6 +59,23 @@ def public_material(revision):
     references = []
     if kind == MaterialPack.Kind.PINYIN:
         references = [row for section in payload["sections"] for row in section["rows"]]
+        legacy_ids = {
+            str(row["hinghwa_word_id"])
+            for row in references
+            if row.get("hinghwa_word_id")
+        }
+        entries = dict(
+            LegacyImportRecord.objects.filter(
+                source_system=SOURCE_SYSTEM,
+                source_table="word_word",
+                target_model=Entry._meta.label,
+                source_id__in=legacy_ids,
+            ).values_list("source_id", "target_id")
+        )
+        for row in references:
+            legacy_id = row.pop("hinghwa_word_id", None)
+            if legacy_id is not None and str(legacy_id) in entries:
+                row["entry_id"] = entries[str(legacy_id)]
     elif kind == MaterialPack.Kind.KINSHIP:
         references = [term for node in payload["nodes"] for term in node["terms"]]
 
