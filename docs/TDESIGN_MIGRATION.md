@@ -276,7 +276,7 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
 ## 录音投稿审核（#702）
 
-投稿页使用“同意并提交审核”按钮记录公开展示许可。录音详情复用 BaseField、BaseButton 和确认对话框，让本人查看退回理由、修改大意、换音频、重投或撤回。地区审核员在整理工作台切换“仅看录音审核队列”，试听后给出审核结论，已公开投稿可从详情填写理由并下架。
+投稿页使用“同意并提交审核”按钮记录公开展示许可。录音详情的重投和下架表单在共享 BaseForm 校验通过后才能提交，校验等待时锁定操作。详情复用 BaseField、BaseButton 和确认对话框，让本人查看退回理由、修改大意、换音频、重投或撤回。地区审核员在整理工作台切换“仅看录音审核队列”，试听后给出审核结论，已公开投稿可从详情填写理由并下架。
 
 新音频由 `POST /files` 转码为 MP3，编码过程使用临时文件，输入和输出各上限 5 MB。音频字节随数据库备份，受控播放地址位于 `/files/recording-media/<uuid>/`。H5 使用带登录凭证的临时 Blob 试听，微信使用带凭证的临时下载。匿名公开播放、审核员试听和撤回均使用同一权限判定。网关需将该前缀转发到 Django 并保留 `Cache-Control: private, no-store`，不得以静态文件或 CDN 缓存命中。
 
