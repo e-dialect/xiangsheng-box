@@ -204,6 +204,13 @@
               />
             </view>
             <PronunciationForms :variant="variant" />
+            <BaseButton
+              v-if="variant.dialect?.qualified_code"
+              size="small"
+              variant="ghost"
+              text="查看拼音方案"
+              @click="openPinyinGuide(variant.dialect.qualified_code)"
+            />
           </view>
         </view>
         <view
@@ -535,6 +542,9 @@ export default {
       const result = await action(this.id);
       this.entry.is_bookmarked = result.bookmarked;
       notifySuccess({ title: result.bookmarked ? '已收藏词条' : '已取消收藏' });
+    },
+    openPinyinGuide(dialect) {
+      openPage(ROUTES.localTools, { dialect, tool: 'pinyin' });
     },
     async attest({ dialectId }) {
       if (!dialectId) return;
