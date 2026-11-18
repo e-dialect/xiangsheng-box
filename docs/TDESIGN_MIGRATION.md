@@ -1,5 +1,9 @@
 # TDesign UI migration tracker
 
+## 2026-11-19 · 逐字查音
+
+查词页新增跨地区字音入口。逐字页复用 PageShell、BaseForm、BaseField、PronunciationForms 和公共状态组件，H5 与微信共用页面。[#673](https://github.com/e-dialect/xiangsheng-box/issues/673)
+
 ## 2026-11-05 · 成员反馈 UI 收敛
 
 沿用 `codex/ui-phase-one`，处理录音授权与状态一致性、原始大意标识、常驻草稿工具区、方言层级返回和账户贡献概览。具体反馈映射、回归与待确认数据依赖见[成员反馈迭代记录](UI_FEEDBACK_2026-11-05.md)。11 月 6 日代码与主线对齐见[版本对齐记录](RELEASE_ALIGNMENT_2026-11-06.md)；微信真机和线上证据核查仍待验收。
