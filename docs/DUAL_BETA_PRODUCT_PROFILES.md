@@ -26,12 +26,29 @@ BOX_PRODUCT_PROFILE_ORIGINS={"https://box.test.edialect.top":"box","https://pxm.
 
 使用 `VITE_BACKEND_URL=` 的同源发布镜像即可复用两站构建。该镜像的浏览器缓存按站点 origin 隔离，站点配置接口为 `no-store`。公共媒体仍使用部署方已配置的规范 URL。微信构建可用 `VITE_BOX_PRODUCT_PROFILE=pxm` 绑定已登记 profile。微信 AppID、合法域名和 OAuth 凭据仍由对应发行环境设置，需实机验证。不同 AppID 会话连续性也需单独验证。
 
+### K3s 双站入口
+
+[双域 IngressRoute](../deploy/beta/ingress.yaml) 交给提供这批内测的命名空间。它要求同命名空间内有 `frontend:8080` 与 `backend:8000` 两个 Ready Service，两个域名使用同一份 H5 和同一套内测库。部署配置中使用上面的双域映射、稳定的 HTTPS `PUBLIC_BACKEND_URL` 和持久化的 SQLite。受控录音的二进制及授权关系保存在 SQLite，历史媒体继续使用原媒体卷或对象存储。
+
+命名空间由值班人核对 Service、PVC 和运行环境后指定。以下两条命令预览资源，`diff` 返回 1 表示有变更。
+
+```sh
+kubectl --context taju-yl -n "${BETA_NAMESPACE:?指定已核对的内测命名空间}" apply --dry-run=server -f deploy/beta/ingress.yaml
+kubectl --context taju-yl -n "$BETA_NAMESPACE" diff -f deploy/beta/ingress.yaml
+```
+
+公网路由使用 `edialect-public/websecure` 和现有 `tencentcloud` resolver。两个 Host 共用三条有优先级的规则。H5 的分享封面和图标许可文件交给前端，其余 `/static/`（含后台静态资源）、`/local-tools/`、`/files/recording-media/` 和既有 API 交给 Django。词条分享深链与旧兴化语记页面交给前端 history fallback。应用清单前留存既有兴化测试 Web 路由、优先级和 resolver；默认旧 Host 规则保留时，新 H5 的优先级 60 可接管，原兴化测试 API 域名独立运行。
+
+`python3 scripts/check-dual-beta-ingress.py` 从公网检查两个默认 HTTPS 域名。隔离入口可通过 `--box`、`--pxm` 指定。探针只发起匿名 GET，验证域名对应的站点配置与切站链接、查词深链、两站入口 JS 哈希、实际 PNG 分享图、地方工具 JSON，以及随机不存在的音频是否收到不可缓存的 API 404。它会输出两站入口文件的 SHA-256 供发布记录使用。已录制、待审和撤回音频需要用投稿人、审核人及访客在同一网关另行验收。
+
 ## 隔离验证与回退
 
 - 用既有发布流程备份 SQLite、持久化媒体、对象存储及网关配置，记录镜像 digest、提交、数据库备份时间和媒体恢复点。保留原始账户、贡献和权限，在隔离副本演练 `migrate`，无需导入演示库。验证 `siteconfig.0005_product_profiles` 新增配置表及初始版本，并核对 `0006_profile_home_layout` 为旧版本补齐「地方工具、混合精选」及原有三种工具的默认配置。
 - 核对两站的首页、查词、词条、录音、账户、404、分享冷启动与登录返回。在浅色和暗色的手机宽度下复测。前端 E2E 运行方式见下方，匿名检查之外另需真实登录和录制授权验收。
 - 运营内容故障可恢复到上一站点版本。如果两站品牌配置都需临时撤下，保留两个 origin 并将其映射改为 `general`，重启后端后复核。单纯移除 origin 会同时取消该 Host 的生产 API 准入。
 - 应用回退优先使用上一个已验证 digest，保留已经扩展的数据库及新写入。回到只认一个 Host 的旧后端时，应一并还原原网关配置，先在隔离环境验证旧入口和新入口的转接安排。数据库恢复使用独立副本演练，恢复点之后的写入可能丢失。公共内测上线前另行验证备份恢复、真实认证、媒体读写、告警和资源余量。
+
+回退到双站版本以前时，旧版写接口沿用原来的录音公开策略。保留当前数据库与媒体并暂停投稿，先将流量恢复到经过验证的只读入口，再使用包含授权审核的版本恢复投稿。切回旧兴化测试 Web 只切换浏览入口。真实备份应在隔离副本核对恢复点、SQLite 完整性及外键、既有录音的媒体和授权、恢复点后的投稿。新录音保存在新表，向下迁移会删除表及录音数据。
 
 ## 本地双站检查
 
