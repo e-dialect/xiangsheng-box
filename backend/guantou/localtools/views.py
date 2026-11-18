@@ -29,7 +29,8 @@ def parent_pinyin_for(dialect):
     code = dialect.qualified_code
     for pk in ancestors:
         revision = published.get(pk)
-        if revision and code in revision.payload.get("also_for", []):
+        coverage = revision.payload.get("also_for") if revision else None
+        if isinstance(coverage, list) and code in coverage:
             return revision
     return None
 

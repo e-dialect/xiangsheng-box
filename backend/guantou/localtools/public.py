@@ -62,7 +62,7 @@ def public_material(revision):
         legacy_ids = {
             str(row["hinghwa_word_id"])
             for row in references
-            if row.get("hinghwa_word_id")
+            if type(row.get("hinghwa_word_id")) is int
         }
         entries = dict(
             LegacyImportRecord.objects.filter(
@@ -74,7 +74,11 @@ def public_material(revision):
         )
         for row in references:
             legacy_id = row.pop("hinghwa_word_id", None)
-            if legacy_id is not None and str(legacy_id) in entries:
+            if (
+                type(legacy_id) is int
+                and not row.get("entry_id")
+                and str(legacy_id) in entries
+            ):
                 row["entry_id"] = entries[str(legacy_id)]
     elif kind == MaterialPack.Kind.KINSHIP:
         references = [term for node in payload["nodes"] for term in node["terms"]]

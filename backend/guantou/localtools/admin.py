@@ -148,6 +148,7 @@ class MaterialRevisionAdmin(admin.ModelAdmin):
             **self.admin_site.each_context(request),
             "title": f"{obj.title} · 预览",
             "material": public_material(obj),
+            "original": obj,
             "kind": obj.pack.kind,
         }
         return render(request, "admin/localtools/preview.html", context)
