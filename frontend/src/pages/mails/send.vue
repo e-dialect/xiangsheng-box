@@ -237,6 +237,7 @@ import BaseLoading from '@/components/BaseLoading.vue';
 import PageShell from '@/components/PageShell.vue';
 import SectionBlock from '@/components/SectionBlock.vue';
 import { notifyError, notifySuccess } from '@/services/feedback';
+import { contentFeedbackDraft } from '@/services/contentFeedback';
 import { postMail } from '@/services/mail';
 import { openPage, ROUTES } from '@/services/navigation';
 import { searchUsers } from '@/services/user';
@@ -320,6 +321,11 @@ export default {
   },
   onLoad(options = {}) {
     this.applyRecipient(options.id ?? options.recipient);
+    const feedbackDraft = contentFeedbackDraft(options);
+    if (feedbackDraft) {
+      Object.assign(this.Notification, feedbackDraft);
+      return;
+    }
     if (options.title) this.Notification.title = decodeURIComponent(options.title);
     if (options.content) {
       this.Notification.content = decodeURIComponent(options.content);

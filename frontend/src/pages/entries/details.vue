@@ -4,11 +4,12 @@
       v-if="loading"
       text="正在读取词条…"
     />
-    <EmptyState
+    <UnavailableContent
       v-else-if="errorMessage"
       :title="errorMessage"
-      action-text="重试"
-      @action="load"
+      object-type="entry"
+      :object-id="id"
+      @retry="load"
     />
     <view
       v-else-if="entry"
@@ -327,6 +328,7 @@ import CollectionPicker from '@/components/CollectionPicker.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import UnavailableContent from '@/components/UnavailableContent.vue';
 import DialectLabel from '@/components/DialectLabel.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
@@ -363,6 +365,7 @@ export default {
     BaseLoading,
     DialectLabel,
     EmptyState,
+    UnavailableContent,
     EntryRecordingCard,
     PageShell,
   },

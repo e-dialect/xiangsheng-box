@@ -4,11 +4,12 @@
       v-if="loading"
       text="正在读取乡音…"
     />
-    <EmptyState
+    <UnavailableContent
       v-else-if="error"
       :title="error"
-      action-text="重试"
-      @action="load"
+      object-type="recording"
+      :object-id="id"
+      @retry="load"
     />
     <view
       v-else-if="recording"
@@ -88,7 +89,7 @@ import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
-import EmptyState from '@/components/EmptyState.vue';
+import UnavailableContent from '@/components/UnavailableContent.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import RecordingContributorButton from '@/components/RecordingContributorButton.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
@@ -118,7 +119,7 @@ export default {
     PageShell,
     BaseButton,
     BaseLoading,
-    EmptyState,
+    UnavailableContent,
     EntryRecordingCard,
     RecordingContributorButton,
     CollectionPicker,
