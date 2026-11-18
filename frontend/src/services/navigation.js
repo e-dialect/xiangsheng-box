@@ -9,6 +9,7 @@ export const ROUTES = Object.freeze({
   entryDetail: '/pages/entries/details',
   mine: '/pages/users/me',
   login: '/pages/login/login',
+  localTools: '/pages/tools/local',
   circleList: '/pages/circles/index',
   circleDetail: '/pages/circles/details',
   userDetail: '/pages/users/details',

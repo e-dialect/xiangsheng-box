@@ -17,3 +17,11 @@ e-dialect or Beijing Taju Technology Co., Ltd.
 When adding or updating a vendored component, preserve its adjacent notices and
 update this table with the exact source, version/commit, license, and local
 modification status.
+
+### Kinship calculator engine
+
+`frontend/src/utils/localtools/kinshipEngine.mjs` is the unmodified engine from
+[e-dialect/hinghwa-dict-web at a84cbd7](https://github.com/e-dialect/hinghwa-dict-web/blob/a84cbd7eabacfd31ad1727fc77ca96c5f471ecf7/src/data/kinship/v1/engine.mjs).
+The implementation is by lin594 and is available under AGPL-3.0-only, as
+documented by the source repository's license. This notice covers the engine
+code. The separately attributed content packs have their own provenance.

@@ -12,6 +12,7 @@ urlpatterns = [
     path("", include("guantou.urls")),
     path("", include("themes.urls")),
     path("", include("productanalytics.urls")),
+    path("local-tools/", include("localtools.urls")),
     path("users/", include("user.urls", namespace="users")),
     path("login/", include("user.urls", namespace="login")),
     path("users", user.router_users),

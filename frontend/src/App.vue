@@ -13,6 +13,7 @@ import {
 } from '@/services/dialectOnboarding';
 import { bindThemeAdapters, pullThemeCloudState } from '@/services/themeApi';
 import { applyTheme } from '@/services/theme';
+import { loadProductProfile, syncProductTitle } from '@/services/productProfile';
 import { hydrateOutfitStyle } from '@/services/themeCenter';
 import pagesJson from '@/pages.json';
 
@@ -24,6 +25,8 @@ export default {
     bindThemeAdapters();
     applyTheme();
     hydrateOutfitStyle();
+    syncProductTitle();
+    loadProductProfile();
     this.globalData.capabilities = await hydrateCapabilities();
     if (!this.globalData.id) {
       const token = uni.getStorageSync('token');

@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 
+from .product_origins import product_profile_origins
 from .settings import *  # noqa: F403,F401
 
 if ENVIRONMENT != "production":
@@ -29,9 +30,23 @@ if (
 ):
     raise ImproperlyConfigured("PUBLIC_BACKEND_URL must be an HTTPS origin")
 PUBLIC_BACKEND_URL = f"https://{origin.hostname}"
-ALLOWED_HOSTS = [origin.hostname, "127.0.0.1", "localhost"]
+BOX_PRODUCT_PROFILE_ORIGINS = product_profile_origins(
+    BOX_PRODUCT_PROFILE_ORIGINS, production=True
+)
+ALLOWED_HOSTS = list(
+    dict.fromkeys(
+        [
+            origin.hostname,
+            "127.0.0.1",
+            "localhost",
+            *(urlsplit(site).hostname for site in BOX_PRODUCT_PROFILE_ORIGINS),
+        ]
+    )
+)
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [PUBLIC_BACKEND_URL]
+CORS_ALLOWED_ORIGINS = list(
+    dict.fromkeys([PUBLIC_BACKEND_URL, *BOX_PRODUCT_PROFILE_ORIGINS])
+)
 CSRF_TRUSTED_ORIGINS = [PUBLIC_BACKEND_URL]
 # The application has no host port; only the shared gateway supplies this header.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

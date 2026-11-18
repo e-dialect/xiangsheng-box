@@ -270,6 +270,10 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 验证：Node 22.23.4、冻结 yarn.lock 离线安装；lint 通过；全量单测 913 通过、3 跳过；H5/微信 checked build 通过。构建仅通过 Node 的 warning code 选项屏蔽运行器注入的 UNDICI-EHPA 代理实验警告，未改项目警告审计。新增 EntryReadingRelations 11 项单测覆盖同值/不同/缺项/文读、四类关系、未知关系与义项切换。H5 使用明确标为演示的拦截响应，在 390×844 浅/深色检查；未连接真实后端或执行微信真机验收。
 
+## 地方工具（#675、#700、#701）
+
+地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
+
 ## 录音投稿审核（#702）
 
 重新送审和下架均经 BaseForm 校验。校验期间按钮锁定，切换账号后旧操作不会提交。

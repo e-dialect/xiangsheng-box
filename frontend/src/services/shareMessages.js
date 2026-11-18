@@ -1,4 +1,5 @@
-import { SHARE_TITLE } from '@/const/branding';
+import { SHARE_TAGLINE } from '@/const/branding';
+import { currentProductName } from '@/services/productProfile';
 import { ROUTES } from '@/services/navigation';
 
 export function message(successMessage, failMessage) {
@@ -24,7 +25,7 @@ export function defaultMessage() {
 export default {
   onShareTimeline() {
     return {
-      title: SHARE_TITLE,
+      title: `${currentProductName()}：${SHARE_TAGLINE}`,
       path: ROUTES.home,
       imageUrl: 'https://cos.edialect.top/miniprogram/fm.gif',
       ...defaultMessage(),

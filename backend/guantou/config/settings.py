@@ -45,6 +45,9 @@ PHONE_CODE_THROTTLE_SECONDS = env.int("PHONE_CODE_THROTTLE_SECONDS", 60)
 
 ALLOWED_HOSTS = ["*"]
 
+# Public H5 profile lookup only. These origins do not grant API permissions.
+BOX_PRODUCT_PROFILE_ORIGINS = env.json("BOX_PRODUCT_PROFILE_ORIGINS", default=None)
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -65,6 +68,7 @@ INSTALLED_APPS = [
     "inbox",
     "themes",
     "productanalytics",
+    "localtools",
     "corsheaders",
 ]
 

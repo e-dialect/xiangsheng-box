@@ -4,11 +4,12 @@
       v-if="loading"
       text="正在读取乡音…"
     />
-    <EmptyState
+    <UnavailableContent
       v-else-if="error"
       :title="error"
-      action-text="重试"
-      @action="load"
+      object-type="recording"
+      :object-id="id"
+      @retry="load"
     />
     <view
       v-else-if="recording"
@@ -16,7 +17,7 @@
     >
       <view class="box-cover">
         <text class="box-kicker">
-          乡声集盒 · 听见一个地方
+          {{ productName }} · 听见一个地方
         </text>
         <text class="box-title">
           录音详情
@@ -175,7 +176,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
-import EmptyState from '@/components/EmptyState.vue';
+import UnavailableContent from '@/components/UnavailableContent.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import RecordingContributorButton from '@/components/RecordingContributorButton.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
@@ -193,6 +194,7 @@ import { requireAuth } from '@/services/authGuard';
 import { chooseAudioFile, uploadFile } from '@/services/file';
 import { confirm, notify } from '@/services/feedback';
 import { stopAudio } from '@/utils/audio';
+import { currentProductName } from '@/services/productProfile';
 import {
   defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
@@ -210,7 +212,7 @@ export default {
     PageShell,
     BaseButton,
     BaseLoading,
-    EmptyState,
+    UnavailableContent,
     EntryRecordingCard,
     RecordingContributorButton,
     CollectionPicker,
@@ -238,6 +240,7 @@ export default {
 
   }),
   computed: {
+    productName: currentProductName,
     speakerRoleLabel() {
       return {
         self: '发声人 · 投稿人本人',
