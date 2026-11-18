@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import {
   beforeEach,
   describe,
@@ -9,6 +9,13 @@ import {
 
 vi.mock('@/routers', () => ({ toIndexPage: vi.fn() }));
 
+vi.mock('@/services/productProfile', async (importOriginal) => ({
+  ...await importOriginal(),
+  currentProductName: () => '兴化语记',
+  loadProductProfile: vi.fn(),
+}));
+
+const { loadProductProfile } = await import('@/services/productProfile');
 const { toIndexPage } = await import('@/routers');
 const { default: NotFoundPage } = await import('@/pages/error/not-found.vue');
 
@@ -45,6 +52,29 @@ describe('not-found recovery page', () => {
     expect(wrapper.text()).toContain(attemptedPath);
     expect(wrapper.text()).not.toContain('private-value');
     expect(wrapper.text()).toContain('这条路没有找到页面');
+  });
+
+  it.each([
+    ['/articles/175', {}, '暂未接入旧版文章'],
+    ['/pages/articles/details', {}, '暂未接入旧版文章'],
+    ['/music', {}, '暂未接入旧版音乐'],
+    ['/search', { legacySearchNeedsInput: '1' }, '关键词需要重新选择'],
+  ])('offers a search or home action for the legacy PXM path %s', async (path, query, message) => {
+    loadProductProfile.mockResolvedValue({ key: 'pxm' });
+    const wrapper = mountPage();
+    wrapper.vm.$options.onLoad.call(wrapper.vm, { path, ...query });
+    await flushPromises();
+    expect(wrapper.text()).toContain(message);
+    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['查找词条', '回到首页']);
+  });
+
+  it('keeps the general site recovery page for the same historical path', async () => {
+    loadProductProfile.mockResolvedValue({ key: 'box' });
+    const wrapper = mountPage();
+    wrapper.vm.$options.onLoad.call(wrapper.vm, { path: '/articles/175' });
+    await flushPromises();
+    expect(wrapper.text()).toContain('这条路没有找到页面');
+    expect(wrapper.findAll('button')).toHaveLength(1);
   });
 
   it('uses only an unreplaced H5 history path as the attempted route', () => {
