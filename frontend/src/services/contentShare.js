@@ -1,4 +1,4 @@
-import { APP_NAME } from '@/const/branding';
+import { currentProductName, productShareTitle } from '@/services/productProfile';
 import { openPage, pageUrl, ROUTES } from '@/services/navigation';
 import { showWechatShareMenu, WECHAT_SHARE_IMAGE } from '@/services/pageShare';
 import { canUseNativeMiniProgramShare, isQQMiniProgram } from '@/services/platform';
@@ -14,7 +14,7 @@ function contentShareMessage(content, route, title) {
   const dialect = content.usage_dialect;
   const region = naturalDialectName(dialect?.path_names?.slice(-1)[0] || dialect?.name);
   return {
-    title: `${title} · ${shareText(region, 12) || '地区待补充'}`,
+    title: productShareTitle(`${title} · ${shareText(region, 12) || '地区待补充'}`),
     path: pageUrl(route, { id: content.id }),
     query: `id=${encodeURIComponent(content.id)}`,
   };
@@ -40,19 +40,19 @@ export function collectionShareMessage(collection) {
   if (collection?.is_public !== true || !collection.id) return null;
   const title = shareText(collection.title, 24) || '公开集盒';
   return {
-    title: `集盒｜${title}`,
+    title: productShareTitle(`集盒｜${title}`),
     path: pageUrl(ROUTES.collectionDetail, { id: collection.id }),
     query: `id=${encodeURIComponent(collection.id)}`,
   };
 }
 
 export function defaultContentShareMessage() {
-  return { title: APP_NAME, path: ROUTES.home };
+  return { title: currentProductName(), path: ROUTES.home };
 }
 
 export function qqContentShareMessage(message, kind) {
   return {
-    title: message?.title || APP_NAME,
+    title: message?.title || currentProductName(),
     imageUrl: WECHAT_SHARE_IMAGE,
     ...(message?.query ? { query: `box_share=${kind}&${message.query}` } : {}),
   };

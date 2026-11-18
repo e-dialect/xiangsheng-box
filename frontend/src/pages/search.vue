@@ -2,6 +2,7 @@
   <AppShell
     title="查找词条"
     active="search"
+    :product-switch-params="productSwitchParams"
     @scrolltolower="loadMore"
   >
     <view class="entry-search">
@@ -450,7 +451,7 @@ import { listAllDialects } from '@/services/guantou';
 import {
   goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
 } from '@/services/navigation';
-import { APP_NAME } from '@/const/branding';
+import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
@@ -458,6 +459,16 @@ import {
 import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
+
+const SWITCH_FILTERS = {
+  writingType: 'writing_type',
+  sourceType: 'source_type',
+  status: 'status',
+  ipa: 'ipa',
+  romanization: 'romanization',
+  source: 'source',
+  concept: 'concept',
+};
 
 const WRITING_TYPES = [
   { label: '不限', value: '' },
@@ -553,6 +564,9 @@ export default {
       searchRequestId: 0,
       dialects: [],
       dialectsLoading: false,
+      siteScopeReady: null,
+      dialectTouched: false,
+      pendingSiteScope: null,
       dialectsError: '',
       dialectPickerVisible: false,
       writingPickerVisible: false,
@@ -596,9 +610,25 @@ export default {
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
       const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
       return {
-        title: `查词｜${keyword} · ${APP_NAME}`,
+        title: `查词｜${keyword} · ${currentProductName()}`,
         path,
         query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+      };
+    },
+    productSwitchParams() {
+      const { filters } = this;
+      const pending = !this.dialectTouched && !filters.dialectId ? this.pendingSiteScope : null;
+      const pendingMatch = pending?.exact ? 'exact' : '';
+      const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
+      return {
+        keywords: filters.keyword,
+        dialect: dialect?.qualified_code || pending?.code || (filters.dialectId ? '' : 'all'),
+        dialect_id: dialect ? '' : filters.dialectId,
+        dialect_scope: filters.dialectId ? filters.dialectMatch : pendingMatch,
+        ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
+          [key, filters[field]]
+        ))),
+        has_recording: typeof filters.hasRecording === 'boolean' ? filters.hasRecording : '',
       };
     },
     primaryDialect() {
@@ -674,21 +704,63 @@ export default {
       }
     }
     // #endif
-    this.loadDialects();
-    if (this.filters.keyword) await this.search();
+    this.siteScopeReady = this.initializeSiteScope(options);
+    if (!this.filters.keyword) {
+      const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
+      if (!switchKeys.some((key) => options[key])) return;
+      await this.siteScopeReady;
+      if (!activeFilterCount(this.filters) && !this.pendingSiteScope) return;
+    }
+    await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
-    const { title = `查找词条｜${APP_NAME}`, query } = this.keywordShare || {};
+    const { title = `查找词条｜${currentProductName()}`, query } = this.keywordShare || {};
     const path = query ? `${ROUTES.search}?${query}` : ROUTES.search;
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
   onShareTimeline() {
-    const { title = `查找词条｜${APP_NAME}`, query = 'sharedKeyword=' } = this.keywordShare || {};
+    const { title = `查找词条｜${currentProductName()}`, query = 'sharedKeyword=' } = this.keywordShare || {};
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
   // #endif
   methods: {
+    async initializeSiteScope(options) {
+      const explicitDialect = typeof options.dialect === 'string';
+      const legacyShare = typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
+      Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
+        if (typeof options[key] === 'string') this.filters[field] = options[key];
+      });
+      if (options.has_recording === 'true' || options.has_recording === 'false') {
+        this.filters.hasRecording = options.has_recording === 'true';
+      }
+      const catalog = this.loadDialects();
+      if (!explicitDialect && /^[1-9]\d*$/.test(options.dialect_id || '')) {
+        this.filters.dialectId = options.dialect_id;
+        this.filters.dialectMatch = options.dialect_scope === 'exact' ? 'exact' : 'subtree';
+        return;
+      }
+      if (legacyShare && !explicitDialect) return;
+      const code = explicitDialect
+        ? options.dialect : (await loadProductProfile()).default_dialect;
+      if (!code || code === 'all') return;
+      this.pendingSiteScope = { code, exact: options.dialect_scope === 'exact' };
+      await catalog;
+      this.resolveSiteScope();
+    },
+    resolveSiteScope() {
+      if (!this.pendingSiteScope) return;
+      if (this.filters.dialectId || this.dialectTouched) {
+        this.pendingSiteScope = null;
+        return;
+      }
+      const { code, exact } = this.pendingSiteScope;
+      const dialect = this.dialects.find(({ qualified_code: value }) => value === code);
+      if (!dialect) return;
+      this.filters.dialectId = dialect.id;
+      this.filters.dialectMatch = exact ? 'exact' : 'subtree';
+      this.pendingSiteScope = null;
+    },
     async loadDialects() {
       if (this.dialectsLoading) return;
       this.dialectsLoading = true;
@@ -730,6 +802,7 @@ export default {
       this.search();
     },
     resetAdvancedFilters() {
+      this.dialectTouched = true;
       const { keyword } = this.filters;
       this.filters = { ...defaultFilters(), keyword };
       this.search();
@@ -738,17 +811,32 @@ export default {
       this.openSections = [];
       return this.search();
     },
-    handleErrorAction() {
+    async handleErrorAction() {
       if (this.searchUnavailable) {
         goHome(true);
         return;
       }
-      this.search();
+      if (this.pendingSiteScope) await this.loadDialects();
+      await this.search();
     },
     async search() {
-      const filters = { ...this.filters };
       const requestId = this.searchRequestId + 1;
       this.searchRequestId = requestId;
+      if (this.siteScopeReady) await this.siteScopeReady;
+      if (requestId !== this.searchRequestId) return;
+      this.resolveSiteScope();
+      if (this.pendingSiteScope) {
+        this.searched = true;
+        this.searchUnavailable = false;
+        this.loading = false;
+        this.loadingMore = false;
+        this.entries = [];
+        this.total = 0;
+        this.next = null;
+        this.errorMessage = '指定的地区暂时无法读取，请重试或手动选择地区';
+        return;
+      }
+      const filters = { ...this.filters };
       this.loadingMore = false;
       this.submittedKeyword = String(filters.keyword || '').trim();
       filters.keyword = entryQuestionTerm(this.submittedKeyword, this.dialects);
@@ -825,9 +913,11 @@ export default {
       }
     },
     onDialectChange(context = {}) {
+      this.dialectTouched = true;
       this.filters.dialectId = context.value || '';
     },
     clearDialect() {
+      this.dialectTouched = true;
       this.filters.dialectId = '';
       this.filters.dialectMatch = 'subtree';
     },

@@ -1,6 +1,9 @@
 import demjson3
 from django.http import JsonResponse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_safe
+from django.views.decorators.vary import vary_on_headers
 
 from announcements.dto.announcement import announcement_normal
 from announcements.models import Announcement
@@ -10,6 +13,12 @@ from utils.collections import order_by_id_list
 
 from .models import SiteSettings
 from .capabilities import resolved_remote_capabilities
+from .product_profiles import (
+    GENERAL_KEY,
+    active_profile,
+    profile_payload,
+    resolve_profile_request,
+)
 
 
 def announcement_payload(announcement):
@@ -131,3 +140,19 @@ def capabilities(request):
         },
         status=200,
     )
+
+
+@require_safe
+@never_cache
+@vary_on_headers("Origin")
+def product_profile(request):
+    profile, targets = resolve_profile_request(request)
+    return JsonResponse({"profile": profile, "switch_targets": targets})
+
+
+@require_safe
+@never_cache
+def client_product_profile(request, key):
+    """A compiled client may request a registered profile by key."""
+    profile = active_profile(key) or active_profile(GENERAL_KEY)
+    return JsonResponse({"profile": profile_payload(profile), "switch_targets": []})

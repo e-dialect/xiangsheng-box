@@ -1,0 +1,7 @@
+{% extends "admin/change_form.html" %}
+{% block object-tools-items %}
+  {% if original %}
+    <li><a href="{% url 'admin:siteconfig_revision_preview' original.pk %}">预览和发布</a></li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

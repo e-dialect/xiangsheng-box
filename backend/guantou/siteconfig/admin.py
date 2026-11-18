@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from . import profile_admin  # Registers the per-profile administration views.
 from .models import SiteSettings
 
 

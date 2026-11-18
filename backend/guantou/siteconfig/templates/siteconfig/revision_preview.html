@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">首页</a> ›
+  <a href="{% url 'admin:siteconfig_productprofilerevision_changelist' %}">站点版本</a> ›
+  预览
+</div>
+{% endblock %}
+{% block content %}
+<section class="module">
+  <h2>{{ profile.name }}</h2>
+  {% if profile.credit %}<p>{{ profile.credit }}</p>{% endif %}
+  <dl>
+    <dt>状态</dt><dd>{{ status }}</dd>
+    <dt>默认查词范围</dt><dd>{{ profile.default_dialect|default:"不限" }}</dd>
+    <dt>地方工具</dt><dd>{{ profile.local_tools_dialect|default:"未配置" }}</dd>
+    <dt>首页精选</dt>
+    <dd>
+      <ol>
+        {% for feature in profile.featured %}
+          <li>{{ feature.title }}（{{ feature.type }} {{ feature.id }}）</li>
+        {% empty %}
+          <li>当前无公开精选</li>
+        {% endfor %}
+      </ol>
+    </dd>
+  </dl>
+</section>
+<form method="post" class="submit-row">
+  {% csrf_token %}
+  {% if can_copy %}<button type="submit" name="action" value="copy">复制为新草稿</button>{% endif %}
+  {% if can_publish %}
+    <button type="submit" name="action" value="publish">
+      {% if revision.first_published_at %}恢复此版本{% else %}发布此版本{% endif %}
+    </button>
+  {% endif %}
+</form>
+{% endblock %}
