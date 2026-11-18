@@ -1,4 +1,6 @@
 ﻿import os
+import tempfile
+from pathlib import Path
 
 import demjson3
 from django.conf import settings
@@ -6,6 +8,8 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
+from guantou.models import RecordingMedia
+from files.recording_media import media_url
 from user.tokens import get_authorization_token, token_check
 from utils.exceptions.types.bad_request import BadRequestException
 from utils.exceptions.types.service_unavailable import ServiceUnavailableException
@@ -85,36 +89,40 @@ def files(request):
         suffix = file_extension(uploaded_file, file_type).lower()
         if audio_upload:
             validate_audio_format(uploaded_file)
-            file_type = "audio"
-            # All accepted formats are normalized to MP3 before storage.
-            suffix = "mp3"
+            # A temporary file is required by the encoder. Never write new audio
+            # under MEDIA_ROOT or send it to the publicly served COS namespace.
+            with tempfile.NamedTemporaryFile(suffix=".mp3") as normalized:
+                try:
+                    duration_ms = normalize_audio_to_mp3(uploaded_file, normalized.name)
+                except AudioDecodeError as exc:
+                    raise BadRequestException("无法解析音频文件") from exc
+                except AudioCapabilityUnavailable as exc:
+                    raise ServiceUnavailableException(str(exc)) from exc
+                except AudioProcessingError as exc:
+                    raise ServiceUnavailableException("音频处理服务暂不可用") from exc
+                if os.path.getsize(normalized.name) > MAX_AUDIO_SIZE_BYTES:
+                    raise BadRequestException("转码后的音频不能超过 5 MB")
+                asset = RecordingMedia.objects.create(
+                    owner=user,
+                    duration_ms=duration_ms,
+                    content=Path(normalized.name).read_bytes(),
+                )
+            return JsonResponse(
+                {"url": media_url(asset.id), "duration_ms": duration_ms}
+            )
         filename = f"{timezone.now().strftime('%Y_%m_%d')}_{random_str(15)}.{suffix}"
         folder = os.path.join(settings.MEDIA_ROOT, file_type, str(user.id))
         os.makedirs(folder, exist_ok=True)
         path = os.path.join(folder, filename)
-        duration_ms = 0
-        if not audio_upload:
-            with open(path, "wb") as f:
-                for chunk in uploaded_file.chunks():
-                    f.write(chunk)
-        else:
-            try:
-                duration_ms = normalize_audio_to_mp3(uploaded_file, path)
-            except AudioDecodeError as exc:
-                raise BadRequestException("无法解析音频文件") from exc
-            except AudioCapabilityUnavailable as exc:
-                raise ServiceUnavailableException(str(exc)) from exc
-            except AudioProcessingError as exc:
-                raise ServiceUnavailableException("音频处理服务暂不可用") from exc
+        with open(path, "wb") as f:
+            for chunk in uploaded_file.chunks():
+                f.write(chunk)
         key = (
             f"files/{file_type}/{user.id}/"
             + timezone.now().strftime("%Y/%m/%d/")
             + filename.split("_")[-1]
         )
-        response_data = {"url": upload_file(path, key)}
-        if audio_upload:
-            response_data["duration_ms"] = duration_ms
-        return JsonResponse(response_data, status=200)
+        return JsonResponse({"url": upload_file(path, key)}, status=200)
     if request.method == "DELETE":
         try:
             body = demjson3.decode(request.body)

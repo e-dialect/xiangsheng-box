@@ -73,7 +73,7 @@
     "@rollup/plugin-alias": "^6.0.1",
     "@tdesign/uniapp": "^1.0.0",
     "marked": "^18.2.0",
-    "postcss": "^8.5.31",
+    "postcss": "^8.5.33",
     "vue": "3.4.21"
   },
   "devDependencies": {
@@ -82,7 +82,7 @@
     "@dcloudio/uni-cli-shared": "3.0.0-5030420261029002",
     "@dcloudio/uni-stacktracey": "3.0.0-5030420261029002",
     "@dcloudio/vite-plugin-uni": "3.0.0-5030420261029002",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "@vitejs/plugin-vue": "6.0.11",
     "@vue/compiler-dom": "3.5.45",
     "@vue/runtime-core": "3.5.45",
@@ -98,7 +98,7 @@
     "mini-types": "*",
     "miniprogram-api-typings": "*",
     "playwright": "^1.63.0",
-    "rollup": "4.68.2",
+    "rollup": "4.68.3",
     "sass": "^1.108.2",
     "start-server-and-test": "^3.0.13",
     "unplugin-auto-import": "^21.1.0",
@@ -108,7 +108,7 @@
     "wait-on": "^9.5.1"
   },
   "resolutions": {
-    "rollup": "4.68.2",
+    "rollup": "4.68.3",
     "vite": "5.4.21"
   }
 }

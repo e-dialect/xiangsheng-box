@@ -147,30 +147,44 @@ async function persistSavedFile(audio, mediaId) {
 }
 
 export async function persistDraftAudio(audio, mediaId) {
-  if (!audio || !audio.path) return null;
+  if (!audio) return null;
+  // A failed preview still refers to saved audio. Text-only edits must not
+  // replace that reference with null and delete its Blob. Explicit removal
+  // clears persistence metadata along with the path in the recording page.
+  if (!audio.path && audio.persisted && audio.storage === 'indexeddb' && audio.mediaId) {
+    return audioMetadata(audio, { available: false });
+  }
+  if (!audio.path) return null;
   if (isWebPlatform()) return persistWebAudio(audio, mediaId);
   return persistSavedFile(audio, mediaId);
 }
 
 export async function restoreDraftAudio(audio) {
   if (!audio) return null;
-  if (!(await isDraftAudioAvailable(audio))) {
-    return audioMetadata(audio, {
-      path: '',
-      persisted: Boolean(audio.persisted),
-      available: false,
-      invalid: true,
-    });
+  const unavailable = () => audioMetadata(audio, {
+    path: '',
+    persisted: Boolean(audio.persisted),
+    available: false,
+    invalid: true,
+  });
+  if (audio.persisted && audio.storage === 'indexeddb') {
+    try {
+      // Restore the same Blob we checked, without a second storage transaction.
+      const blob = await useObjectStore('readonly', (store) => store.get(audio.mediaId));
+      if (!blob) return unavailable();
+      return audioMetadata(audio, {
+        path: URL.createObjectURL(blob),
+        persisted: true,
+        available: true,
+        invalid: false,
+      });
+    } catch (error) {
+      // Audio failure must not prevent restoring the draft's text and entry.
+      // Keep persistence metadata so opening the draft again can retry.
+      return unavailable();
+    }
   }
-  if (audio.storage === 'indexeddb') {
-    const blob = await useObjectStore('readonly', (store) => store.get(audio.mediaId));
-    return audioMetadata(audio, {
-      path: URL.createObjectURL(blob),
-      persisted: true,
-      available: true,
-      invalid: false,
-    });
-  }
+  if (!(await isDraftAudioAvailable(audio))) return unavailable();
   return audioMetadata(audio, {
     path: audio.path,
     mediaId: audio.mediaId,

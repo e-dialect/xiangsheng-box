@@ -256,13 +256,34 @@ def _review(actor, target_type, target_id, changes, reason):
         )
         grant = _require_regional(actor, obj.usage_dialect)
         _choice(status, Recording.Status.choices, "changes.status")
+        if obj.media_id:
+            if changes.get("revision") != serializers.DateTimeField().to_representation(
+                obj.updated_at
+            ):
+                _fail("录音已更新，请重新试听后处理", "changes.revision")
+            allowed = {
+                Recording.Status.DRAFT: {
+                    Recording.Status.PUBLISHED,
+                    Recording.Status.REJECTED,
+                },
+                Recording.Status.PUBLISHED: {Recording.Status.REJECTED},
+            }
+            if status not in allowed.get(obj.status, set()):
+                _fail("录音状态已变化，请重新加载后处理", "changes.status")
+        elif status == Recording.Status.WITHDRAWN:
+            _fail("撤回仅限投稿本人操作", "changes.status")
         before = _recording_snapshot(obj)
         obj.status = status
         if status == Recording.Status.PUBLISHED:
             obj.visibility = True
         elif status == Recording.Status.REJECTED:
             obj.visibility = False
-        obj.save(update_fields=["status", "visibility", "updated_at"])
+        obj.review_reason = reason
+        obj.save(update_fields=["status", "visibility", "review_reason", "updated_at"])
+        if obj.media_id:
+            generated_id = obj.media.generated_entry_id
+            if generated_id:
+                Entry.objects.filter(pk=generated_id).update(visibility=obj.visibility)
         return grant, before, _recording_snapshot(obj), str(obj)[:240]
     if target_type == CurationAction.TargetType.RECORDING_LINK:
         obj = lock_scope_child(
