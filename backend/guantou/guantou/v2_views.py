@@ -1,7 +1,16 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import BooleanField, Count, Exists, OuterRef, Prefetch, Q, Value
+from django.db.models import (
+    BooleanField,
+    Count,
+    Exists,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    Value,
+)
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
@@ -343,9 +352,38 @@ class DialectCircleViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+def evidence_for_entry(entry_id, available_links):
+    """Resolve evidence through visible, current claims; one source can support several."""
+    claims = EvidenceLink.objects.order_by()
+    links = available_links.filter(entry_id=entry_id).order_by()
+    evidence_ids = (
+        claims.filter(entry_id=entry_id)
+        .values("evidence_id")
+        .union(
+            claims.filter(sense__entry_id=entry_id).values("evidence_id"),
+            claims.filter(pronunciation_variant__entry_id=entry_id).values(
+                "evidence_id"
+            ),
+            links.values("evidence_links__evidence_id"),
+            links.values("recording__evidence_links__evidence_id"),
+            all=True,
+        )
+    )
+    return EvidenceRecord.objects.filter(pk__in=evidence_ids)
+
+
 def entry_api_queryset(user):
     links = available_recording_links_for_user(user).select_related(
         "recording", "sense"
+    )
+    # The evidence-ID subqueries refer past the evidence row to this entry.
+    evidence_counts = (
+        evidence_for_entry(OuterRef(OuterRef("pk")), links)
+        .order_by()
+        .annotate(group=Value(1))
+        .values("group")
+        .annotate(total=Count("pk"))
+        .values("total")
     )
     return (
         visible_entries_for_user(user)
@@ -379,7 +417,7 @@ def entry_api_queryset(user):
             ),
         )
         .annotate(
-            evidence_count=Count("evidence_links", distinct=True),
+            evidence_count=Subquery(evidence_counts),
             attestation_count=Count(
                 "usage_attestations",
                 filter=Q(usage_attestations__active=True),
@@ -536,6 +574,13 @@ class EntryViewSet(viewsets.ModelViewSet):
             or self.request.query_params.get("search")
             or ""
         ).strip()
+        source_type = self.request.query_params.get("source_type")
+        citation = self.request.query_params.get("source")
+        if search or source_type or citation:
+            evidence = evidence_for_entry(
+                OuterRef(OuterRef("pk")),
+                available_recording_links_for_user(self.request.user),
+            )
         if search:
             queryset = queryset.filter(
                 Q(summary__icontains=search)
@@ -554,23 +599,21 @@ class EntryViewSet(viewsets.ModelViewSet):
                 | Q(pronunciation_variants__surface_romanization__icontains=search)
                 | Q(senses__concept_links__concept__code__icontains=search)
                 | Q(senses__concept_links__concept__label__icontains=search)
-                | Q(evidence_links__evidence__original_writing__icontains=search)
-                | Q(evidence_links__evidence__original_gloss__icontains=search)
-            )
-        filters = {
-            "status": "status",
-            "source_type": "evidence_links__evidence__source_type",
-            "source": "evidence_links__evidence__citation__icontains",
-        }
-        filter_values = {}
-        for parameter, lookup in filters.items():
-            value = self.request.query_params.get(parameter)
-            if value:
-                filter_values[lookup] = (
-                    value.strip() if parameter == "source" else value
+                | Exists(
+                    evidence.filter(
+                        Q(original_writing__icontains=search)
+                        | Q(original_gloss__icontains=search)
+                    )
                 )
-        # Keep source type and citation on the same evidence record.
-        queryset = queryset.filter(**filter_values)
+            )
+        if entry_status := self.request.query_params.get("status"):
+            queryset = queryset.filter(status=entry_status)
+        if source_type or citation:
+            if source_type:
+                evidence = evidence.filter(source_type=source_type)
+            if citation:
+                evidence = evidence.filter(citation__icontains=citation.strip())
+            queryset = queryset.filter(Exists(evidence))
         writing = self.request.query_params.get("writing")
         writing_type = self.request.query_params.get("writing_type")
         if writing or writing_type:
@@ -1112,26 +1155,20 @@ class EvidenceRecordViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        visible_entries = visible_entries_for_user(self.request.user)
-        visible_recordings = visible_recordings_for_user(self.request.user)
-        queryset = EvidenceRecord.objects.filter(
-            Q(claim_links__entry__in=visible_entries)
-            | Q(claim_links__sense__entry__in=visible_entries)
-            | Q(claim_links__pronunciation_variant__entry__in=visible_entries)
-            | Q(claim_links__recording__in=visible_recordings)
-            | Q(claim_links__recording_entry_link__recording__in=visible_recordings)
-        ).select_related("contributor")
+        user = self.request.user
+        entry_id = self.request.query_params.get("entry_id")
+        if entry_id:
+            if not visible_entries_for_user(user).filter(pk=entry_id).exists():
+                return EvidenceRecord.objects.none()
+            queryset = evidence_for_entry(
+                entry_id, available_recording_links_for_user(user)
+            )
+        else:
+            queryset = visible_evidence_for_user(user)
+        queryset = queryset.select_related("contributor")
         source_type = self.request.query_params.get("source_type")
         if source_type:
             queryset = queryset.filter(source_type=source_type)
-        entry_id = self.request.query_params.get("entry_id")
-        if entry_id:
-            queryset = queryset.filter(
-                Q(claim_links__entry_id=entry_id)
-                | Q(claim_links__sense__entry_id=entry_id)
-                | Q(claim_links__pronunciation_variant__entry_id=entry_id)
-                | Q(claim_links__recording_entry_link__entry_id=entry_id)
-            )
         recording_id = self.request.query_params.get("recording_id")
         if recording_id:
             queryset = queryset.filter(
