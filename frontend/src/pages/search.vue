@@ -454,6 +454,7 @@ import {
 } from '@/services/entrySearchAssist';
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
+import { readSoundLookupSearch } from '@/services/localTools';
 import {
   goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
@@ -692,7 +693,8 @@ export default {
   },
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
-  async onLoad(options = {}) {
+  async onLoad(routeOptions = {}) {
+    const options = { ...routeOptions, ...readSoundLookupSearch(routeOptions.sound_lookup) };
     // #ifdef MP-WEIXIN
     if (isWechatMiniProgram()) showWechatShareMenu();
     // #endif

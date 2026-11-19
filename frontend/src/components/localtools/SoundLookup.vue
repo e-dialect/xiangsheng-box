@@ -150,7 +150,9 @@ export default {
       this.selection[this.activeField.key] = chosen;
     },
     searchByCharacter(character) {
-      openPage(ROUTES.search, { keywords: character, dialect: this.dialect });
+      openPage(ROUTES.search, {
+        sound_lookup: JSON.stringify({ keywords: character, dialect: this.dialect }),
+      });
     },
   },
 };

@@ -21,6 +21,7 @@ const request = (await import('@/utils/request')).default;
 const { listAllDialects } = await import('@/services/guantou');
 const { request: analyticsRequest } = await import('@/utils/httpClient');
 const SearchPage = (await import('@/pages/search.vue')).default;
+const SoundLookup = (await import('@/components/localtools/SoundLookup.vue')).default;
 const {
   fallbackProductProfile, productProfile, productSwitchUrl,
 } = await import('@/services/productProfile');
@@ -260,6 +261,39 @@ describe('entry-first search page orchestration', () => {
     page.loading = true;
     expect(SearchPage.onShareAppMessage.call(page).path).toBe('/pages/search');
     expect(SearchPage.onShareTimeline.call(page).query).toBe('sharedKeyword=');
+  });
+
+  it.each(['WeChat', 'H5'])('round-trips a sound lookup result through %s navigation', async (platform) => {
+    const dialect = '闽.莆仙.莆田.城里';
+    const navigateTo = vi.fn();
+    vi.stubGlobal('uni', { ...globalThis.uni, navigateTo });
+    try {
+      SoundLookup.methods.searchByCharacter.call({ dialect }, '红');
+      const [{ url }] = navigateTo.mock.calls[0];
+      const [path, query] = url.split('?');
+      expect(path).toBe('/pages/search');
+      expect(query).toContain('%E7%BA%A2');
+      const options = platform === 'H5'
+        ? Object.fromEntries(new URLSearchParams(query))
+        : { sound_lookup: query.slice('sound_lookup='.length) };
+      listAllDialects.mockResolvedValue([{ id: 23, qualified_code: dialect }]);
+      request.get.mockResolvedValue({ results: [] });
+      const page = pageContext();
+      await SearchPage.onLoad.call(page, options);
+      expect(page.filters).toMatchObject({ keyword: '红', dialectId: 23 });
+      expect(request.get).toHaveBeenCalledWith('/entries/', expect.objectContaining({
+        search: '红', dialect_id: 23,
+      }), true, { loading: false });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('preserves an existing keyword with a literal escape when the lookup parameter is invalid', async () => {
+    request.get.mockResolvedValue({ results: [] });
+    const page = pageContext();
+    await SearchPage.onLoad.call(page, { key: '行 %2F', sound_lookup: '%2525ZZ' });
+    expect(page.filters.keyword).toBe('行 %2F');
   });
 
   it('keeps same-writing results as separate entries', async () => {
