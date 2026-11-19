@@ -46,6 +46,15 @@ async function routeBackgroundRequests(page) {
   });
 }
 
+async function expectLoadingBeforeResponse(page, path, label, responseGate) {
+  try {
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(label)).toBeVisible();
+  } finally {
+    responseGate.resolve();
+  }
+}
+
 test('circle directory leads from context and search into a real circle', async ({ page }) => {
   await routeBackgroundRequests(page);
   await page.route(/\/circles\/(?:\?.*)?$/, async (route) => {
@@ -77,20 +86,19 @@ test('circle directory leads from context and search into a real circle', async 
 
 test('circle directory exposes loading, failure, and empty next steps', async ({ page }) => {
   await routeBackgroundRequests(page);
+  const responseGate = Promise.withResolvers();
   let requests = 0;
   await page.route(/\/circles\/(?:\?.*)?$/, async (route) => {
     requests += 1;
     if (requests === 1) {
-      await new Promise((resolve) => { setTimeout(resolve, 1000); });
+      await responseGate.promise;
       await route.fulfill({ status: 503, json: { detail: 'unavailable' } });
       return;
     }
     await route.fulfill({ json: { count: 0, results: [] } });
   });
 
-  await page.goto('/pages/circles/index');
-
-  await expect(page.getByText('正在加载方言圈…')).toBeVisible();
+  await expectLoadingBeforeResponse(page, '/pages/circles/index', '正在加载方言圈…', responseGate);
   await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible();
   await page.getByRole('button', { name: '重新加载' }).click();
   await expect(page.getByText('还没有匹配的方言圈')).toBeVisible();
@@ -99,9 +107,10 @@ test('circle directory exposes loading, failure, and empty next steps', async ({
 
 test('circle detail keeps its context when recordings alone fail', async ({ page }) => {
   await routeBackgroundRequests(page);
+  const responseGate = Promise.withResolvers();
   let recordingRequests = 0;
   await page.route('**/circles/4/', async (route) => {
-    await new Promise((resolve) => { setTimeout(resolve, 1000); });
+    await responseGate.promise;
     await route.fulfill({ json: circle });
   });
   await page.route(/\/circles\/4\/recordings\/(?:\?.*)?$/, async (route) => {
@@ -113,9 +122,7 @@ test('circle detail keeps its context when recordings alone fail', async ({ page
     await route.fulfill({ json: { count: 0, results: [] } });
   });
 
-  await page.goto('/pages/circles/details?id=4');
-
-  await expect(page.getByText('正在进入方言圈…')).toBeVisible();
+  await expectLoadingBeforeResponse(page, '/pages/circles/details?id=4', '正在进入方言圈…', responseGate);
   await expect(page.getByText('莆仙方言', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '重新获取录音' })).toBeVisible();
   await page.getByRole('button', { name: '重新获取录音' }).click();
@@ -125,11 +132,12 @@ test('circle detail keeps its context when recordings alone fail', async ({ page
 
 test('public profile moves from recoverable error to an accessible contribution view', async ({ page }) => {
   await routeBackgroundRequests(page);
+  const responseGate = Promise.withResolvers();
   let requests = 0;
   await page.route(/\/users\/9\/?(?:\?.*)?$/, async (route) => {
     requests += 1;
     if (requests === 1) {
-      await new Promise((resolve) => { setTimeout(resolve, 1000); });
+      await responseGate.promise;
       await route.fulfill({ status: 503, json: { detail: 'unavailable' } });
       return;
     }
@@ -145,9 +153,7 @@ test('public profile moves from recoverable error to an accessible contribution 
       },
     });
   });
-  await page.goto('/pages/users/details?id=9');
-
-  await expect(page.getByText('正在读取用户档案…')).toBeVisible();
+  await expectLoadingBeforeResponse(page, '/pages/users/details?id=9', '正在读取用户档案…', responseGate);
   await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible();
   await page.getByRole('button', { name: '重新加载' }).click();
   await expect(page.getByText('阿荔', { exact: true }).last()).toBeVisible();
