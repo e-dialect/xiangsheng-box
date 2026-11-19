@@ -115,6 +115,7 @@ import {
 import { hasShareTarget, sharePage, showWechatShareMenu } from '@/services/pageShare';
 import { isWechatMiniProgram } from '@/services/platform';
 import { resolveSessionUserId } from '@/services/session';
+import { observeSharedOpen } from '@/services/shareObservation';
 import { getUserInfo } from '@/services/user';
 
 const TOOLS = Object.freeze([
@@ -241,6 +242,11 @@ export default {
         this.currentDialect = response.dialect;
         this.packs = response.packs || {};
         this.quizUnavailable = response.quiz_unavailable;
+        if (this.tool === 'quiz' && this.quizVersion && !this.quizUnavailable
+          && this.currentDialect?.qualified_code === this.routeDialect
+          && this.packs.quiz?.version === this.quizVersion) {
+          observeSharedOpen(this.shareMessage.path);
+        }
       } catch {
         if (request === this.generation) this.error = true;
       } finally {
