@@ -2,6 +2,8 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
+from guantou.legacy_import import resolve_dialect
+
 from .content import VALIDATORS, validate_content
 
 
@@ -70,6 +72,14 @@ class MaterialRevision(models.Model):
         if self.pack_id and self.pack.kind in VALIDATORS:
             try:
                 validate_content(self.pack.kind, self.payload)
+                if self.pack.kind == MaterialPack.Kind.PINYIN:
+                    for code in self.payload.get("also_for", []):
+                        if not code.startswith(
+                            self.pack.dialect.qualified_code + "."
+                        ) or not resolve_dialect(code):
+                            raise ValidationError(
+                                f"适用方言点须是本资料包下属的已登记方言点：{code}"
+                            )
             except ValidationError as error:
                 raise ValidationError({"payload": error.messages}) from error
         for field in ("title", "accent", "source", "rights"):
