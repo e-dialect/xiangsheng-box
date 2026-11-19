@@ -12,7 +12,7 @@ describe('V2 visual review matrix', () => {
     const registered = pagesJson.pages.map((page) => `/${page.path}`).sort();
     const mapped = ROUTE_VISUAL_MATRIX.map((entry) => entry.route).sort();
 
-    expect(registered).toHaveLength(40);
+    expect(registered).toHaveLength(41);
     expect(mapped).toEqual(registered);
     expect(new Set(ROUTE_VISUAL_MATRIX.map((entry) => entry.slug)).size)
       .toBe(ROUTE_VISUAL_MATRIX.length);

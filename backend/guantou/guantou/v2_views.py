@@ -406,6 +406,16 @@ class EntryViewSet(viewsets.ModelViewSet):
     ]
     permission_classes = [V2ResourcePermission]
 
+    @action(detail=False, methods=["get"], url_path="character-readings")
+    def character_readings(self, request):
+        from .character_readings import lookup_characters
+
+        return Response(
+            lookup_characters(
+                request.query_params.get("text", ""), visible_entries_for_user(None)
+            )
+        )
+
     @action(detail=False, methods=["get"])
     def suggestions(self, request):
         from .restoration import entry_suggestions

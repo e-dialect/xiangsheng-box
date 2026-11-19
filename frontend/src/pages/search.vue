@@ -46,6 +46,12 @@
           :text="`地区：${selectedDialectLabel}`"
           @click="dialectPickerVisible = true"
         />
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="逐字查音（各地读音）"
+          @click="openCharacterReadings"
+        />
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
         </text>
@@ -449,7 +455,7 @@ import {
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
+  goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
 import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
@@ -969,6 +975,9 @@ export default {
     onSourceTypeChange(context = {}) {
       this.filters.sourceType = context.value?.[0] || '';
       this.sourcePickerVisible = false;
+    },
+    openCharacterReadings() {
+      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
     },
   },
 };
