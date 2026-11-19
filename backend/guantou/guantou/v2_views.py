@@ -72,6 +72,7 @@ from .v2_serializers import (
     PublicCreatorEntrySerializer,
     RecordingEntryLinkSerializer,
     RecordingSerializer,
+    speaker_declaration,
     UsageAttestationSerializer,
     WritingFormSerializer,
 )
@@ -892,6 +893,8 @@ class RecordingViewSet(viewsets.ModelViewSet):
             data["can_take_down"] = reviewer and recording.visibility
             if owner or reviewer:
                 data["review_reason"] = recording.review_reason
+                data["speaker_consent_source"] = recording.speaker_consent_source
+                data["speaker_label"] = recording.speaker_label
         return Response(data)
 
     @action(
@@ -936,6 +939,9 @@ class RecordingViewSet(viewsets.ModelViewSet):
             raise BadRequestException("请填写修改后的录音大意")
         if request.data.get("publication_consent") != "public-display-v1":
             raise BadRequestException("请确认同意审核通过后公开展示")
+        declaration = speaker_declaration(request.data)
+        recording.speaker_consent_source = declaration["speaker_consent_source"]
+        recording.speaker_label = declaration["speaker_label"]
         asset = recording.media
         if request.data.get("audio_url"):
             from files.recording_media import submission_asset
@@ -1601,7 +1607,11 @@ class CurationTaskView(APIView):
                     "recording",
                     recording.id,
                     recording.original_gloss or f"录音 {recording.id}",
-                    "核对地区范围、原始大意与授权",
+                    (
+                        f"核对地区范围、原始大意与授权 · {recording.get_speaker_consent_source_display() or '同意来源未记录'}"
+                        if recording.media_id
+                        else "核对地区范围、原始大意与授权"
+                    ),
                     CurationAction.TargetType.RECORDING,
                     recording.usage_dialect,
                     (

@@ -27,6 +27,7 @@ describe('first missing recording step', () => {
     [{ path: 'blob:expired', invalid: true }, { usage_dialect_id: 2, original_gloss: '已有大意' }, 'record-required-audio', '请先录音或选择一段音频'],
     [{ path: 'blob:audio' }, {}, 'record-required-dialect', '请选择这段话的使用地区'],
     [{ path: 'blob:audio' }, { usage_dialect_id: 2 }, 'record-required-gloss', '请用自己的话简单说明意思'],
+    [{ path: 'blob:audio' }, { usage_dialect_id: 2, original_gloss: '大意' }, 'record-speaker-consent', '请选择发声人及其同意方式'],
   ])('gives the first missing action and its section', async (audio, fields, target, message) => {
     const page = pageContext(audio, fields);
     expect(await page.validateForm()).toBe(false);
@@ -36,7 +37,7 @@ describe('first missing recording step', () => {
   });
 
   it('keeps a generic notice for an unexpected base-form validation failure', async () => {
-    const page = pageContext({ path: 'blob:audio' }, { usage_dialect_id: 2, original_gloss: '大意' });
+    const page = pageContext({ path: 'blob:audio' }, { usage_dialect_id: 2, original_gloss: '大意', speaker_consent_source: 'self' });
     page.$refs.form.validate.mockResolvedValue(false);
     expect(await page.validateForm()).toBe(false);
     expect(notify).toHaveBeenCalledWith({ title: '请检查填写内容', icon: 'none' });
@@ -54,7 +55,7 @@ describe('first missing recording step', () => {
   });
 
   it('does not redirect a complete form or change draft contents', async () => {
-    const form = { usage_dialect_id: 2, original_gloss: '大意', rights_statement: '原授权' };
+    const form = { usage_dialect_id: 2, original_gloss: '大意', rights_statement: '原授权', speaker_consent_source: 'self' };
     const page = pageContext({ path: 'blob:audio' }, form);
     expect(await page.validateForm()).toBe(true);
     expect(page.validationTarget).toBe('');

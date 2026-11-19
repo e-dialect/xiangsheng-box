@@ -46,6 +46,8 @@ function pageContext() {
   page.audio = { path: 'blob:recording', durationMs: 2300 };
   page.form.usage_dialect_id = 11;
   page.form.original_gloss = '测试录音';
+  page.form.speaker_consent_source = 'speaker_oral';
+  page.form.speaker_label = '家中长辈';
   return page;
 }
 
@@ -73,10 +75,43 @@ describe('recording submission feedback', () => {
     expect(uploadFile).toHaveBeenCalledWith('/saved/recording.mp3', requestOptions);
     expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
       publication_consent: 'public-display-v1',
+      speaker_consent_source: 'speaker_oral',
+      speaker_label: '家中长辈',
     }), requestOptions);
     expect(notifySuccess).toHaveBeenCalledWith('已提交，等待审核');
     expect(goRecordingDetail).toHaveBeenCalledWith(12, { replace: true });
     expect(page.submitted).toBe(true);
+  });
+
+  it('submits the original audio and speaker statement throughout validation and upload', async () => {
+    const page = pageContext();
+    page.$refs.form.validate.mockImplementation(async () => {
+      page.onAudioChange({ path: '/other.wav' });
+      page.setSpeakerConsent('self');
+      page.updateFormField('speaker_label', '其他称呼');
+      expect(page.audio.path).toBe('blob:recording');
+      expect(page.form.speaker_consent_source).toBe('speaker_oral');
+      expect(page.form.speaker_label).toBe('家中长辈');
+      return true;
+    });
+    uploadFile.mockImplementation(async () => {
+      // Even a late form update cannot change the statement attached to this upload.
+      page.form.speaker_consent_source = 'self';
+      page.form.speaker_label = '';
+      return { url: '/files/voice.mp3', duration_ms: 2300 };
+    });
+    createRecording.mockResolvedValue({ id: 12 });
+    await page.submit();
+    expect(createRecording).toHaveBeenCalledWith(expect.objectContaining({
+      speaker_consent_source: 'speaker_oral', speaker_label: '家中长辈',
+    }), expect.objectContaining({ loading: false }));
+  });
+
+  it('clears the last speaker declaration when a contributor changes the audio', () => {
+    const page = pageContext();
+    page.onAudioChange({ path: '/next.wav' });
+    expect(page.form.speaker_consent_source).toBe('');
+    expect(page.form.speaker_label).toBe('');
   });
 
   it('retains the upload error while confirming a complete draft can be retried', async () => {

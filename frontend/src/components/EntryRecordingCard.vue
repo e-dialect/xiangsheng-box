@@ -89,7 +89,7 @@
         :size="32"
       />
       <text class="recording-card__author-name">
-        {{ recorderName }}
+        {{ recording.speaker_role === 'other' ? `代录投稿 · ${recorderName}` : recorderName }}
       </text>
       <BaseButton
         v-if="detailLink"

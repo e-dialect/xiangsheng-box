@@ -257,6 +257,8 @@ def _review(actor, target_type, target_id, changes, reason):
         grant = _require_regional(actor, obj.usage_dialect)
         _choice(status, Recording.Status.choices, "changes.status")
         if obj.media_id:
+            if status == Recording.Status.PUBLISHED and obj.speaker_role == "unknown":
+                _fail("缺少发声人的同意来源，请退回投稿人补充", "changes.status")
             if changes.get("revision") != serializers.DateTimeField().to_representation(
                 obj.updated_at
             ):

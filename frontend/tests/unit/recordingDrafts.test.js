@@ -29,10 +29,13 @@ describe('Recording draft lifecycle', () => {
   it('restores fields and audio after a refresh, keeps logout data isolated, then cleans submitted drafts', async () => {
     persistDraftAudio.mockResolvedValue({ persisted: true, mediaId: 'a', storage: 'indexeddb' });
     restoreDraftAudio.mockResolvedValue({ path: 'blob:restored', persisted: true });
-    const saved = await saveRecordingDraft(input());
+    const draft = input();
+    draft.form.speaker_consent_source = 'speaker_oral';
+    draft.form.speaker_label = '家中长辈';
+    const saved = await saveRecordingDraft(draft);
     expect(listRecordingDrafts()).toHaveLength(1);
     const restored = await restoreRecordingDraft(saved.id);
-    expect(restored.form).toEqual(input().form);
+    expect(restored.form).toEqual(draft.form);
     expect(restored.entryId).toBe(3);
     expect(restored.audio.path).toBe('blob:restored');
     user = ''; expect(listRecordingDrafts()).toEqual([]);
