@@ -504,38 +504,6 @@ function defaultFilters() {
   };
 }
 
-// Only persisted public search criteria travel to another user.
-function publicFilters(filters = {}) {
-  const result = {};
-  if (/^[1-9]\d*$/.test(String(filters.dialectId || ''))) {
-    result.dialectId = String(filters.dialectId);
-    if (filters.dialectMatch === 'exact') result.dialectMatch = 'exact';
-  }
-  if (WRITING_TYPES.some(({ value }) => value && value === filters.writingType)) {
-    result.writingType = filters.writingType;
-  }
-  if (SOURCE_TYPES.some(({ value }) => value && value === filters.sourceType)) {
-    result.sourceType = filters.sourceType;
-  }
-  if (['draft', 'reviewed', 'disputed'].includes(filters.status)) result.status = filters.status;
-  if (typeof filters.hasRecording === 'boolean') result.hasRecording = filters.hasRecording;
-  ['ipa', 'romanization', 'source', 'concept'].forEach((key) => {
-    if (typeof filters[key] === 'string' && filters[key].trim()) result[key] = filters[key].trim();
-  });
-  return result;
-}
-
-function sharedFilters(raw) {
-  if (typeof raw !== 'string' || !raw) return {};
-  try {
-    // H5 supplies decoded route options. WeChat may supply the encoded component.
-    const parsed = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
-    return parsed && typeof parsed === 'object' ? publicFilters(parsed) : {};
-  } catch {
-    return {};
-  }
-}
-
 function resultBucket(count) {
   if (count <= 0) return '0';
   if (count <= 5) return '1-5';
