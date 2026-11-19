@@ -540,6 +540,87 @@ def _preserve_competing(actor, recording, changes, reason):
     return grant, before, after, f"{str(recording)[:120]} ↔ {_entry_label(entry)}"
 
 
+def _require_visible_targets(actor, target_type, target_id, changes):
+    # Reuse the API visibility boundary, including controlled submission media.
+    # Import lazily because the views call this service.
+    from .v2_views import visible_entries_for_user, visible_recordings_for_user
+
+    def object_id(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError, OverflowError):
+            _fail("对象编号无效", "changes")
+
+    target_id = object_id(target_id)
+    source_values = changes.get("source_entry_ids", [])
+    if not isinstance(source_values, list):
+        _fail("待合并词条必须是编号列表", "changes.source_entry_ids")
+    source_ids = {object_id(value) for value in source_values}
+    entry_ids = set(source_ids)
+    if changes.get("entry_id"):
+        entry_ids.add(object_id(changes["entry_id"]))
+    recording_ids = []
+    child_model = {
+        "sense": EntrySense,
+        "writing": EntryWriting,
+        "pronunciation": PronunciationVariant,
+        "recording_link": RecordingEntryLink,
+    }.get(target_type)
+    child = None
+    if target_type == "entry":
+        entry_ids.add(target_id)
+    elif target_type == "recording":
+        recording_ids.append(target_id)
+    elif child_model:
+        child = child_model.objects.filter(pk=target_id).first()
+        if child:
+            entry_ids.add(child.entry_id)
+            if target_type == "recording_link":
+                recording_ids.append(child.recording_id)
+    # Match withdrawal: lock recordings before their generated entries.
+    recording_ids.extend(
+        Recording.objects.filter(media__generated_entry_id__in=entry_ids).values_list(
+            "pk", flat=True
+        )
+    )
+    list(
+        Recording.objects.select_for_update()
+        .filter(pk__in=recording_ids)
+        .order_by("pk")
+    )
+    list(Entry.objects.select_for_update().filter(pk__in=entry_ids).order_by("pk"))
+    if child is not None:
+        locked_child = (
+            child_model.objects.select_for_update().filter(pk=target_id).first()
+        )
+        if locked_child is None:
+            _fail("待整理对象不存在", "target_id")
+        if locked_child.entry_id != child.entry_id or (
+            target_type == "recording_link"
+            and locked_child.recording_id != child.recording_id
+        ):
+            _fail("对象关联已变化，请重新检查后重试", "target_id")
+    entries = visible_entries_for_user(actor)
+    recordings = visible_recordings_for_user(actor)
+    if target_type == "entry":
+        allowed = entries.filter(pk=target_id).exists()
+    elif target_type == "recording":
+        allowed = recordings.filter(pk=target_id).exists()
+    elif child_model:
+        objects = child_model.objects.filter(pk=target_id, entry__in=entries)
+        if target_type == "recording_link":
+            objects = objects.filter(recording__in=recordings)
+        allowed = objects.exists()
+    else:
+        allowed = True
+    if not allowed:
+        _fail("待整理对象不存在或不可访问", "target_id")
+    if source_ids and entries.filter(pk__in=source_ids).count() != len(source_ids):
+        _fail("待合并词条不存在或不可访问", "changes.source_entry_ids")
+    if changes.get("entry_id") and not entries.filter(pk=changes["entry_id"]).exists():
+        _fail("关联词条不存在或不可访问", "changes.entry_id")
+
+
 @transaction.atomic
 def perform_curation_action(actor, validated_data):
     action_type = validated_data["action_type"]
@@ -551,6 +632,8 @@ def perform_curation_action(actor, validated_data):
         validated_data.get("evidence_ids"),
         required=action_type in EVIDENCE_REQUIRED_ACTIONS,
     )
+
+    _require_visible_targets(actor, target_type, target_id, changes)
 
     try:
         if action_type == CurationAction.ActionType.REVIEW:
