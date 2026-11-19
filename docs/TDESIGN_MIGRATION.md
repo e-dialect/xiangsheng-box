@@ -1,5 +1,9 @@
 # TDesign UI migration tracker
 
+## 2026-11-19 · 逐字查音
+
+查词页新增跨地区字音入口。逐字页复用 PageShell、BaseForm、BaseField、PronunciationForms 和公共状态组件，H5 与微信共用页面。[#673](https://github.com/e-dialect/xiangsheng-box/issues/673)
+
 ## 2026-11-05 · 成员反馈 UI 收敛
 
 沿用 `codex/ui-phase-one`，处理录音授权与状态一致性、原始大意标识、常驻草稿工具区、方言层级返回和账户贡献概览。具体反馈映射、回归与待确认数据依赖见[成员反馈迭代记录](UI_FEEDBACK_2026-11-05.md)。11 月 6 日代码与主线对齐见[版本对齐记录](RELEASE_ALIGNMENT_2026-11-06.md)；微信真机和线上证据核查仍待验收。
@@ -243,6 +247,8 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 实施依据：[已确认计划](plans/2026-09-06-v2-restoration.md)，实现见 [PR #408](https://github.com/e-dialect/xiangsheng-box/pull/408)；功能去向见
 [回归记录](audits/2026-09-06-v1-feature-restoration.md)。浏览器测试为 `frontend/tests/e2e/restoration.spec.js`。
 
+集盒目录新增逐词阅读入口，沿用 BaseButton、PronunciationForms 和 EntryRecordingCard，使用当前站点品牌。移动端浅色和暗色走查见同一浏览器套件。[验收单 #728](https://github.com/e-dialect/xiangsheng-box/issues/728)
+
 ### 二次补缺：词条讨论与草稿生命周期
 
 关联 #405、#407。新增共享 DiscussionThread，词条与录音详情共用 BaseForm/BaseField/BaseButton、加载与错误反馈；词条讨论为独立内容区。草稿箱用 BaseLoading 展示实际音频状态检查，录音页沿用原表单和保存反馈，增加编辑与离页保存。
@@ -270,6 +276,10 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 概念关联仍按义项消费现有 relation_type，区分对应、较宽、较窄和相关；未知关系不默认为对应，无数据明确待标注。此切片不新增词性字段、分类树、自动标注或未经核验的方言事实，也不代表整个 #403 已完成。
 
 验证：Node 22.23.4、冻结 yarn.lock 离线安装；lint 通过；全量单测 913 通过、3 跳过；H5/微信 checked build 通过。构建仅通过 Node 的 warning code 选项屏蔽运行器注入的 UNDICI-EHPA 代理实验警告，未改项目警告审计。新增 EntryReadingRelations 11 项单测覆盖同值/不同/缺项/文读、四类关系、未知关系与义项切换。H5 使用明确标为演示的拦截响应，在 390×844 浅/深色检查；未连接真实后端或执行微信真机验收。
+
+## 地方工具（#675、#700、#701）
+
+地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
 
 ## 录音投稿审核（#702）
 

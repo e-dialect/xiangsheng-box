@@ -207,6 +207,7 @@ AUXILIARY_V2_PATHS = {
     "/collections/{collection_id}/order/": {"post"},
     "/entries/suggestions/": {"get"},
     "/entries/popular/": {"get"},
+    "/entries/daily/": {"get"},
     "/recordings/daily/": {"get"},
     "/recordings/random/": {"get"},
     "/recordings/{recording_id}/like/": {"put", "delete"},

@@ -10,6 +10,14 @@ export const suggestEntries = (q) => request.get('/entries/suggestions/', {
 export const popularEntries = () => request.get('/entries/popular/', {}, true, {
   loading: false,
 });
+export function getDailyEntry(dialectId, dialectScope) {
+  const params = dialectId ? { dialect_id: dialectId, dialect_scope: dialectScope } : {};
+  return request.get('/entries/daily/', params, true, {
+    auth: false,
+    visitor: false,
+    loading: false,
+  });
+}
 export function searchHistory() {
   try {
     const items = JSON.parse(uni.getStorageSync(storageKey()) || '[]');

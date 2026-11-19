@@ -24,6 +24,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
       JWT_KEY: ${JWT_KEY:-dev-jwt-key}
+      BOX_PRODUCT_PROFILE_ORIGINS: ${BOX_PRODUCT_PROFILE_ORIGINS:-null}
       PRODUCT_EVENT_RETENTION_DAYS: ${PRODUCT_EVENT_RETENTION_DAYS:-90}
       COS_SECRET_ID: ${COS_SECRET_ID:-DEFAULT_COS_SECRET_ID}
       COS_SECRET_KEY: ${COS_SECRET_KEY:-DEFAULT_COS_SECRET_KEY}
@@ -87,7 +88,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.guantou-frontend.entrypoints=web"
-      - "traefik.http.routers.guantou-frontend.rule=Host(`guantou.localhost`)"
+      - "traefik.http.routers.guantou-frontend.rule=${TRAEFIK_FRONTEND_RULE:-Host(`guantou.localhost`)}"
       - "traefik.http.services.guantou-frontend.loadbalancer.server.port=8080"
     networks:
       - guantou

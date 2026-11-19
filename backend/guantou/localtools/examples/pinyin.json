@@ -1,0 +1,126 @@
+{
+  "dialect": "闽.莆仙",
+  "kind": "pinyin",
+  "version": "putian-city-reference-2",
+  "title": "莆仙话拼音 · 莆田城里入门",
+  "accent": "莆田城里口音",
+  "source": "莆仙乡音社拼音方案（旧兴化语记），据公开版本整理",
+  "source_url": "https://github.com/e-dialect/hinghwa-dict-web/blob/a84cbd7eabacfd31ad1727fc77ca96c5f471ecf7/src/views/Pinyin.vue",
+  "rights": "旧 uni-app DATA_PROVENANCE.md 记载莆仙乡音社授权项目使用。这里独立撰写说明，仅列少量单项音系事实和例字；完整旧表、行文、录音和视频转载需要重新确认本产品的使用范围。",
+  "payload": {
+    "schema": 1,
+    "also_for": ["闽.莆仙.莆田.城里"],
+    "sections": [
+      {
+        "title": "怎么读拼音",
+        "text": "一个音节可以分成声母、韵母和声调。下面的表只列莆田城里入门例子；数字是调类编号，调值则用 1 至 5 描写相对音高。整词里的实际音高可能因连读而变化。",
+        "rows": []
+      },
+      {
+        "title": "声母举例",
+        "text": "注意拼写和国际音标的字母未必相同。",
+        "rows": [
+          {
+            "form": "b",
+            "ipa": "p",
+            "example": "布 bou4"
+          },
+          {
+            "form": "p",
+            "ipa": "pʰ",
+            "example": "破 pua4",
+            "hinghwa_word_id": 4334
+          },
+          {
+            "form": "m",
+            "ipa": "m",
+            "example": "骂 mor4"
+          },
+          {
+            "form": "s",
+            "ipa": "ɬ",
+            "example": "洗 se3"
+          },
+          {
+            "form": "g",
+            "ipa": "k",
+            "example": "狗 gao3"
+          }
+        ]
+      },
+      {
+        "title": "韵母举例",
+        "text": "开尾、鼻尾和带喉塞尾的韵母各列几例。",
+        "rows": [
+          {
+            "form": "ai",
+            "ipa": "ai",
+            "example": "菜 cai4"
+          },
+          {
+            "form": "ang",
+            "ipa": "aŋ",
+            "example": "红 ang2"
+          },
+          {
+            "form": "eng",
+            "ipa": "ɛŋ",
+            "example": "灯 deng1"
+          },
+          {
+            "form": "ih",
+            "ipa": "iʔ",
+            "example": "笔 bih6"
+          },
+          {
+            "form": "uoh",
+            "ipa": "uoʔ",
+            "example": "我 guoh3"
+          }
+        ]
+      },
+      {
+        "title": "声调",
+        "text": "下表中间一列是五度标记的本调调值。",
+        "rows": [
+          {
+            "form": "1 · 阴平",
+            "ipa": "533",
+            "example": "枝 gi1",
+            "hinghwa_word_id": 2226
+          },
+          {
+            "form": "2 · 阳平",
+            "ipa": "13",
+            "example": "期 gi2"
+          },
+          {
+            "form": "3 · 上声",
+            "ipa": "453",
+            "example": "指 gi3"
+          },
+          {
+            "form": "4 · 阴去",
+            "ipa": "42",
+            "example": "记 gi4"
+          },
+          {
+            "form": "5 · 阳去",
+            "ipa": "11",
+            "example": "义 gi5"
+          },
+          {
+            "form": "6 · 阴入",
+            "ipa": "21",
+            "example": "急 gih6"
+          },
+          {
+            "form": "7 · 阳入",
+            "ipa": "4",
+            "example": "及 gih7"
+          }
+        ]
+      }
+    ]
+  }
+}

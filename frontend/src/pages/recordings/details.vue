@@ -17,7 +17,7 @@
     >
       <view class="box-cover">
         <text class="box-kicker">
-          乡声集盒 · 听见一个地方
+          {{ productName }} · 听见一个地方
         </text>
         <text class="box-title">
           录音详情
@@ -179,6 +179,7 @@ import { requireAuth } from '@/services/authGuard';
 import { chooseAudioFile, uploadFile } from '@/services/file';
 import { confirm, notify } from '@/services/feedback';
 import { stopAudio } from '@/utils/audio';
+import { currentProductName } from '@/services/productProfile';
 import {
   defaultContentShareMessage, qqContentShareMessage, recordingShareMessage, syncContentShareMenu,
 } from '@/services/contentShare';
@@ -222,6 +223,7 @@ export default {
 
   }),
   computed: {
+    productName: currentProductName,
     showModeration() {
       const r = this.recording;
       return r && (r.can_withdraw || r.can_resubmit || r.can_take_down || r.review_reason);

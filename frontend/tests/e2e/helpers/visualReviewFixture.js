@@ -225,6 +225,20 @@ function successPayload(pathname, method, {
       public_recording_count: 16,
     }]);
   }
+  if (pathname === '/local-tools/') {
+    return {
+      dialect: DIALECTS[1],
+      packs: {
+        pinyin: {
+          title: '莆仙话拼音 · 莆田城里入门',
+          accent: '莆田城里口音',
+          version: 'visual-fixture-1',
+          source: '视觉验收资料',
+          content: { sections: [{ title: '声母', rows: [{ form: 'b', ipa: 'p', example: '布 bou4' }] }] },
+        },
+      },
+    };
+  }
   if (pathname === '/dialects/resolve/') return DIALECTS[1];
   if (pathname === '/dialects/') return paged(empty ? [] : DIALECTS);
   if (pathname === '/entries/suggestions/' || pathname === '/entries/popular/') return [ENTRY];
@@ -346,6 +360,8 @@ export function observeRuntime(page) {
 
 export async function installVisualFixture(page, {
   accent = 'pine',
+  apiOrigin = process.env.VISUAL_REVIEW_API_ORIGIN || 'http://localhost:8000',
+  passthroughPaths = [],
   avatarState = 'image',
   persona = 'guest',
   theme = 'light',
@@ -372,10 +388,11 @@ export async function installVisualFixture(page, {
     preserve: preserveStorage,
   });
 
-  await page.route(`${process.env.VISUAL_REVIEW_API_ORIGIN || 'http://localhost:8000'}/**`, async (route) => {
+  await page.route(`${apiOrigin}/**`, async (route) => {
     const request = route.request();
     if (!['xhr', 'fetch'].includes(request.resourceType())) { await route.continue(); return; }
     const { pathname } = new URL(request.url());
+    if (passthroughPaths.includes(pathname)) { await route.continue(); return; }
     const isFocus = focused(pathname, focus);
     if (isFocus && state === 'loading') {
       await new Promise((resolve) => { setTimeout(resolve, 2500); });

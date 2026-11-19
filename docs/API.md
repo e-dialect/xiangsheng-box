@@ -52,6 +52,7 @@ make api-contract-check
 - `DELETE /recording-comments/{id}/`：作者删除／管理员隐藏，该评论下回复不再展示。
 - `PUT/DELETE /recording-comments/{id}/like/`：评论点赞／取消。
 - `GET /entries/suggestions/?q=...`、`popular/`：最多 8 个公开词条；推荐依照公开录音点赞及有效地区补证，不计私人收藏，不记录搜索原词。
+- `GET /entries/daily/`：按服务端本地日期轮换公开词条，可用 `dialect_id`、`dialect_scope=exact|subtree` 限制词条标注的使用地区；没有候选时返回 204。
 
 评论、回复和点赞通知复用消息中心，跳转录音详情；不重复发送自身通知，消息正文不复制录音或评论原文。
 

@@ -97,6 +97,24 @@ print(json.dumps({
                 timeout=20,
             )
 
+    def test_dual_beta_origins_extend_explicit_production_hosts(self):
+        sites = {
+            "https://box.test.edialect.top": "box",
+            "https://pxm.test.edialect.top": "pxm",
+        }
+        result = self._load({"BOX_PRODUCT_PROFILE_ORIGINS": json.dumps(sites)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("box.test.edialect.top", payload["hosts"])
+        self.assertIn("pxm.test.edialect.top", payload["hosts"])
+        self.assertEqual(payload["cors"], ["https://box.example.invalid", *sites])
+        self.assertEqual(payload["csrf"], ["https://box.example.invalid"])
+        invalid = self._load(
+            {"BOX_PRODUCT_PROFILE_ORIGINS": '{"http://pxm.localhost":"pxm"}'}
+        )
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertIn("Invalid site origin mapping", invalid.stderr)
+
     def test_production_defaults_are_writable_before_base_settings_import(self):
         for environment in ("production", " Production ", "PRODUCTION"):
             with self.subTest(environment=environment):

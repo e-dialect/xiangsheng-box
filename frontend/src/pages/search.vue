@@ -2,6 +2,7 @@
   <AppShell
     title="查找词条"
     active="search"
+    :product-switch-params="productSwitchParams"
     @scrolltolower="loadMore"
   >
     <view class="entry-search">
@@ -44,6 +45,12 @@
           size="small"
           :text="`地区：${selectedDialectLabel}`"
           @click="dialectPickerVisible = true"
+        />
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="逐字查音（各地读音）"
+          @click="openCharacterReadings"
         />
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
@@ -169,10 +176,17 @@
           size="small"
           variant="ghost"
           :open-type="shareType"
-          :text="shareType || canSystemShare ? '分享查词结果' : '复制关键词链接'"
+          :text="shareButtonText"
           @click="shareKeyword"
         />
       </view>
+
+      <DailyEntry
+        v-if="showDailyEntry"
+        :key="`daily-${filters.dialectId}-${filters.dialectMatch}`"
+        :dialect-id="filters.dialectId"
+        :dialect-scope="filters.dialectMatch"
+      />
 
       <view
         v-if="!searched && !filters.keyword"
@@ -435,6 +449,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import DailyEntry from '@/components/DailyEntry.vue';
 import {
   buildEntrySearchParams,
   dialectLabel,
@@ -448,16 +463,26 @@ import {
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
+  goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
-import { APP_NAME } from '@/const/branding';
+import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
 import {
   canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
-import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
+import { CAPABILITIES, ensureCapability, isCapabilityEnabled } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
+
+const SWITCH_FILTERS = {
+  writingType: 'writing_type',
+  sourceType: 'source_type',
+  status: 'status',
+  ipa: 'ipa',
+  romanization: 'romanization',
+  source: 'source',
+  concept: 'concept',
+};
 
 const WRITING_TYPES = [
   { label: '不限', value: '' },
@@ -498,6 +523,38 @@ function defaultFilters() {
   };
 }
 
+// Only persisted public search criteria travel to another user.
+function publicFilters(filters = {}) {
+  const result = {};
+  if (/^[1-9]\d*$/.test(String(filters.dialectId || ''))) {
+    result.dialectId = String(filters.dialectId);
+    if (filters.dialectMatch === 'exact') result.dialectMatch = 'exact';
+  }
+  if (WRITING_TYPES.some(({ value }) => value && value === filters.writingType)) {
+    result.writingType = filters.writingType;
+  }
+  if (SOURCE_TYPES.some(({ value }) => value && value === filters.sourceType)) {
+    result.sourceType = filters.sourceType;
+  }
+  if (['draft', 'reviewed', 'disputed'].includes(filters.status)) result.status = filters.status;
+  if (typeof filters.hasRecording === 'boolean') result.hasRecording = filters.hasRecording;
+  ['ipa', 'romanization', 'source', 'concept'].forEach((key) => {
+    if (typeof filters[key] === 'string' && filters[key].trim()) result[key] = filters[key].trim();
+  });
+  return result;
+}
+
+function sharedFilters(raw) {
+  if (typeof raw !== 'string' || !raw) return {};
+  try {
+    // H5 supplies decoded route options. WeChat may supply the encoded component.
+    const parsed = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
+    return parsed && typeof parsed === 'object' ? publicFilters(parsed) : {};
+  } catch {
+    return {};
+  }
+}
+
 function resultBucket(count) {
   if (count <= 0) return '0';
   if (count <= 5) return '1-5';
@@ -530,6 +587,7 @@ export default {
     BaseLoading,
     EmptyState,
     DialectSelector,
+    DailyEntry,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -553,6 +611,10 @@ export default {
       searchRequestId: 0,
       dialects: [],
       dialectsLoading: false,
+      siteScopeReady: null,
+      browseScopeReady: false,
+      dialectTouched: false,
+      pendingSiteScope: null,
       dialectsError: '',
       dialectPickerVisible: false,
       writingPickerVisible: false,
@@ -580,6 +642,10 @@ export default {
     };
   },
   computed: {
+    showDailyEntry() {
+      return this.browseScopeReady && !this.pendingSiteScope && !this.searched
+        && !this.filters.keyword && isCapabilityEnabled(CAPABILITIES.ENTRY_SEARCH);
+    },
     interpretedTerm() {
       const term = this.appliedFilters?.keyword;
       return term !== this.submittedKeyword ? term : '';
@@ -587,18 +653,39 @@ export default {
     shareType() { return isWechatMiniProgram() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     keywordShare() {
-      if (!hasShareTarget() || this.loading || this.errorMessage
-        || !this.entries.length || !this.submittedKeyword) {
-        return null;
-      }
+      const criteria = publicFilters(this.appliedFilters || {});
+      const filtered = Object.keys(criteria).length > 0;
+      if (!hasShareTarget() || this.loading || this.errorMessage || !this.entries.length
+        || (!this.submittedKeyword && !filtered)) return null;
       const characters = Array.from(this.submittedKeyword);
       const keyword = characters.length > 24
         ? `${characters.slice(0, 23).join('')}…` : this.submittedKeyword;
-      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword });
+      const filters = filtered ? JSON.stringify(criteria) : undefined;
+      const path = pageUrl(ROUTES.search, { key: this.submittedKeyword, filters });
+      const query = pageUrl('', { sharedKeyword: this.submittedKeyword, filters }).slice(1);
       return {
-        title: `查词｜${keyword} · ${APP_NAME}`,
-        path,
-        query: `sharedKeyword=${encodeURIComponent(this.submittedKeyword)}`,
+        title: `查词｜${keyword || '筛选结果'} · ${currentProductName()}`, path, query, filtered,
+      };
+    },
+    shareButtonText() {
+      const action = this.shareType || this.canSystemShare ? '分享' : '复制';
+      const subject = this.keywordShare?.filtered ? '查词结果' : '关键词';
+      return `${action}${subject}${action === '复制' ? '链接' : ''}`;
+    },
+    productSwitchParams() {
+      const { filters } = this;
+      const pending = !this.dialectTouched && !filters.dialectId ? this.pendingSiteScope : null;
+      const pendingMatch = pending?.exact ? 'exact' : '';
+      const dialect = this.dialects.find((item) => String(item.id) === String(filters.dialectId));
+      return {
+        keywords: filters.keyword,
+        dialect: dialect?.qualified_code || pending?.code || (filters.dialectId ? '' : 'all'),
+        dialect_id: dialect ? '' : filters.dialectId,
+        dialect_scope: filters.dialectId ? filters.dialectMatch : pendingMatch,
+        ...Object.fromEntries(Object.entries(SWITCH_FILTERS).map(([field, key]) => (
+          [key, filters[field]]
+        ))),
+        has_recording: typeof filters.hasRecording === 'boolean' ? filters.hasRecording : '',
       };
     },
     primaryDialect() {
@@ -638,6 +725,10 @@ export default {
     },
   },
   watch: {
+    async siteScopeReady(ready) {
+      await ready;
+      this.browseScopeReady = true;
+    },
     'filters.keyword': function suggestKeyword(value) {
       clearTimeout(this.suggestTimer);
       this.suggestSequence += 1;
@@ -674,21 +765,67 @@ export default {
       }
     }
     // #endif
-    this.loadDialects();
-    if (this.filters.keyword) await this.search();
+    const restored = sharedFilters(options.filters);
+    Object.assign(this.filters, restored);
+    const filtered = Object.keys(restored).length > 0;
+    this.siteScopeReady = this.initializeSiteScope(options, filtered);
+    if (!this.filters.keyword && !filtered) {
+      const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
+      if (!switchKeys.some((key) => options[key])) return;
+      await this.siteScopeReady;
+      if (!activeFilterCount(this.filters) && !this.pendingSiteScope) return;
+    }
+    await this.search();
   },
   // #ifdef MP-WEIXIN
   onShareAppMessage() {
-    const { title = `查找词条｜${APP_NAME}`, query } = this.keywordShare || {};
+    const { title = `查找词条｜${currentProductName()}`, query } = this.keywordShare || {};
     const path = query ? `${ROUTES.search}?${query}` : ROUTES.search;
     return { title, path, imageUrl: WECHAT_SHARE_IMAGE };
   },
   onShareTimeline() {
-    const { title = `查找词条｜${APP_NAME}`, query = 'sharedKeyword=' } = this.keywordShare || {};
+    const { title = `查找词条｜${currentProductName()}`, query = 'sharedKeyword=' } = this.keywordShare || {};
     return { title, query, imageUrl: WECHAT_SHARE_IMAGE };
   },
   // #endif
   methods: {
+    async initializeSiteScope(options, filtered = false) {
+      const explicitDialect = typeof options.dialect === 'string';
+      const sharedSearch = filtered
+        || typeof options.sharedKeyword === 'string' || typeof options.key === 'string';
+      Object.entries(SWITCH_FILTERS).forEach(([field, key]) => {
+        if (typeof options[key] === 'string') this.filters[field] = options[key];
+      });
+      if (options.has_recording === 'true' || options.has_recording === 'false') {
+        this.filters.hasRecording = options.has_recording === 'true';
+      }
+      const catalog = this.loadDialects();
+      if (!explicitDialect && /^[1-9]\d*$/.test(options.dialect_id || '')) {
+        this.filters.dialectId = options.dialect_id;
+        this.filters.dialectMatch = options.dialect_scope === 'exact' ? 'exact' : 'subtree';
+        return;
+      }
+      if (sharedSearch && !explicitDialect) return;
+      const code = explicitDialect
+        ? options.dialect : (await loadProductProfile()).default_dialect;
+      if (!code || code === 'all') return;
+      this.pendingSiteScope = { code, exact: options.dialect_scope === 'exact' };
+      await catalog;
+      this.resolveSiteScope();
+    },
+    resolveSiteScope() {
+      if (!this.pendingSiteScope) return;
+      if (this.filters.dialectId || this.dialectTouched) {
+        this.pendingSiteScope = null;
+        return;
+      }
+      const { code, exact } = this.pendingSiteScope;
+      const dialect = this.dialects.find(({ qualified_code: value }) => value === code);
+      if (!dialect) return;
+      this.filters.dialectId = dialect.id;
+      this.filters.dialectMatch = exact ? 'exact' : 'subtree';
+      this.pendingSiteScope = null;
+    },
     async loadDialects() {
       if (this.dialectsLoading) return;
       this.dialectsLoading = true;
@@ -706,7 +843,7 @@ export default {
     goCollections,
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
-      return sharePage(this.keywordShare, '关键词链接已复制');
+      return sharePage(this.keywordShare, this.keywordShare?.filtered ? '查词结果链接已复制' : '关键词链接已复制');
       // #endif
     },
     clearHistory() { clearSearchHistory(); this.history = []; },
@@ -730,6 +867,7 @@ export default {
       this.search();
     },
     resetAdvancedFilters() {
+      this.dialectTouched = true;
       const { keyword } = this.filters;
       this.filters = { ...defaultFilters(), keyword };
       this.search();
@@ -738,17 +876,32 @@ export default {
       this.openSections = [];
       return this.search();
     },
-    handleErrorAction() {
+    async handleErrorAction() {
       if (this.searchUnavailable) {
         goHome(true);
         return;
       }
-      this.search();
+      if (this.pendingSiteScope) await this.loadDialects();
+      await this.search();
     },
     async search() {
-      const filters = { ...this.filters };
       const requestId = this.searchRequestId + 1;
       this.searchRequestId = requestId;
+      if (this.siteScopeReady) await this.siteScopeReady;
+      if (requestId !== this.searchRequestId) return;
+      this.resolveSiteScope();
+      if (this.pendingSiteScope) {
+        this.searched = true;
+        this.searchUnavailable = false;
+        this.loading = false;
+        this.loadingMore = false;
+        this.entries = [];
+        this.total = 0;
+        this.next = null;
+        this.errorMessage = '指定的地区暂时无法读取，请重试或手动选择地区';
+        return;
+      }
+      const filters = { ...this.filters };
       this.loadingMore = false;
       this.submittedKeyword = String(filters.keyword || '').trim();
       filters.keyword = entryQuestionTerm(this.submittedKeyword, this.dialects);
@@ -825,9 +978,11 @@ export default {
       }
     },
     onDialectChange(context = {}) {
+      this.dialectTouched = true;
       this.filters.dialectId = context.value || '';
     },
     clearDialect() {
+      this.dialectTouched = true;
       this.filters.dialectId = '';
       this.filters.dialectMatch = 'subtree';
     },
@@ -838,6 +993,9 @@ export default {
     onSourceTypeChange(context = {}) {
       this.filters.sourceType = context.value?.[0] || '';
       this.sourcePickerVisible = false;
+    },
+    openCharacterReadings() {
+      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
     },
   },
 };

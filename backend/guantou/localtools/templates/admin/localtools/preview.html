@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>{{ material.accent }} · {{ material.version }} · {{ material.source }}</p>
+{% if material.source_url %}<p><a href="{{ material.source_url }}">{{ material.source_url }}</a></p>{% endif %}
+{% if kind == "pinyin" %}
+  {% if original.payload.also_for %}<p>同时适用的方言点：{{ original.payload.also_for|join:"、" }}</p>{% endif %}
+  {% for section in material.content.sections %}
+  <h2>{{ section.title }}</h2>
+  <p>{{ section.text|linebreaksbr }}</p>
+  <ul>
+    {% for row in section.rows %}
+    <li>{{ row.form }} {{ row.ipa }} {{ row.example }}{% if row.entry_id %} · 词条 #{{ row.entry_id }}{% endif %}{% if row.recording_id %} · 录音 #{{ row.recording_id }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
+{% elif kind == "quiz" %}
+  {% for question in material.content.questions %}
+  <h2>{{ forloop.counter }}. {{ question.prompt }}</h2>
+  <ol>
+    {% for option in question.options %}
+    <li>{{ option }}{% if forloop.counter0 == question.answer %}（答案）{% endif %}</li>
+    {% endfor %}
+  </ol>
+  <p>{{ question.explanation }}</p>
+  {% endfor %}
+{% else %}
+  <table>
+    <thead><tr><th>角色</th><th>称谓与用法</th><th>关系</th></tr></thead>
+    <tbody>
+    {% for node in material.content.nodes %}
+    <tr>
+      <th>{{ node.label }}</th>
+      <td>{% for term in node.terms %}{{ term.text }} {{ term.usage }}<br>{% empty %}待核验{% endfor %}</td>
+      <td>{% for field, target in node.relations.items %}{{ field }} → {{ target }}<br>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}

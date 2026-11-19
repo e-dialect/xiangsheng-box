@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 from .models import (
     Dialect,
     Entry,
+    LegacyImportRecord,
     PronunciationVariant,
     Recording,
     RecordingEntryLink,
@@ -22,6 +23,23 @@ class EntryRegionLinkTests(TestCase):
         )
         self.other = Dialect.objects.create(name="测试粤语", code="test-yue")
         self.client = APIClient()
+
+    def test_old_word_links_only_resolve_explicit_public_v2_targets(self):
+        numbered = self.entry()
+        target = self.entry()
+        path = f"/entries/from-hinghwa/{numbered.pk}/"
+        self.assertEqual(self.client.get(path).status_code, 404)
+        LegacyImportRecord.objects.create(
+            source_system="hinghwa-dict-backend",
+            source_table="word_word",
+            source_id=str(numbered.pk),
+            target_model=Entry._meta.label,
+            target_id=target.pk,
+        )
+        self.assertEqual(self.client.get(path).json(), {"id": target.pk})
+        target.visibility = False
+        target.save(update_fields=["visibility"])
+        self.assertEqual(self.client.get(path).status_code, 404)
 
     def entry(self, dialect=None):
         return Entry.objects.create(

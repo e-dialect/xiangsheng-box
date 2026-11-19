@@ -162,6 +162,14 @@
       "style": {}
     },
     {
+      "path": "pages/tools/character-readings",
+      "style": {}
+    },
+    {
+      "path": "pages/tools/local",
+      "style": {}
+    },
+    {
       "path": "pages/error/not-found",
       "style": {}
     }

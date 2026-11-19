@@ -105,6 +105,12 @@ export const ROUTE_VISUAL_MATRIX = Object.freeze([
     route: '/pages/login/forget', target: '/pages/login/forget', slug: 'forget-password', issues: [344], persona: 'guest',
   },
   {
+    route: '/pages/tools/character-readings', target: '/pages/tools/character-readings', slug: 'character-readings', issues: [673], persona: 'guest',
+  },
+  {
+    route: '/pages/tools/local', target: '/pages/tools/local?dialect=%E9%97%BD.%E8%8E%86%E4%BB%99', slug: 'local-tools', issues: [675, 700, 701], persona: 'guest',
+  },
+  {
     route: '/pages/error/not-found', target: '/pages/error/not-found', slug: 'not-found', issues: [362], persona: 'guest',
   },
 ]);

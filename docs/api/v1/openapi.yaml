@@ -698,6 +698,70 @@ paths:
         schema:
           type: integer
           minimum: 1
+  /entries/character-readings/:
+    get:
+      tags: [Entries]
+      operationId: lookupCharacterReadings
+      summary: 按原顺序逐字查全部地区的公开字音
+      security: []
+      parameters:
+        - name: text
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 32 }
+      responses:
+        "200":
+          description: 每个字符包含精确匹配的公开词条、读音的直接引证及已授权的词条录音
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [character, kind, entries]
+                  properties:
+                    character: { type: string }
+                    kind: { type: string, enum: [han, separator, other] }
+                    entries:
+                      type: array
+                      items:
+                        type: object
+                        required: [id, summary, writings, status, readings, recordings]
+                        properties:
+                          id: { type: integer }
+                          summary: { type: string }
+                          writings: { type: array, items: { type: string } }
+                          status: { type: string, enum: [reviewed, disputed] }
+                          readings:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                district: { type: string }
+                                ipa: { type: string }
+                                base_romanization: { type: string }
+                                surface_romanization: { type: string }
+                                reading_type: { type: string, enum: [general, literary, colloquial, other] }
+                                usage_note: { type: string }
+                                status: { type: string, enum: [reviewed, disputed] }
+                                sources:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      id: { type: integer }
+                                      relation: { type: string }
+                                      citation: { type: string }
+                          recordings:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                district: { type: string }
+        "400":
+          description: 文本为空或超过 32 个字符
   /entries/suggestions/:
     get:
       tags:
@@ -725,6 +789,28 @@ paths:
           in: query
           schema:
             type: string
+  /entries/from-hinghwa/{legacy_id}/:
+    get:
+      tags: [Entries]
+      operationId: resolveHinghwaLegacyWord
+      summary: 从旧兴化语记词条编号查找已迁入的公开词条
+      security: []
+      parameters:
+        - name: legacy_id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[1-9][0-9]{0,18}$' }
+      responses:
+        "200":
+          description: 迁入台账指向的现行公开词条
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                properties:
+                  id: { type: integer }
+        "404": { description: 没有对应的公开词条 }
   /entries/popular/:
     get:
       tags:
@@ -747,6 +833,39 @@ paths:
         "404":
           description: 对象不存在或不可见
       security: []
+  /entries/daily/:
+    get:
+      tags:
+        - Entries
+      operationId: dailyEntry
+      summary: 按日期和使用地区发现一个公开词条
+      description: >-
+        按服务端本地日期轮换。同一地区的候选集合不变时，当天返回同一词条。
+        地区限定词条标注的使用范围；无候选时返回 204。
+      security: []
+      parameters:
+        - name: dialect_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: dialect_scope
+          in: query
+          schema:
+            type: string
+            enum: [exact, subtree]
+            default: exact
+      responses:
+        "200":
+          description: 当天选中的公开词条
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntryV2"
+        "204":
+          description: 没有公开候选
+        "400":
+          description: 地区条件无效
   /entries/:
     get:
       tags: [Entries]
