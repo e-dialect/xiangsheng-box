@@ -175,6 +175,13 @@
         />
       </view>
 
+      <DailyEntry
+        v-if="showDailyEntry"
+        :key="`daily-${filters.dialectId}-${filters.dialectMatch}`"
+        :dialect-id="filters.dialectId"
+        :dialect-scope="filters.dialectMatch"
+      />
+
       <view
         v-if="!searched && !filters.keyword"
         class="entry-search__suggestions"
@@ -436,6 +443,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import DailyEntry from '@/components/DailyEntry.vue';
 import {
   buildEntrySearchParams,
   dialectLabel,
@@ -457,7 +465,7 @@ import {
   canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
-import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
+import { CAPABILITIES, ensureCapability, isCapabilityEnabled } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
 const SWITCH_FILTERS = {
@@ -541,6 +549,7 @@ export default {
     BaseLoading,
     EmptyState,
     DialectSelector,
+    DailyEntry,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -565,6 +574,7 @@ export default {
       dialects: [],
       dialectsLoading: false,
       siteScopeReady: null,
+      browseScopeReady: false,
       dialectTouched: false,
       pendingSiteScope: null,
       dialectsError: '',
@@ -594,6 +604,10 @@ export default {
     };
   },
   computed: {
+    showDailyEntry() {
+      return this.browseScopeReady && !this.pendingSiteScope && !this.searched
+        && !this.filters.keyword && isCapabilityEnabled(CAPABILITIES.ENTRY_SEARCH);
+    },
     interpretedTerm() {
       const term = this.appliedFilters?.keyword;
       return term !== this.submittedKeyword ? term : '';
@@ -704,7 +718,9 @@ export default {
       }
     }
     // #endif
-    this.siteScopeReady = this.initializeSiteScope(options);
+    this.siteScopeReady = this.initializeSiteScope(options).then(() => {
+      this.browseScopeReady = true;
+    });
     if (!this.filters.keyword) {
       const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
       if (!switchKeys.some((key) => options[key])) return;

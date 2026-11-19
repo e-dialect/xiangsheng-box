@@ -747,6 +747,39 @@ paths:
         "404":
           description: 对象不存在或不可见
       security: []
+  /entries/daily/:
+    get:
+      tags:
+        - Entries
+      operationId: dailyEntry
+      summary: 按日期和使用地区发现一个公开词条
+      description: >-
+        按服务端本地日期轮换。同一地区的候选集合不变时，当天返回同一词条。
+        地区限定词条标注的使用范围；无候选时返回 204。
+      security: []
+      parameters:
+        - name: dialect_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: dialect_scope
+          in: query
+          schema:
+            type: string
+            enum: [exact, subtree]
+            default: exact
+      responses:
+        "200":
+          description: 当天选中的公开词条
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EntryV2"
+        "204":
+          description: 没有公开候选
+        "400":
+          description: 地区条件无效
   /entries/:
     get:
       tags: [Entries]
