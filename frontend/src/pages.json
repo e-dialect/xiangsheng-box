@@ -158,6 +158,10 @@
       "style": {}
     },
     {
+      "path": "pages/tools/character-readings",
+      "style": {}
+    },
+    {
       "path": "pages/tools/local",
       "style": {}
     },

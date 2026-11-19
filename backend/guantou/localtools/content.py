@@ -44,6 +44,13 @@ def public_references(item):
 
 
 def validate_pinyin(payload):
+    dialects = payload.get("also_for", [])
+    check(
+        isinstance(dialects, list) and len(dialects) <= 30,
+        "适用方言点须为列表，最多 30 项",
+    )
+    for code in dialects:
+        string(code, "适用方言限定码", 512)
     for section in items(payload.get("sections"), "拼音章节", 20):
         string(section.get("title"), "章节标题", 120)
         for row in items(section.get("rows", []), "拼音表", 120, minimum=0):
@@ -51,6 +58,16 @@ def validate_pinyin(payload):
             string(row.get("ipa", ""), "音标或调值", 80, optional=True)
             string(row.get("example", ""), "例字", 120, optional=True)
             public_references(row)
+            legacy_id = row.get("hinghwa_word_id")
+            if legacy_id is not None:
+                check(
+                    type(legacy_id) is int and 1 <= legacy_id <= 2**53 - 1,
+                    "旧兴化语记词条编号须为正整数",
+                )
+                check(
+                    row.get("entry_id") is None,
+                    "请在本站词条编号与旧兴化语记词条编号中选填一项",
+                )
         text = section.get("text", "")
         string(text, "章节说明", 10000, optional=True)
         check(text.strip() or section.get("rows"), "拼音章节需有说明或拼音表")

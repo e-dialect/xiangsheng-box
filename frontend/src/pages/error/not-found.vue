@@ -16,13 +16,18 @@
             路径暂时中断
           </view>
           <view class="title">
-            这条路没有找到页面
+            {{ legacyTitle || '这条路没有找到页面' }}
           </view>
         </view>
       </view>
 
       <view class="description">
-        可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用{{ productName }}。
+        <template v-if="legacyTitle">
+          可以在{{ productName }}查词，也可以回到首页。
+        </template>
+        <template v-else>
+          可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用{{ productName }}。
+        </template>
       </view>
 
       <view
@@ -55,6 +60,13 @@
       </view>
 
       <BaseButton
+        v-if="legacyTitle"
+        block
+        variant="ghost"
+        text="查找词条"
+        @click="search"
+      />
+      <BaseButton
         block
         size="large"
         text="回到首页"
@@ -69,7 +81,9 @@
 import BaseButton from '@/components/BaseButton.vue';
 import PageShell from '@/components/PageShell.vue';
 import { toIndexPage } from '@/routers';
-import { currentProductName } from '@/services/productProfile';
+import { currentProductName, loadProductProfile } from '@/services/productProfile';
+import { goSearch, pageUrl, ROUTES } from '@/services/navigation';
+import rawRequest from '@/utils/rawRequest';
 
 const NOT_FOUND_ROUTE = '/pages/error/not-found';
 
@@ -92,13 +106,57 @@ export default {
   name: 'NotFoundPage',
   components: { BaseButton, PageShell },
   data() {
-    return { requestedPath: '' };
+    return { requestedPath: '', legacyTitle: '', active: true };
   },
   computed: { productName: currentProductName },
   onLoad(query = {}) {
     this.requestedPath = this.resolveRequestedPath(query);
+    this.resolveOldRoute(query);
+  },
+  onUnload() {
+    this.active = false;
   },
   methods: {
+    search() { goSearch(); },
+    async resolveOldRoute(query) {
+      const path = this.requestedPath;
+      const word = /^\/words\/([1-9][0-9]{0,18})\/?$/.exec(path)?.[1]
+        || (path === '/pages/words/details' && query.legacyWord);
+      const tools = { '/pinyin': 'pinyin', '/PuxianExam': 'quiz' };
+      const tool = Object.prototype.hasOwnProperty.call(tools, path) && tools[path];
+      const search = path === '/search';
+      let message = '';
+      if (/^\/(?:articles(?:\/|$)|pages\/articles\/)/.test(path)) {
+        message = '兴化语记 2.0 暂未接入旧版文章';
+      } else if (path === '/music' || path === '/pages/music') {
+        message = '兴化语记 2.0 暂未接入旧版音乐';
+      } else if (search && query.legacySearchNeedsInput === '1') {
+        message = '旧查询的范围或关键词需要重新选择';
+      }
+      if (typeof window === 'undefined' || (!word && !tool && !search && !message)) return;
+      const profile = await loadProductProfile();
+      if (!this.active || profile.key !== 'pxm') return;
+      // Use an ordinary same-origin H5 URL so refreshing or copying it preserves one encoding.
+      const mount = import.meta.env.BASE_URL.replace(/\/$/, '');
+      const replace = (route, params) => window.location.replace(mount + pageUrl(route, params));
+      if (message) {
+        this.legacyTitle = message;
+      } else if (tool) {
+        replace(ROUTES.localTools, { tool, dialect: '闽.莆仙' });
+      } else if (search) {
+        const keywords = typeof query.legacySearch === 'string' ? query.legacySearch.slice(0, 200) : '';
+        replace(ROUTES.search, keywords ? { keywords } : {});
+      } else if (/^[1-9][0-9]{0,18}$/.test(word)) {
+        try {
+          const entry = await rawRequest.get(`/entries/from-hinghwa/${word}/`, {}, {
+            auth: false, loading: false, silent: true,
+          });
+          if (this.active) replace(ROUTES.entryDetail, { id: entry.id });
+        } catch {
+          if (this.active) this.legacyTitle = '暂时找不到这条旧词条对应的公开资料';
+        }
+      }
+    },
     resolveRequestedPath(query = {}) {
       const explicitPath = query.path || query.from;
       const navigationState = typeof window !== 'undefined'

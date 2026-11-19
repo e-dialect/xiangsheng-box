@@ -1,5 +1,9 @@
 # TDesign UI migration tracker
 
+## 2026-11-19 · 逐字查音
+
+查词页新增跨地区字音入口。逐字页复用 PageShell、BaseForm、BaseField、PronunciationForms 和公共状态组件，H5 与微信共用页面。[#673](https://github.com/e-dialect/xiangsheng-box/issues/673)
+
 ## 2026-11-05 · 成员反馈 UI 收敛
 
 沿用 `codex/ui-phase-one`，处理录音授权与状态一致性、原始大意标识、常驻草稿工具区、方言层级返回和账户贡献概览。具体反馈映射、回归与待确认数据依赖见[成员反馈迭代记录](UI_FEEDBACK_2026-11-05.md)。11 月 6 日代码与主线对齐见[版本对齐记录](RELEASE_ALIGNMENT_2026-11-06.md)；微信真机和线上证据核查仍待验收。
@@ -241,6 +245,8 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 实施依据：[已确认计划](plans/2026-09-06-v2-restoration.md)，实现见 [PR #408](https://github.com/e-dialect/xiangsheng-box/pull/408)；功能去向见
 [回归记录](audits/2026-09-06-v1-feature-restoration.md)。浏览器测试为 `frontend/tests/e2e/restoration.spec.js`。
+
+集盒目录新增逐词阅读入口，沿用 BaseButton、PronunciationForms 和 EntryRecordingCard，使用当前站点品牌。移动端浅色和暗色走查见同一浏览器套件。[验收单 #728](https://github.com/e-dialect/xiangsheng-box/issues/728)
 
 ### 二次补缺：词条讨论与草稿生命周期
 

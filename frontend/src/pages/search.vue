@@ -46,6 +46,12 @@
           :text="`地区：${selectedDialectLabel}`"
           @click="dialectPickerVisible = true"
         />
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="逐字查音（各地读音）"
+          @click="openCharacterReadings"
+        />
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
         </text>
@@ -174,6 +180,13 @@
           @click="shareKeyword"
         />
       </view>
+
+      <DailyEntry
+        v-if="showDailyEntry"
+        :key="`daily-${filters.dialectId}-${filters.dialectMatch}`"
+        :dialect-id="filters.dialectId"
+        :dialect-scope="filters.dialectMatch"
+      />
 
       <view
         v-if="!searched && !filters.keyword"
@@ -440,6 +453,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import DailyEntry from '@/components/DailyEntry.vue';
 import {
   buildEntrySearchParams,
   dialectLabel,
@@ -453,7 +467,7 @@ import {
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
+  goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
 import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
@@ -461,7 +475,7 @@ import {
   canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
-import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
+import { CAPABILITIES, ensureCapability, isCapabilityEnabled } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
 const SWITCH_FILTERS = {
@@ -488,6 +502,38 @@ function defaultFilters() {
     concept: '',
     hasRecording: '',
   };
+}
+
+// Only persisted public search criteria travel to another user.
+function publicFilters(filters = {}) {
+  const result = {};
+  if (/^[1-9]\d*$/.test(String(filters.dialectId || ''))) {
+    result.dialectId = String(filters.dialectId);
+    if (filters.dialectMatch === 'exact') result.dialectMatch = 'exact';
+  }
+  if (WRITING_TYPES.some(({ value }) => value && value === filters.writingType)) {
+    result.writingType = filters.writingType;
+  }
+  if (SOURCE_TYPES.some(({ value }) => value && value === filters.sourceType)) {
+    result.sourceType = filters.sourceType;
+  }
+  if (['draft', 'reviewed', 'disputed'].includes(filters.status)) result.status = filters.status;
+  if (typeof filters.hasRecording === 'boolean') result.hasRecording = filters.hasRecording;
+  ['ipa', 'romanization', 'source', 'concept'].forEach((key) => {
+    if (typeof filters[key] === 'string' && filters[key].trim()) result[key] = filters[key].trim();
+  });
+  return result;
+}
+
+function sharedFilters(raw) {
+  if (typeof raw !== 'string' || !raw) return {};
+  try {
+    // H5 supplies decoded route options. WeChat may supply the encoded component.
+    const parsed = JSON.parse(raw.startsWith('{') ? raw : decodeURIComponent(raw));
+    return parsed && typeof parsed === 'object' ? publicFilters(parsed) : {};
+  } catch {
+    return {};
+  }
 }
 
 function resultBucket(count) {
@@ -522,6 +568,7 @@ export default {
     BaseLoading,
     EmptyState,
     DialectSelector,
+    DailyEntry,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -546,6 +593,7 @@ export default {
       dialects: [],
       dialectsLoading: false,
       siteScopeReady: null,
+      browseScopeReady: false,
       dialectTouched: false,
       pendingSiteScope: null,
       dialectsError: '',
@@ -575,6 +623,10 @@ export default {
     };
   },
   computed: {
+    showDailyEntry() {
+      return this.browseScopeReady && !this.pendingSiteScope && !this.searched
+        && !this.filters.keyword && isCapabilityEnabled(CAPABILITIES.ENTRY_SEARCH);
+    },
     interpretedTerm() {
       const term = this.appliedFilters?.keyword;
       return term !== this.submittedKeyword ? term : '';
@@ -653,6 +705,10 @@ export default {
     },
   },
   watch: {
+    async siteScopeReady(ready) {
+      await ready;
+      this.browseScopeReady = true;
+    },
     'filters.keyword': function suggestKeyword(value) {
       clearTimeout(this.suggestTimer);
       this.suggestSequence += 1;
@@ -920,6 +976,9 @@ export default {
     onSourceTypeChange(context = {}) {
       this.filters.sourceType = context.value?.[0] || '';
       this.sourcePickerVisible = false;
+    },
+    openCharacterReadings() {
+      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
     },
   },
 };

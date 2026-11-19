@@ -23,6 +23,50 @@ for (const theme of ['light', 'dark']) {
   });
 }
 
+['light', 'dark'].forEach((theme) => {
+  test(`guest reads the collection one word at a time in ${theme}`, async ({ page }, testInfo) => {
+    await installVisualFixture(page, { theme });
+    const sections = ['面线', '红团'].map((word, index) => ({
+      id: index + 30,
+      entry: { id: index + 10, display_writing: word, summary: '测试释义' },
+      recordings: [],
+      recording_count: 0,
+    }));
+    sections[0].recordings = ['莆田城里', '仙游'].map((name, index) => ({
+      id: index + 50,
+      recording: {
+        id: index + 60,
+        usage_dialect: { id: index + 70, name },
+        original_gloss: `示例 ${index + 1}`,
+      },
+    }));
+    sections[0].recording_count = 2;
+    await page.route('**/collections/19/', (route) => route.fulfill({
+      json: {
+        id: 19, title: '测试菜单', is_public: true, sections, pending: [], entry_count: 2, recording_count: 2,
+      },
+    }));
+    await openVisualRoute(page, '/pages/collections/details?id=19');
+    await page.getByText('逐词阅读', { exact: true }).click();
+    await expect(page.getByText('面线', { exact: true })).toBeVisible();
+    await expect(page.locator('.box-directory', { hasText: '莆田城里' }).getByText('示例 1')).toBeVisible();
+    await expect(page.locator('.box-directory', { hasText: '仙游' }).getByText('示例 2')).toBeVisible();
+    await page.getByText('下一个词', { exact: true }).click();
+    await expect(page.getByText('第 2 / 2 个词', { exact: true })).toBeVisible();
+    await expect(page.getByText('红团', { exact: true })).toBeVisible();
+    await expect(page.getByText('本集盒暂未收录这个词的读音。')).toBeVisible();
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);
+    await page.screenshot({ path: testInfo.outputPath(`collection-word-${theme}.png`) });
+    await page.getByText('打开词条', { exact: true }).click();
+    await expect(page).toHaveURL(/entries\/details\?id=11/);
+    await page.goBack();
+    await expect(page.getByText('第 2 / 2 个词', { exact: true })).toBeVisible();
+    if (theme === 'dark') await page.locator('.shell-back:visible').click();
+    else await page.getByText('返回目录', { exact: true }).click();
+    await expect(page.getByText('逐词阅读', { exact: true })).toBeVisible();
+  });
+});
+
 test('collection directory fits desktop and its box label remains editable', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await installVisualFixture(page, { persona: 'member' });
