@@ -1,7 +1,16 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import BooleanField, Count, Exists, OuterRef, Prefetch, Q, Value
+from django.db.models import (
+    BooleanField,
+    Count,
+    Exists,
+    OuterRef,
+    Prefetch,
+    Q,
+    Subquery,
+    Value,
+)
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
@@ -539,6 +548,42 @@ class EntryViewSet(viewsets.ModelViewSet):
             if page is not None
             else Response(serializer.data)
         )
+
+    @action(detail=False, methods=["get"])
+    def daily(self, request):
+        raw_dialect = request.query_params.get("dialect_id")
+        if raw_dialect:
+            try:
+                if not 0 < int(raw_dialect) <= 2**63 - 1:
+                    raise ValueError
+            except ValueError as error:
+                raise BadRequestException("dialect_id 必须是有效的地区编号") from error
+
+        writings = EntryWriting.objects.filter(
+            entry_id=OuterRef("pk"),
+            is_current=True,
+            relation_type=EntryWriting.RelationType.PRIMARY,
+        ).exclude(status=EntryWriting.Status.REJECTED)
+        candidates = (
+            visible_entries_for_user(None)
+            .exclude(status=Entry.Status.REDIRECTED)
+            .filter(~Q(summary="") | Exists(writings))
+            .order_by("id")
+        )
+        ids = selected_dialect_ids(request)
+        if ids is not None:
+            candidates = candidates.filter(usage_dialect_id__in=ids)
+
+        count = candidates.count()
+        if not count:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        position = timezone.localdate().toordinal() % count
+        selected_id = candidates.values("pk")[position : position + 1]
+        entry = entry_api_queryset(None).filter(pk=Subquery(selected_id)).first()
+        if entry is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(EntryCardSerializer(entry).data)
 
     def get_queryset(self):
         queryset = entry_api_queryset(self.request.user)
