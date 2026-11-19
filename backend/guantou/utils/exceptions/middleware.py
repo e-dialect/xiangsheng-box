@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import EmptyPage
 from django.http import JsonResponse
 from django.middleware.common import MiddlewareMixin
@@ -80,13 +81,19 @@ class ExceptionMiddleware(MiddlewareMixin):
                 response["Content-Type"] = "application/json"
         return response
 
-    def process_exception(self, request, exception) -> JsonResponse:
+    def process_exception(self, request, exception) -> JsonResponse | None:
         """
         统一异常处理
         :param request: 请求对象
         :param exception: 异常对象
         :return:
         """
+        # Let Django render permission refusals from the admin with its normal 403.
+        if (
+            isinstance(exception, PermissionDenied)
+            and getattr(request.resolver_match, "app_name", None) == "admin"
+        ):
+            return None
         if isinstance(exception, EmptyPage):
             return BadRequestException(str(exception)).response(request)
         if isinstance(exception, KeyError):

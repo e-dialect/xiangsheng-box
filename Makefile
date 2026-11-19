@@ -13,8 +13,8 @@ setup:
 backend-check:
 	cd $(BACKEND_DIR) && ./.venv/bin/python manage.py check
 	cd $(BACKEND_DIR) && ./.venv/bin/python manage.py makemigrations --check --dry-run
-	cd $(BACKEND_DIR) && ./.venv/bin/python manage.py test config guantou announcements user siteconfig files inbox audit themes productanalytics
-	cd $(BACKEND_DIR) && ./.venv/bin/python -m black --check announcements guantou user siteconfig files inbox audit utils config themes productanalytics
+	cd $(BACKEND_DIR) && ./.venv/bin/python manage.py test config guantou announcements user siteconfig files inbox audit themes productanalytics localtools
+	cd $(BACKEND_DIR) && ./.venv/bin/python -m black --check announcements guantou user siteconfig files inbox audit utils config themes productanalytics localtools
 
 frontend-check:
 	cd $(FRONTEND_DIR) && yarn lint

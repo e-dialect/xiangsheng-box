@@ -15,7 +15,7 @@ class SiteSettingsAdmin(admin.ModelAdmin):
     )
 
     def has_add_permission(self, request):
-        return not SiteSettings.objects.exists()
+        return super().has_add_permission(request) and not SiteSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False
