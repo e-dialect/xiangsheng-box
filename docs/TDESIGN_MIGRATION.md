@@ -242,6 +242,8 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 实施依据：[已确认计划](plans/2026-09-06-v2-restoration.md)，实现见 [PR #408](https://github.com/e-dialect/xiangsheng-box/pull/408)；功能去向见
 [回归记录](audits/2026-09-06-v1-feature-restoration.md)。浏览器测试为 `frontend/tests/e2e/restoration.spec.js`。
 
+集盒目录新增逐词阅读入口，沿用 BaseButton、PronunciationForms 和 EntryRecordingCard，使用当前站点品牌。移动端浅色和暗色走查见同一浏览器套件。[验收单 #728](https://github.com/e-dialect/xiangsheng-box/issues/728)
+
 ### 二次补缺：词条讨论与草稿生命周期
 
 关联 #405、#407。新增共享 DiscussionThread，词条与录音详情共用 BaseForm/BaseField/BaseButton、加载与错误反馈；词条讨论为独立内容区。草稿箱用 BaseLoading 展示实际音频状态检查，录音页沿用原表单和保存反馈，增加编辑与离页保存。
