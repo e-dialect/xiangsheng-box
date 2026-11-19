@@ -2,6 +2,7 @@ import demjson3
 import requests
 from urllib.parse import urlparse
 from django.conf import settings
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views import View
@@ -117,20 +118,24 @@ class WechatRegister(View):
             # Set empty email for WeChat-only registration
             if not user.email:
                 user.email = ""
-            # Save user first before creating UserInfo
-            user.save()
-
-            # Now create UserInfo with saved user
-            user_info = UserInfo.objects.create(user=user, nickname=user.username)
-            user_info.wechat = openid
-            if "nickname" in body:
-                user_info.nickname = body["nickname"]
-            if "avatar" in body:
-                user_info.avatar = upload_avatar(user.id, body["avatar"], suffix="png")
-            # Add phone number if provided
-            if "telephone" in body:
-                user_info.telephone = body["telephone"]
-            user_info.save()
+            try:
+                with transaction.atomic():
+                    user.save()
+                    user_info = UserInfo(
+                        user=user,
+                        wechat=openid,
+                        nickname=body.get("nickname", user.username),
+                        telephone=body.get("telephone", ""),
+                    )
+                    if "avatar" in body:
+                        user_info.avatar = upload_avatar(
+                            user.id, body["avatar"], suffix="png"
+                        )
+                    user_info.save()
+            except IntegrityError:
+                if UserInfo.objects.filter(wechat=openid).exists():
+                    return JsonResponse({"msg": "该微信已绑定账户"}, status=409)
+                raise
             return JsonResponse(
                 {"id": user.id, "token": generate_token(user)}, status=200
             )

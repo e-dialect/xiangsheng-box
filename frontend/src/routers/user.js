@@ -1,5 +1,5 @@
 import {
-  goHome,
+  goMine,
   goRecommendFollow,
   goUserDetail,
   goUserEmail,
@@ -23,5 +23,5 @@ export function toFollowRecommendations(closeAll = false) {
 }
 
 export function toMePage(closeAll = false) {
-  return goHome(closeAll, { status: 'me' });
+  return goMine(closeAll);
 }
