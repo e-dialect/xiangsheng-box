@@ -75,18 +75,25 @@
           />
         </view>
       </view>
-      <EntryRecordingCard
-        v-for="item in readingRecordings"
-        :key="item.id"
-        ref="readingRecordingCards"
-        :compact="true"
-        :community="false"
-        :recording="item.recording"
-        @open-entry="goEntryDetail"
-        @continue="recordFor"
-      />
+      <view
+        v-for="group in readingGroups"
+        :key="group.id"
+        class="box-directory"
+      >
+        <text class="box-heading">
+          {{ group.label }}
+        </text>
+        <EntryRecordingCard
+          v-for="item in group.items"
+          :key="item.id"
+          ref="readingRecordingCards"
+          :compact="true"
+          :community="false"
+          :recording="item.recording"
+        />
+      </view>
       <text
-        v-if="!readingRecordings.length"
+        v-if="!readingGroups.length"
         class="box-note"
       >
         本集盒暂未收录这个词的读音。
@@ -274,7 +281,7 @@
           class="box-directory"
         >
           <view
-            v-for="group in groups(section)"
+            v-for="group in groups(section.recordings)"
             :key="group.id"
           >
             <text class="box-heading">
@@ -544,8 +551,9 @@ export default {
     readingSection() {
       return this.box?.sections?.[this.readingIndex];
     },
-    readingRecordings() {
-      return this.readingSection?.recordings.filter((item) => !item.needs_review) || [];
+    readingGroups() {
+      const confirmed = this.readingSection?.recordings.filter((item) => !item.needs_review) || [];
+      return this.groups(confirmed);
     },
     shareType() { return canUseNativeMiniProgramShare() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
@@ -619,9 +627,9 @@ export default {
         entry_id: id,
       });
     },
-    groups(section) {
+    groups(recordings) {
       const groups = [];
-      section.recordings.forEach((item) => {
+      recordings.forEach((item) => {
         const id = item.recording.usage_dialect?.id || 'unknown';
         let group = groups.find((row) => row.id === id);
         if (!group) {

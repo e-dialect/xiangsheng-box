@@ -1,5 +1,7 @@
 import { mount } from '@vue/test-utils';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
 import CollectionDetails from '@/pages/collections/details.vue';
 import { getCollection } from '@/services/collections';
 
@@ -9,8 +11,12 @@ vi.mock('@/services/collections', async (importOriginal) => ({
 
 const stopPlayback = vi.fn();
 const section = (id, word, recordings = []) => ({
-  id, entry: { id: id + 10, display_writing: word, summary: word, pronunciation_variants: [] },
-  recordings, recording_count: recordings.length,
+  id,
+  entry: {
+    id: id + 10, display_writing: word, summary: word, pronunciation_variants: [],
+  },
+  recordings,
+  recording_count: recordings.length,
 });
 const box = (sections) => ({
   title: '菜单', is_public: true, sections, pending: [], entry_count: sections.length,
@@ -24,7 +30,8 @@ function mountPage(sections) {
         PageShell: { template: '<main><slot /></main>' },
         BaseButton: { props: ['text'], emits: ['click'], template: '<button @click="$emit(\'click\')">{{ text }}</button>' },
         EntryRecordingCard: {
-          props: ['recording'], methods: { stopPlayback },
+          props: ['recording'],
+          methods: { stopPlayback },
           template: '<span>{{ recording.original_gloss }}</span>',
         },
         EmptyState: true,
@@ -40,14 +47,20 @@ describe('逐词阅读', () => {
   it('reads in directory order, stops playback and keeps unconfirmed audio out of the word', async () => {
     const page = mountPage([
       section(7, '面线', [
-        { id: 1, recording: { original_gloss: '可试听的录音' } },
+        { id: 1, recording: { original_gloss: '甲录音', usage_dialect: { id: 51, name: '莆田城里' } } },
         { id: 2, needs_review: true, recording: { original_gloss: '待核的旧关联' } },
+        { id: 3, recording: { original_gloss: '乙录音', usage_dialect: { id: 52, name: '仙游' } } },
       ]),
       section(5, '红团'),
     ]);
     await button(page, '逐词阅读').trigger('click');
     expect(page.text()).toContain('第 1 / 2 个词');
-    expect(page.text()).toContain('可试听的录音');
+    const recordings = page.findAll('.box-directory');
+    expect(recordings).toHaveLength(2);
+    expect(recordings[0].text()).toContain('莆田城里');
+    expect(recordings[0].text()).toContain('甲录音');
+    expect(recordings[1].text()).toContain('仙游');
+    expect(recordings[1].text()).toContain('乙录音');
     expect(page.text()).not.toContain('待核的旧关联');
     await button(page, '上一个词').trigger('click');
     expect(stopPlayback).toHaveBeenCalled();
