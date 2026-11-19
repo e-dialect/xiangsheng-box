@@ -27,35 +27,25 @@
         @click="openEntry"
       />
     </template>
-    <template v-else-if="failed">
-      <text class="daily-entry__summary">
-        每日一词暂时没有加载出来。
-      </text>
-      <BaseButton
-        size="small"
-        variant="ghost"
-        text="重试每日一词"
-        @click="loadEntry"
-      />
-    </template>
-    <text
+    <EmptyState
       v-else
-      class="daily-entry__summary"
-    >
-      当前地区范围暂时没有可推荐的词条。
-    </text>
+      :title="failed ? '每日一词暂时没有加载出来。' : '当前地区范围暂时没有可推荐的词条。'"
+      :action-text="failed ? '重试每日一词' : ''"
+      @action="loadEntry"
+    />
   </view>
 </template>
 
 <script>
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
+import EmptyState from '@/components/EmptyState.vue';
 import { entryTitle } from '@/services/entryRecording';
 import { getDailyEntry } from '@/services/entrySearchAssist';
 import { goEntryDetail } from '@/services/navigation';
 
 export default {
-  components: { BaseButton, BaseLoading },
+  components: { BaseButton, BaseLoading, EmptyState },
   props: {
     dialectId: { type: [String, Number], default: '' },
     dialectScope: { type: String, default: 'exact' },
@@ -101,6 +91,11 @@ export default {
   background: var(--accent-subtle-color);
   color: var(--text-color);
   overflow-wrap: anywhere;
+}
+
+.daily-entry :deep(.empty-state) {
+  justify-self: stretch;
+  padding: var(--space-3) 0;
 }
 
 .daily-entry__heading,

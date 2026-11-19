@@ -40,11 +40,19 @@ describe('daily entry', () => {
     request.get.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce('');
     const wrapper = shallowMount(DailyEntry);
     await flushPromises();
-    expect(wrapper.text()).toContain('暂时没有加载出来');
+    const state = wrapper.findComponent({ name: 'EmptyState' });
+    expect(state.props()).toMatchObject({
+      title: '每日一词暂时没有加载出来。',
+      actionText: '重试每日一词',
+    });
 
-    wrapper.findComponent({ name: 'BaseButton' }).vm.$emit('click');
+    state.vm.$emit('action');
     await flushPromises();
-    expect(wrapper.text()).toContain('当前地区范围暂时没有可推荐的词条');
+    expect(wrapper.findComponent({ name: 'EmptyState' }).props()).toMatchObject({
+      title: '当前地区范围暂时没有可推荐的词条。',
+      actionText: '',
+    });
+    expect(request.get).toHaveBeenCalledTimes(2);
     expect(request.get).toHaveBeenLastCalledWith('/entries/daily/', {}, true, expect.any(Object));
     expect(goEntryDetail).not.toHaveBeenCalled();
   });
