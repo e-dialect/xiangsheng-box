@@ -8,12 +8,24 @@ if (
   Array.isArray(guantouH5Routes)
   && !guantouH5Routes.some((route) => route.path === '${H5_CATCH_ALL_ROUTE}')
 ) {
+  const recoveryQuery = (to) => {
+    const path = to.path;
+    const { id, key, keywords, index } = to.query || {};
+    if (path === '/pages/words/details' && typeof id === 'string' && /^[1-9][0-9]{0,18}$/.test(id)) {
+      return { path, legacyWord: id };
+    }
+    if (path !== '/search') return { path };
+    if (index !== undefined || (key !== undefined && keywords !== undefined && key !== keywords)) {
+      return { path, legacySearchNeedsInput: '1' };
+    }
+    const term = key === undefined ? keywords : key;
+    if (term === undefined) return { path };
+    if (typeof term !== 'string') return { path, legacySearchNeedsInput: '1' };
+    return { path, legacySearch: term.slice(0, 200) };
+  };
   guantouH5Routes.push({
     path: '${H5_CATCH_ALL_ROUTE}',
-    redirect: (to) => ({
-      path: '${H5_NOT_FOUND_ROUTE}',
-      query: { path: to.path },
-    }),
+    redirect: (to) => ({ path: '${H5_NOT_FOUND_ROUTE}', query: recoveryQuery(to) }),
     meta: { route: 'pages/error/not-found' },
   });
 }
