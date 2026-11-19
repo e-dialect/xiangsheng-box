@@ -281,6 +281,8 @@ BaseLoading、EmptyState 与显式导入的 TDesign Switch。收纳面板使用�
 
 地方工具沿用 PageShell、DialectSelector、BaseButton、BaseLoading 和 EmptyState。后台资料格式及发布流程见 [地方工具资料发布](LOCAL_TOOLS.md)。
 
+声韵调查字使用 TDesign Picker 选择三项独立条件，空结果复用 EmptyState。资料版本的来源、适用口音、回查词条与录音入口见 [#597](https://github.com/e-dialect/xiangsheng-box/issues/597)。
+
 ## 录音投稿审核（#702）
 
 重新送审和下架均经 BaseForm 校验。校验期间按钮锁定，切换账号后旧操作不会提交。

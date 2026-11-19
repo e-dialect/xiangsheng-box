@@ -55,6 +55,12 @@
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
         </text>
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="声韵调查字"
+          @click="openSoundLookup"
+        />
       </view>
       <DialectSelector
         v-model:visible="dialectPickerVisible"
@@ -462,6 +468,7 @@ import {
 } from '@/services/entrySearchAssist';
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
+import { readSoundLookupSearch } from '@/services/localTools';
 import {
   goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
@@ -747,7 +754,8 @@ export default {
   },
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
-  async onLoad(options = {}) {
+  async onLoad(routeOptions = {}) {
+    const options = { ...routeOptions, ...readSoundLookupSearch(routeOptions.sound_lookup) };
     // #ifdef MP-WEIXIN
     if (isWechatMiniProgram()) showWechatShareMenu();
     // #endif
@@ -841,6 +849,10 @@ export default {
       }
     },
     goCollections,
+    openSoundLookup() {
+      const { dialect } = this.productSwitchParams;
+      openPage(ROUTES.localTools, { tool: 'sounds', dialect: dialect === 'all' ? '' : dialect });
+    },
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
       return sharePage(this.keywordShare, this.keywordShare?.filtered ? '查词结果链接已复制' : '关键词链接已复制');

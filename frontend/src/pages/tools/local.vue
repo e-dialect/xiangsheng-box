@@ -63,6 +63,12 @@
           v-if="tool === 'pinyin'"
           :sections="material.content.sections"
         />
+        <SoundLookup
+          v-else-if="tool === 'sounds'"
+          :key="`${dialect}:${material.version}`"
+          :rows="material.content.sound_rows"
+          :dialect="dialect"
+        />
         <template v-else-if="tool === 'quiz'">
           <LocalQuiz
             :key="`${dialect}:${material.version}`"
@@ -107,6 +113,7 @@ import KinshipCalculator from '@/components/localtools/KinshipCalculator.vue';
 import LocalQuiz from '@/components/localtools/LocalQuiz.vue';
 import MaterialSource from '@/components/localtools/MaterialSource.vue';
 import PinyinGuide from '@/components/localtools/PinyinGuide.vue';
+import SoundLookup from '@/components/localtools/SoundLookup.vue';
 import PageShell from '@/components/PageShell.vue';
 import { listAllDialects } from '@/services/guantou';
 import {
@@ -119,6 +126,7 @@ import { getUserInfo } from '@/services/user';
 
 const TOOLS = Object.freeze([
   { id: 'pinyin', label: '拼音方案' },
+  { id: 'sounds', label: '声韵调查字' },
   { id: 'quiz', label: '聪明花开' },
   { id: 'kinship', label: '亲戚计算器' },
 ]);
@@ -134,6 +142,7 @@ export default {
     MaterialSource,
     PageShell,
     PinyinGuide,
+    SoundLookup,
   },
   data() {
     return {
@@ -166,6 +175,10 @@ export default {
       });
     },
     material() {
+      if (this.tool === 'sounds') {
+        const guide = this.packs.pinyin;
+        return guide?.content?.sound_rows?.length ? guide : null;
+      }
       return this.packs[this.tool];
     },
     shareMessage() {
@@ -178,6 +191,7 @@ export default {
     missingTitle() {
       if (!this.dialect) return '先选择一种方言';
       if (this.tool === 'quiz' && this.quizUnavailable) return '分享的这组题暂不可用';
+      if (this.tool === 'sounds') return '当前方言暂无可按声韵调查找的例字';
       const label = this.tools.find((item) => item.id === this.tool)?.label;
       return `当前方言暂无发布的${label}`;
     },
@@ -195,7 +209,8 @@ export default {
     this.quizVersion = readLocalParam(query.quiz);
     this.tool = TOOLS.some((item) => item.id === query.tool) ? query.tool : 'pinyin';
     this.userId = resolveSessionUserId();
-    if (this.userId && !this.quizVersion && query.tool !== 'pinyin') {
+    const requestedDialect = query.tool === 'pinyin' || (this.tool === 'sounds' && this.routeDialect);
+    if (this.userId && !this.quizVersion && !requestedDialect) {
       const cachedUser = getApp().globalData.userInfo;
       try {
         const user = cachedUser?.id === this.userId
