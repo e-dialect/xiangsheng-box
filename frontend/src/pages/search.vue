@@ -49,6 +49,12 @@
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
         </text>
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="声韵调查字"
+          @click="openSoundLookup"
+        />
       </view>
       <DialectSelector
         v-model:visible="dialectPickerVisible"
@@ -449,7 +455,7 @@ import {
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
+  goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
 import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
@@ -776,6 +782,10 @@ export default {
       }
     },
     goCollections,
+    openSoundLookup() {
+      const { dialect } = this.productSwitchParams;
+      openPage(ROUTES.localTools, { tool: 'sounds', dialect: dialect === 'all' ? '' : dialect });
+    },
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
       return sharePage(this.keywordShare, '关键词链接已复制');
