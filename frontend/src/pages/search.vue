@@ -682,6 +682,10 @@ export default {
     },
   },
   watch: {
+    async siteScopeReady(ready) {
+      await ready;
+      this.browseScopeReady = true;
+    },
     'filters.keyword': function suggestKeyword(value) {
       clearTimeout(this.suggestTimer);
       this.suggestSequence += 1;
@@ -718,9 +722,7 @@ export default {
       }
     }
     // #endif
-    this.siteScopeReady = this.initializeSiteScope(options).then(() => {
-      this.browseScopeReady = true;
-    });
+    this.siteScopeReady = this.initializeSiteScope(options);
     if (!this.filters.keyword) {
       const switchKeys = ['dialect', 'dialect_id', 'has_recording', ...Object.values(SWITCH_FILTERS)];
       if (!switchKeys.some((key) => options[key])) return;

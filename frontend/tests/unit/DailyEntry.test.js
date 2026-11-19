@@ -49,11 +49,15 @@ describe('daily entry', () => {
     expect(goEntryDetail).not.toHaveBeenCalled();
   });
 
-  it('keeps the feature hidden while the site region is unresolved or a search is active', () => {
+  it('waits on site scope and hides when a region is unresolved or a search is active', async () => {
     const page = Search.data();
     const show = () => Search.computed.showDailyEntry.call(page);
+    let finishScope;
+    const scopeLoading = new Promise((resolve) => { finishScope = resolve; });
+    const ready = Search.watch.siteScopeReady.call(page, scopeLoading);
     expect(show()).toBe(false);
-    page.browseScopeReady = true;
+    finishScope();
+    await ready;
     page.pendingSiteScope = { code: '闽.莆仙' };
     expect(show()).toBe(false);
     page.pendingSiteScope = null;
