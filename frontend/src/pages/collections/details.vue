@@ -465,7 +465,6 @@
   </PageShell>
 </template>
 <script>
-import PronunciationForms from '@/components/PronunciationForms.vue';
 import TSwitch from '@tdesign/uniapp/switch/switch.vue';
 import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
@@ -474,6 +473,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import UnavailableContent from '@/components/UnavailableContent.vue';
+import PronunciationForms from '@/components/PronunciationForms.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import { currentProductName } from '@/services/productProfile';
 import { requireAuth } from '@/services/authGuard';
