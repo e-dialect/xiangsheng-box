@@ -5,12 +5,20 @@ from .models import ProductEvent, ProductEventDailySummary
 
 @admin.register(ProductEvent)
 class ProductEventAdmin(admin.ModelAdmin):
-    list_display = ("event_name", "platform", "surface", "result", "received_at")
-    list_filter = ("event_name", "platform", "result")
+    list_display = (
+        "event_name",
+        "platform",
+        "site",
+        "surface",
+        "result",
+        "received_at",
+    )
+    list_filter = ("event_name", "platform", "site", "surface", "result")
     readonly_fields = (
         "event_name",
         "session_hash",
         "platform",
+        "site",
         "surface",
         "result",
         "metadata",
@@ -33,16 +41,18 @@ class ProductEventDailySummaryAdmin(admin.ModelAdmin):
         "date",
         "event_name",
         "platform",
+        "site",
         "surface",
         "result",
         "event_count",
         "unique_sessions",
     )
-    list_filter = ("date", "event_name", "platform", "result")
+    list_filter = ("date", "event_name", "platform", "site", "surface", "result")
     readonly_fields = (
         "date",
         "event_name",
         "platform",
+        "site",
         "surface",
         "result",
         "event_count",

@@ -267,24 +267,32 @@ describe('entry-first search page orchestration', () => {
     sender.entries = [{ id: 8 }];
     sender.submittedKeyword = '菜名';
     sender.appliedFilters = {
-      ...sender.filters, dialectId: 21, dialectMatch: 'exact', hasRecording: false,
-      source: '资料 & 50% / 1', status: 'reviewed', owner: 'private',
+      ...sender.filters,
+      dialectId: 21,
+      dialectMatch: 'exact',
+      hasRecording: false,
+      source: '资料 & 50% / 1',
+      status: 'reviewed',
+      owner: 'private',
     };
     sender.filters.dialectId = 99;
     const shared = SearchPage.computed.keywordShare.call(sender);
     const h5 = Object.fromEntries(new URL(shared.path, 'https://example.com').searchParams);
     const wechat = Object.fromEntries(shared.query.split('&').map((part) => part.split('=')));
     request.get.mockResolvedValue({ results: [] });
-    for (const options of [h5, wechat]) {
+    await Promise.all([h5, wechat].map(async (options) => {
       const recipient = pageContext();
-      // eslint-disable-next-line no-await-in-loop
       await SearchPage.onLoad.call(recipient, options);
       expect(recipient.filters).toMatchObject({
-        keyword: '菜名', dialectId: '21', dialectMatch: 'exact', hasRecording: false,
-        source: '资料 & 50% / 1', status: 'reviewed',
+        keyword: '菜名',
+        dialectId: '21',
+        dialectMatch: 'exact',
+        hasRecording: false,
+        source: '资料 & 50% / 1',
+        status: 'reviewed',
       });
       expect(recipient.filters).not.toHaveProperty('owner');
-    }
+    }));
     expect(shared.filtered).toBe(true);
   });
 

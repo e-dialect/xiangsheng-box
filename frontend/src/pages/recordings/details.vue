@@ -168,6 +168,7 @@
   </PageShell>
 </template>
 <script>
+import { observeSharedOpen } from '@/services/shareObservation';
 import DiscussionThread from '@/components/DiscussionThread.vue';
 import PageShell from '@/components/PageShell.vue';
 import RecordingSpeakerDeclaration from '@/components/RecordingSpeakerDeclaration.vue';
@@ -353,6 +354,7 @@ export default {
         };
         this.replacement = null;
         this.takedown.reason = '';
+        observeSharedOpen(recordingShareMessage(recording)?.path);
       } catch (error) {
         if (version !== this.loadVersion) return;
         this.recording = null;

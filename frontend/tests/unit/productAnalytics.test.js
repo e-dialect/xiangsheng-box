@@ -34,6 +34,9 @@ describe('product analytics', () => {
       'recording_submit',
       'evidence_submit',
       'curation_task_complete',
+      'share_clipboard',
+      'share_system',
+      'share_opened',
       'capability_degraded',
     ]);
     expect(productPlatform()).toBe('h5');
