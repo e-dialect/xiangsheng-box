@@ -130,6 +130,8 @@ describe('anonymous H5 shares', () => {
       tool: 'quiz',
       routeDialect: dialect,
       quizVersion: version,
+      get tools() { return LocalToolsPage.computed.tools.call(this); },
+      get toolEnabled() { return LocalToolsPage.computed.toolEnabled.call(this); },
       get material() { return LocalToolsPage.computed.material.call(this); },
       get shareMessage() { return LocalToolsPage.computed.shareMessage.call(this); },
     };
