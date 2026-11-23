@@ -118,7 +118,6 @@
 </template>
 
 <script>
-import { observeSharedOpen } from '@/services/shareObservation';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
