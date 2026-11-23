@@ -419,6 +419,7 @@ class PrivateSubmissionCurationTests(APITestCase):
                 public_recording.id,
                 {"entry_id": self.private_entry.id},
             ),
+            ("merge_entries", "entry", public.id, {"source_entry_ids": public.id}),
         ]
         for action, target, target_id, changes in requests:
             with self.subTest(action=action, changes=changes):

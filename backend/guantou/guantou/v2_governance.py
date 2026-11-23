@@ -554,28 +554,31 @@ def _require_visible_targets(actor, target_type, target_id, changes):
             _fail("对象编号无效", "changes")
 
     target_id = object_id(target_id)
-    entry_ids = [object_id(value) for value in changes.get("source_entry_ids") or []]
+    source_values = changes.get("source_entry_ids", [])
+    if not isinstance(source_values, list):
+        _fail("待合并词条必须是编号列表", "changes.source_entry_ids")
+    source_ids = {object_id(value) for value in source_values}
+    entry_ids = set(source_ids)
     if changes.get("entry_id"):
-        entry_ids.append(object_id(changes["entry_id"]))
+        entry_ids.add(object_id(changes["entry_id"]))
     recording_ids = []
+    child_model = {
+        "sense": EntrySense,
+        "writing": EntryWriting,
+        "pronunciation": PronunciationVariant,
+        "recording_link": RecordingEntryLink,
+    }.get(target_type)
     child = None
     if target_type == "entry":
-        entry_ids.append(target_id)
+        entry_ids.add(target_id)
     elif target_type == "recording":
         recording_ids.append(target_id)
-    else:
-        child_model = {
-            "sense": EntrySense,
-            "writing": EntryWriting,
-            "pronunciation": PronunciationVariant,
-            "recording_link": RecordingEntryLink,
-        }.get(target_type)
-        if child_model:
-            child = child_model.objects.filter(pk=target_id).first()
-            if child:
-                entry_ids.append(child.entry_id)
-                if target_type == "recording_link":
-                    recording_ids.append(child.recording_id)
+    elif child_model:
+        child = child_model.objects.filter(pk=target_id).first()
+        if child:
+            entry_ids.add(child.entry_id)
+            if target_type == "recording_link":
+                recording_ids.append(child.recording_id)
     # Match withdrawal: lock recordings before their generated entries.
     recording_ids.extend(
         Recording.objects.filter(media__generated_entry_id__in=entry_ids).values_list(
@@ -601,18 +604,12 @@ def _require_visible_targets(actor, target_type, target_id, changes):
             _fail("对象关联已变化，请重新检查后重试", "target_id")
     entries = visible_entries_for_user(actor)
     recordings = visible_recordings_for_user(actor)
-    models = {
-        "sense": EntrySense,
-        "writing": EntryWriting,
-        "pronunciation": PronunciationVariant,
-        "recording_link": RecordingEntryLink,
-    }
     if target_type == "entry":
         allowed = entries.filter(pk=target_id).exists()
     elif target_type == "recording":
         allowed = recordings.filter(pk=target_id).exists()
-    elif target_type in models:
-        objects = models[target_type].objects.filter(pk=target_id, entry__in=entries)
+    elif child_model:
+        objects = child_model.objects.filter(pk=target_id, entry__in=entries)
         if target_type == "recording_link":
             objects = objects.filter(recording__in=recordings)
         allowed = objects.exists()
@@ -620,8 +617,7 @@ def _require_visible_targets(actor, target_type, target_id, changes):
         allowed = True
     if not allowed:
         _fail("待整理对象不存在或不可访问", "target_id")
-    source_ids = changes.get("source_entry_ids") or []
-    if any(not entries.filter(pk=value).exists() for value in source_ids):
+    if source_ids and entries.filter(pk__in=source_ids).count() != len(source_ids):
         _fail("待合并词条不存在或不可访问", "changes.source_entry_ids")
     if changes.get("entry_id") and not entries.filter(pk=changes["entry_id"]).exists():
         _fail("关联词条不存在或不可访问", "changes.entry_id")

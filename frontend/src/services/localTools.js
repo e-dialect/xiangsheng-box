@@ -30,3 +30,16 @@ export function readLocalParam(value) {
     return text;
   }
 }
+
+export function readSoundLookupSearch(value) {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    // H5 provides decoded JSON. Native route options can still be encoded.
+    const params = JSON.parse(value.startsWith('{') ? value : readLocalParam(value));
+    if (typeof params?.keywords !== 'string' || Array.from(params.keywords).length !== 1
+      || typeof params.dialect !== 'string' || !params.dialect) return null;
+    return { keywords: params.keywords, dialect: params.dialect };
+  } catch {
+    return null;
+  }
+}

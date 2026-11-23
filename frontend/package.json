@@ -72,7 +72,7 @@
     "@dcloudio/uni-ui": "^1.4.24",
     "@rollup/plugin-alias": "^6.0.1",
     "@tdesign/uniapp": "^1.0.0",
-    "marked": "^18.2.0",
+    "marked": "^18.2.1",
     "postcss": "^8.5.33",
     "vue": "3.4.21"
   },
@@ -98,7 +98,7 @@
     "mini-types": "*",
     "miniprogram-api-typings": "*",
     "playwright": "^1.63.0",
-    "rollup": "4.68.3",
+    "rollup": "4.68.4",
     "sass": "^1.108.2",
     "start-server-and-test": "^3.0.13",
     "unplugin-auto-import": "^21.1.0",
@@ -108,7 +108,7 @@
     "wait-on": "^9.5.1"
   },
   "resolutions": {
-    "rollup": "4.68.3",
+    "rollup": "4.68.4",
     "vite": "5.4.21"
   }
 }

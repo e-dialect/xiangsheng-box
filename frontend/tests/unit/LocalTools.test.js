@@ -1,10 +1,12 @@
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import LocalQuiz from '@/components/localtools/LocalQuiz.vue';
+import SoundLookup from '@/components/localtools/SoundLookup.vue';
 import { quizShareMessage, resolveLocalDialect } from '@/services/localTools';
 import { createKinshipEngine } from '@/utils/localtools/kinshipEngine.mjs';
 import quiz from '../../../backend/guantou/localtools/examples/quiz.json';
 import kinship from '../../../backend/guantou/localtools/examples/kinship.json';
+import pinyin from '../../../backend/guantou/localtools/examples/pinyin.json';
 
 describe('local materials', () => {
   it('uses an explicit selection, then the shared dialect or profile', () => {
@@ -12,6 +14,43 @@ describe('local materials', () => {
     expect(resolveLocalDialect(values)).toBe('other');
     expect(resolveLocalDialect({ ...values, chosen: '' })).toBe('share');
     expect(resolveLocalDialect({ ...values, chosen: '', shared: '' })).toBe('profile');
+  });
+
+  it('intersects sound conditions on one row and distinguishes zero onset from no filter', async () => {
+    const rows = [
+      ...pinyin.payload.sound_rows,
+      // A synthetic second reading verifies that matching retains multiple rows per character.
+      { character: '枝', form: 'gi7', initial: 'g', final: 'i', tone: '7' },
+    ];
+    const lookup = mount(SoundLookup, {
+      props: { rows, dialect: pinyin.dialect },
+    });
+    const choose = async (field, option) => {
+      const button = lookup.findAllComponents({ name: 'BaseButton' })
+        .find((component) => component.props('text').startsWith(`${field} ·`));
+      await button.vm.$emit('click');
+      lookup.vm.pickerVisible = false;
+      lookup.vm.choose({
+        value: [lookup.vm.activeField.options.find(({ label }) => label === option).value],
+      });
+      await lookup.vm.$nextTick();
+    };
+    const readings = () => lookup.findAll('.sound-lookup__reading')
+      .map((row) => row.text().replace(/\s/g, ''));
+
+    expect(readings()).toEqual([]);
+    await choose('声母', '零声母');
+    expect(readings()).toEqual(['红ang2']);
+    await choose('韵母', 'i');
+    expect(lookup.text()).toContain('没有符合条件');
+    await choose('声母', 'g');
+    expect(readings()).toEqual(['枝gi1', '期gi2', '指gi3', '记gi4', '义gi5', '枝gi7']);
+    await choose('声调', '1');
+    expect(readings()).toEqual(['枝gi1']);
+    const clear = lookup.findAllComponents({ name: 'BaseButton' })
+      .find((component) => component.props('text') === '清空条件');
+    await clear.vm.$emit('click');
+    expect(readings()).toEqual([]);
   });
 
   it('shares a pinned quiz and cold-starts a fresh copy at question one', async () => {

@@ -1,7 +1,7 @@
 {
   "dialect": "闽.莆仙",
   "kind": "pinyin",
-  "version": "putian-city-reference-1",
+  "version": "putian-city-reference-3",
   "title": "莆仙话拼音 · 莆田城里入门",
   "accent": "莆田城里口音",
   "source": "莆仙乡音社拼音方案（旧兴化语记），据公开版本整理",
@@ -9,6 +9,7 @@
   "rights": "旧 uni-app DATA_PROVENANCE.md 记载莆仙乡音社授权项目使用。这里独立撰写说明，仅列少量单项音系事实和例字；完整旧表、行文、录音和视频转载需要重新确认本产品的使用范围。",
   "payload": {
     "schema": 1,
+    "also_for": ["闽.莆仙.莆田.城里"],
     "sections": [
       {
         "title": "怎么读拼音",
@@ -27,7 +28,8 @@
           {
             "form": "p",
             "ipa": "pʰ",
-            "example": "破 pua4"
+            "example": "破 pua4",
+            "hinghwa_word_id": 4334
           },
           {
             "form": "m",
@@ -84,7 +86,8 @@
           {
             "form": "1 · 阴平",
             "ipa": "533",
-            "example": "枝 gi1"
+            "example": "枝 gi1",
+            "hinghwa_word_id": 2226
           },
           {
             "form": "2 · 阳平",
@@ -118,6 +121,25 @@
           }
         ]
       }
+    ],
+    "sound_rows": [
+      { "character": "布", "form": "bou4", "initial": "b", "final": "ou", "tone": "4" },
+      { "character": "破", "form": "pua4", "initial": "p", "final": "ua", "tone": "4", "hinghwa_word_id": 4334 },
+      { "character": "骂", "form": "mor4", "initial": "m", "final": "or", "tone": "4" },
+      { "character": "洗", "form": "se3", "initial": "s", "final": "e", "tone": "3" },
+      { "character": "狗", "form": "gao3", "initial": "g", "final": "ao", "tone": "3" },
+      { "character": "菜", "form": "cai4", "initial": "c", "final": "ai", "tone": "4" },
+      { "character": "红", "form": "ang2", "initial": "", "final": "ang", "tone": "2" },
+      { "character": "灯", "form": "deng1", "initial": "d", "final": "eng", "tone": "1" },
+      { "character": "笔", "form": "bih6", "initial": "b", "final": "ih", "tone": "6" },
+      { "character": "我", "form": "guoh3", "initial": "g", "final": "uoh", "tone": "3" },
+      { "character": "枝", "form": "gi1", "initial": "g", "final": "i", "tone": "1", "hinghwa_word_id": 2226 },
+      { "character": "期", "form": "gi2", "initial": "g", "final": "i", "tone": "2" },
+      { "character": "指", "form": "gi3", "initial": "g", "final": "i", "tone": "3" },
+      { "character": "记", "form": "gi4", "initial": "g", "final": "i", "tone": "4" },
+      { "character": "义", "form": "gi5", "initial": "g", "final": "i", "tone": "5" },
+      { "character": "急", "form": "gih6", "initial": "g", "final": "ih", "tone": "6" },
+      { "character": "及", "form": "gih7", "initial": "g", "final": "ih", "tone": "7" }
     ]
   }
 }

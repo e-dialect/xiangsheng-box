@@ -22,7 +22,12 @@
       </view>
 
       <view class="description">
-        可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用{{ productName }}。
+        <template v-if="legacyTitle">
+          可以在{{ productName }}查词，也可以回到首页。
+        </template>
+        <template v-else>
+          可能是链接已过期，或地址里多了字符。当前只是这个链接打不开，你仍可以继续使用{{ productName }}。
+        </template>
       </view>
 
       <view
@@ -119,17 +124,28 @@ export default {
         || (path === '/pages/words/details' && query.legacyWord);
       const tools = { '/pinyin': 'pinyin', '/PuxianExam': 'quiz' };
       const tool = Object.prototype.hasOwnProperty.call(tools, path) && tools[path];
-      const search = path === '/search' && query.legacySearch;
-      if (typeof window === 'undefined' || (!word && !tool && !search)) return;
+      const search = path === '/search';
+      let message = '';
+      if (/^\/(?:articles(?:\/|$)|pages\/articles\/)/.test(path)) {
+        message = '兴化语记 2.0 暂未接入旧版文章';
+      } else if (path === '/music' || path === '/pages/music') {
+        message = '兴化语记 2.0 暂未接入旧版音乐';
+      } else if (search && query.legacySearchNeedsInput === '1') {
+        message = '旧查询的范围或关键词需要重新选择';
+      }
+      if (typeof window === 'undefined' || (!word && !tool && !search && !message)) return;
       const profile = await loadProductProfile();
       if (!this.active || profile.key !== 'pxm') return;
       // Use an ordinary same-origin H5 URL so refreshing or copying it preserves one encoding.
       const mount = import.meta.env.BASE_URL.replace(/\/$/, '');
       const replace = (route, params) => window.location.replace(mount + pageUrl(route, params));
-      if (tool) {
+      if (message) {
+        this.legacyTitle = message;
+      } else if (tool) {
         replace(ROUTES.localTools, { tool, dialect: '闽.莆仙' });
       } else if (search) {
-        replace(ROUTES.search, { keywords: search });
+        const keywords = typeof query.legacySearch === 'string' ? query.legacySearch.slice(0, 200) : '';
+        replace(ROUTES.search, keywords ? { keywords } : {});
       } else if (/^[1-9][0-9]{0,18}$/.test(word)) {
         try {
           const entry = await rawRequest.get(`/entries/from-hinghwa/${word}/`, {}, {

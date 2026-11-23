@@ -3,6 +3,7 @@
 <p>{{ material.accent }} · {{ material.version }} · {{ material.source }}</p>
 {% if material.source_url %}<p><a href="{{ material.source_url }}">{{ material.source_url }}</a></p>{% endif %}
 {% if kind == "pinyin" %}
+  {% if original.payload.also_for %}<p>同时适用的方言点：{{ original.payload.also_for|join:"、" }}</p>{% endif %}
   {% for section in material.content.sections %}
   <h2>{{ section.title }}</h2>
   <p>{{ section.text|linebreaksbr }}</p>
@@ -12,6 +13,24 @@
     {% endfor %}
   </ul>
   {% endfor %}
+  {% if material.content.sound_rows %}
+  <h2>声韵调查字</h2>
+  <table>
+    <thead><tr><th>字</th><th>本调拼写</th><th>声母</th><th>韵母</th><th>调类</th><th>公开链接</th></tr></thead>
+    <tbody>
+    {% for row in material.content.sound_rows %}
+    <tr>
+      <th>{{ row.character }}</th>
+      <td>{{ row.form }}</td>
+      <td>{{ row.initial|default:"零声母" }}</td>
+      <td>{{ row.final }}</td>
+      <td>{{ row.tone }}</td>
+      <td>{% if row.entry_id %}词条 #{{ row.entry_id }}{% endif %}{% if row.recording_id %} 录音 #{{ row.recording_id }}{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 {% elif kind == "quiz" %}
   {% for question in material.content.questions %}
   <h2>{{ forloop.counter }}. {{ question.prompt }}</h2>

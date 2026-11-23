@@ -1,8 +1,38 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.utils import timezone
 
+from guantou.legacy_import import resolve_dialect
+
 from .content import VALIDATORS, validate_content
+
+
+class RegionalMaintainer(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        limit_choices_to={"is_staff": True},
+        verbose_name="后台账号",
+    )
+    dialect = models.ForeignKey(
+        "guantou.Dialect",
+        on_delete=models.PROTECT,
+        verbose_name="维护方言点",
+        help_text="可维护此方言点现有和未来的所有地方资料包。下级方言点需单独分配。",
+    )
+
+    class Meta:
+        verbose_name = "地方管理员"
+        verbose_name_plural = "地方管理员"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "dialect"], name="localtools_unique_maintainer_region"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user} · {self.dialect.qualified_code}"
 
 
 class MaterialPack(models.Model):
@@ -70,6 +100,14 @@ class MaterialRevision(models.Model):
         if self.pack_id and self.pack.kind in VALIDATORS:
             try:
                 validate_content(self.pack.kind, self.payload)
+                if self.pack.kind == MaterialPack.Kind.PINYIN:
+                    for code in self.payload.get("also_for", []):
+                        if not code.startswith(
+                            self.pack.dialect.qualified_code + "."
+                        ) or not resolve_dialect(code):
+                            raise ValidationError(
+                                f"适用方言点须是本资料包下属的已登记方言点：{code}"
+                            )
             except ValidationError as error:
                 raise ValidationError({"payload": error.messages}) from error
         for field in ("title", "accent", "source", "rights"):

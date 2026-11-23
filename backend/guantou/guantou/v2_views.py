@@ -446,25 +446,15 @@ class EntryViewSet(viewsets.ModelViewSet):
     ]
     permission_classes = [V2ResourcePermission]
 
-    @action(
-        detail=False,
-        methods=["get"],
-        permission_classes=[permissions.AllowAny],
-        url_path=r"from-hinghwa/(?P<legacy_id>[1-9][0-9]{0,18})",
-    )
-    def from_hinghwa(self, request, legacy_id):
-        target = LegacyImportRecord.objects.filter(
-            source_system="hinghwa-dict-backend",
-            source_table="word_word",
-            source_id=legacy_id,
-            target_model=Entry._meta.label,
-        ).values_list("target_id", flat=True)
-        entry = get_object_or_404(
-            Entry.objects.filter(visibility=True, pk__in=target).exclude(
-                status=Entry.Status.REDIRECTED
+    @action(detail=False, methods=["get"], url_path="character-readings")
+    def character_readings(self, request):
+        from .character_readings import lookup_characters
+
+        return Response(
+            lookup_characters(
+                request.query_params.get("text", ""), visible_entries_for_user(None)
             )
         )
-        return Response({"id": entry.pk})
 
     @action(detail=False, methods=["get"])
     def suggestions(self, request):
@@ -589,6 +579,42 @@ class EntryViewSet(viewsets.ModelViewSet):
             else Response(serializer.data)
         )
 
+    @action(detail=False, methods=["get"])
+    def daily(self, request):
+        raw_dialect = request.query_params.get("dialect_id")
+        if raw_dialect:
+            try:
+                if not 0 < int(raw_dialect) <= 2**63 - 1:
+                    raise ValueError
+            except ValueError as error:
+                raise BadRequestException("dialect_id 必须是有效的地区编号") from error
+
+        writings = EntryWriting.objects.filter(
+            entry_id=OuterRef("pk"),
+            is_current=True,
+            relation_type=EntryWriting.RelationType.PRIMARY,
+        ).exclude(status=EntryWriting.Status.REJECTED)
+        candidates = (
+            visible_entries_for_user(None)
+            .exclude(status=Entry.Status.REDIRECTED)
+            .filter(~Q(summary="") | Exists(writings))
+            .order_by("id")
+        )
+        ids = selected_dialect_ids(request)
+        if ids is not None:
+            candidates = candidates.filter(usage_dialect_id__in=ids)
+
+        count = candidates.count()
+        if not count:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        position = timezone.localdate().toordinal() % count
+        selected_id = candidates.values("pk")[position : position + 1]
+        entry = entry_api_queryset(None).filter(pk=Subquery(selected_id)).first()
+        if entry is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(EntryCardSerializer(entry).data)
+
     def get_queryset(self):
         queryset = entry_api_queryset(self.request.user)
         search = (
@@ -707,6 +733,26 @@ class EntryViewSet(viewsets.ModelViewSet):
         }:
             raise BadRequestException("不支持该 ordering")
         return queryset.distinct().order_by(ordering, "-id")
+
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        url_path=r"from-hinghwa/(?P<legacy_id>[1-9][0-9]{0,18})",
+    )
+    def from_hinghwa(self, request, legacy_id):
+        target = LegacyImportRecord.objects.filter(
+            source_system="hinghwa-dict-backend",
+            source_table="word_word",
+            source_id=legacy_id,
+            target_model=Entry._meta.label,
+        ).values_list("target_id", flat=True)
+        entry = get_object_or_404(
+            Entry.objects.filter(visibility=True, pk__in=target).exclude(
+                status=Entry.Status.REDIRECTED
+            )
+        )
+        return Response({"id": entry.pk})
 
 
 class EntrySenseViewSet(viewsets.ModelViewSet):

@@ -1,5 +1,9 @@
 <template>
-  <PageShell title="集盒目录">
+  <PageShell
+    :title="readingSection ? '逐词阅读' : '集盒目录'"
+    :intercept-back="Boolean(readingSection)"
+    @back="readingSection && readSection(null)"
+  >
     <BaseLoading
       v-if="loading"
       text="正在打开盒子…"
@@ -12,12 +16,96 @@
       @retry="load"
     />
     <view
+      v-else-if="readingSection"
+      class="box-stack"
+    >
+      <view class="box-panel">
+        <text class="box-heading">
+          {{ box.title }}
+        </text>
+        <view class="box-actions">
+          <text
+            class="box-note"
+            role="status"
+            aria-live="polite"
+          >
+            第 {{ readingIndex + 1 }} / {{ box.sections.length }} 个词
+          </text>
+          <BaseButton
+            size="small"
+            variant="ghost"
+            text="返回目录"
+            @click="readSection(null)"
+          />
+        </view>
+        <text class="box-title">
+          {{ entryTitle(readingSection.entry) }}
+        </text>
+        <text v-if="readingSection.entry.summary">
+          {{ readingSection.entry.summary }}
+        </text>
+        <view
+          v-for="variant in readingSection.entry.pronunciation_variants"
+          :key="variant.id"
+        >
+          <text class="box-note">
+            {{ dialectLabel(variant.dialect) }}
+          </text>
+          <PronunciationForms :variant="variant" />
+        </view>
+        <BaseButton
+          size="small"
+          variant="ghost"
+          text="打开词条"
+          @click="goEntryDetail(readingSection.entry.id)"
+        />
+        <view
+          v-if="box.sections.length > 1"
+          class="box-actions"
+        >
+          <BaseButton
+            variant="ghost"
+            text="上一个词"
+            @click="turnWord(-1)"
+          />
+          <BaseButton
+            variant="ghost"
+            text="下一个词"
+            @click="turnWord(1)"
+          />
+        </view>
+      </view>
+      <view
+        v-for="group in readingGroups"
+        :key="group.id"
+        class="box-directory"
+      >
+        <text class="box-heading">
+          {{ group.label }}
+        </text>
+        <EntryRecordingCard
+          v-for="item in group.items"
+          :key="item.id"
+          ref="readingRecordingCards"
+          :compact="true"
+          :community="false"
+          :recording="item.recording"
+        />
+      </view>
+      <text
+        v-if="!readingGroups.length"
+        class="box-note"
+      >
+        本集盒暂未收录这个词的读音。
+      </text>
+    </view>
+    <view
       v-else-if="box"
       class="box-stack"
     >
       <view class="box-cover">
         <text class="box-kicker">
-          乡声集盒 · {{ box.is_public ? '公开集盒' : '私人珍藏' }}
+          {{ productName }} · {{ box.is_public ? '公开集盒' : '私人珍藏' }}
         </text>
         <text class="box-title">
           {{ box.title }}
@@ -25,6 +113,12 @@
         <text class="box-note">
           {{ box.entry_count }} 个词条 · {{ box.recording_count }} 段乡音
         </text>
+        <BaseButton
+          v-if="box.sections.length"
+          variant="ghost"
+          text="逐词阅读"
+          @click="readSection(box.sections[0].id)"
+        />
         <view
           v-if="shareMessage"
           class="box-actions"
@@ -187,7 +281,7 @@
           class="box-directory"
         >
           <view
-            v-for="group in groups(section)"
+            v-for="group in groups(section.recordings)"
             :key="group.id"
           >
             <text class="box-heading">
@@ -387,7 +481,9 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import UnavailableContent from '@/components/UnavailableContent.vue';
+import PronunciationForms from '@/components/PronunciationForms.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
+import { currentProductName } from '@/services/productProfile';
 import { requireAuth } from '@/services/authGuard';
 import {
   getCollection, updateCollection, deleteCollection, addCollectionEntry,
@@ -409,6 +505,7 @@ import {
 export default {
   components: {
     TSwitch,
+    PronunciationForms,
     PageShell,
     BaseButton,
     BaseForm,
@@ -433,6 +530,7 @@ export default {
         message: '请填写名称',
       }],
     },
+    readingSectionId: null,
     expanded: {},
     pendingOpen: false,
     keyword: '',
@@ -447,6 +545,17 @@ export default {
     recordingPage: 1,
   }),
   computed: {
+    productName: currentProductName,
+    readingIndex() {
+      return this.box?.sections?.findIndex((section) => section.id === this.readingSectionId) ?? -1;
+    },
+    readingSection() {
+      return this.box?.sections?.[this.readingIndex];
+    },
+    readingGroups() {
+      const confirmed = this.readingSection?.recordings.filter((item) => !item.needs_review) || [];
+      return this.groups(confirmed);
+    },
     shareType() { return canUseNativeMiniProgramShare() ? 'share' : ''; },
     canSystemShare: canUseSystemShare,
     shareMessage() {
@@ -486,8 +595,18 @@ export default {
     this.stopRecordingPlayback();
   },
   methods: {
+    readSection(sectionId) {
+      this.stopRecordingPlayback();
+      this.readingSectionId = sectionId;
+    },
+    turnWord(step) {
+      const count = this.box.sections.length;
+      const next = (this.readingIndex + step + count) % count;
+      this.readSection(this.box.sections[next].id);
+    },
     stopRecordingPlayback() {
       [
+        this.$refs.readingRecordingCards,
         this.$refs.recordingCards,
         this.$refs.candidateRecordingCards,
         this.$refs.pendingRecordingCards,
@@ -496,6 +615,7 @@ export default {
       });
     },
     entryTitle,
+    dialectLabel,
     goEntryDetail,
     shareCollection() {
       // #ifdef H5 || APP-PLUS
@@ -508,9 +628,9 @@ export default {
         entry_id: id,
       });
     },
-    groups(section) {
+    groups(recordings) {
       const groups = [];
-      section.recordings.forEach((item) => {
+      recordings.forEach((item) => {
         const id = item.recording.usage_dialect?.id || 'unknown';
         let group = groups.find((row) => row.id === id);
         if (!group) {
@@ -536,6 +656,7 @@ export default {
           description: this.box.description,
           is_public: this.box.is_public,
         };
+        if (!this.readingSection) this.readingSectionId = null;
       } catch (error) {
         this.error = '集盒不存在、已设为私有或暂时无法读取';
       } finally {

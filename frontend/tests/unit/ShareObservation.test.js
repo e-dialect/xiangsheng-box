@@ -3,6 +3,7 @@ import {
 } from 'vitest';
 
 vi.mock('@/services/feedback', () => ({ notify: vi.fn() }));
+vi.mock('@/utils/rawRequest', () => ({ default: { get: vi.fn() } }));
 
 function fetchEvents() {
   return window.fetch.mock.calls.map(([, options]) => JSON.parse(options.body));
@@ -110,6 +111,37 @@ describe('anonymous H5 shares', () => {
     });
     window.history.replaceState({}, '', livePath);
   }
+
+  it.each([true, false])('observes a cold-start quiz only if its version loads (%s)', async (available) => {
+    const { default: LocalToolsPage } = await import('@/pages/tools/local.vue');
+    const { default: rawRequest } = await import('@/utils/rawRequest');
+    const dialect = 'pxm';
+    const version = 'version-1';
+    const marked = '/pages/tools/local?dialect=pxm&tool=quiz&quiz=version-1&share_kind=quiz';
+    setLanding(marked, marked);
+    rawRequest.get.mockResolvedValue({
+      dialect: { qualified_code: dialect },
+      packs: { quiz: { version: available ? version : 'other-version' } },
+      quiz_unavailable: !available,
+    });
+    const page = {
+      ...LocalToolsPage.data(),
+      dialect,
+      tool: 'quiz',
+      routeDialect: dialect,
+      quizVersion: version,
+      get material() { return LocalToolsPage.computed.material.call(this); },
+      get shareMessage() { return LocalToolsPage.computed.shareMessage.call(this); },
+    };
+
+    await LocalToolsPage.methods.refresh.call(page);
+    await LocalToolsPage.methods.refresh.call(page);
+
+    expect(fetchEvents()).toMatchObject(
+      available ? [{ event_name: 'share_opened', surface: 'quiz', result: 'success' }] : [],
+    );
+    expect(window.fetch).toHaveBeenCalledTimes(available ? 1 : 0);
+  });
 
   it('counts one successfully loaded exact target on the original document navigation', () => {
     const path = '/pages/tools/local?dialect=pxm&tool=quiz&quiz=version-1';

@@ -1,3 +1,4 @@
+import { runInNewContext } from 'node:vm';
 import {
   afterEach,
   describe,
@@ -25,14 +26,19 @@ describe('H5 not-found route plugin', () => {
 
     expect(transformed).toContain("path: '/:pathMatch(.*)*'");
     expect(transformed).toContain("path: '/pages/error/not-found'");
-    expect(transformed).toContain('path: to.path');
     const state = { __uniRoutes: [] };
-    const apply = new Function('window', 'globalThis', transformed);
-    apply(state, state);
-    const route = state.__uniRoutes[0];
+    runInNewContext(transformed, { window: state, globalThis: state });
+    const { __uniRoutes: [route] } = state;
     expect(route.redirect({ path: '/pages/words/details', query: { id: '14', token: 'secret' } }).query)
       .toEqual({ path: '/pages/words/details', legacyWord: '14' });
     expect(route.redirect({ path: '/other', query: { key: 'hidden' } }).query).toEqual({ path: '/other' });
+    const search = (query) => route.redirect({ path: '/search', query }).query;
+    expect(search({ desktop: '1', token: 'private' })).toEqual({ path: '/search' });
+    expect(search({ keywords: '面线', token: 'private' })).toEqual({ path: '/search', legacySearch: '面线' });
+    expect(search({ key: '菜', keywords: '菜' })).toEqual({ path: '/search', legacySearch: '菜' });
+    [{ key: '菜', index: '2' }, { key: '甲', keywords: '乙' }, { key: ['甲', '乙'] }].forEach((query) => {
+      expect(search(query)).toEqual({ path: '/search', legacySearchNeedsInput: '1' });
+    });
     expect(transformed.match(/guantouH5Routes\.push/g)).toHaveLength(1);
   });
 

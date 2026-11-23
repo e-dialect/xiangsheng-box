@@ -46,9 +46,21 @@
           :text="`地区：${selectedDialectLabel}`"
           @click="dialectPickerVisible = true"
         />
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="逐字查音（各地读音）"
+          @click="openCharacterReadings"
+        />
         <text v-if="activeFilters">
           已启用 {{ activeFilters }} 项筛选
         </text>
+        <BaseButton
+          variant="ghost"
+          size="small"
+          text="声韵调查字"
+          @click="openSoundLookup"
+        />
       </view>
       <DialectSelector
         v-model:visible="dialectPickerVisible"
@@ -174,6 +186,13 @@
           @click="shareKeyword"
         />
       </view>
+
+      <DailyEntry
+        v-if="showDailyEntry"
+        :key="`daily-${filters.dialectId}-${filters.dialectMatch}`"
+        :dialect-id="filters.dialectId"
+        :dialect-scope="filters.dialectMatch"
+      />
 
       <view
         v-if="!searched && !filters.keyword"
@@ -440,6 +459,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import DailyEntry from '@/components/DailyEntry.vue';
 import {
   buildEntrySearchParams,
   dialectLabel,
@@ -452,8 +472,9 @@ import {
 } from '@/services/entrySearchAssist';
 import entryQuestionTerm from '@/services/entrySearchQuestion';
 import { listAllDialects } from '@/services/guantou';
+import { readSoundLookupSearch } from '@/services/localTools';
 import {
-  goCollections, goEntryDetail, goHome, goRecord, pageUrl, ROUTES,
+  goCollections, goEntryDetail, goHome, goRecord, openPage, pageUrl, ROUTES,
 } from '@/services/navigation';
 import { currentProductName, loadProductProfile } from '@/services/productProfile';
 import { isWechatMiniProgram } from '@/services/platform';
@@ -461,7 +482,7 @@ import {
   canUseSystemShare, hasShareTarget, sharePage, showWechatShareMenu, WECHAT_SHARE_IMAGE,
 } from '@/services/pageShare';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
-import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
+import { CAPABILITIES, ensureCapability, isCapabilityEnabled } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
 const SWITCH_FILTERS = {
@@ -522,6 +543,7 @@ export default {
     BaseLoading,
     EmptyState,
     DialectSelector,
+    DailyEntry,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -546,6 +568,7 @@ export default {
       dialects: [],
       dialectsLoading: false,
       siteScopeReady: null,
+      browseScopeReady: false,
       dialectTouched: false,
       pendingSiteScope: null,
       dialectsError: '',
@@ -575,6 +598,10 @@ export default {
     };
   },
   computed: {
+    showDailyEntry() {
+      return this.browseScopeReady && !this.pendingSiteScope && !this.searched
+        && !this.filters.keyword && isCapabilityEnabled(CAPABILITIES.ENTRY_SEARCH);
+    },
     interpretedTerm() {
       const term = this.appliedFilters?.keyword;
       return term !== this.submittedKeyword ? term : '';
@@ -653,6 +680,10 @@ export default {
     },
   },
   watch: {
+    async siteScopeReady(ready) {
+      await ready;
+      this.browseScopeReady = true;
+    },
     'filters.keyword': function suggestKeyword(value) {
       clearTimeout(this.suggestTimer);
       this.suggestSequence += 1;
@@ -671,7 +702,8 @@ export default {
   },
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
-  async onLoad(options = {}) {
+  async onLoad(routeOptions = {}) {
+    const options = { ...routeOptions, ...readSoundLookupSearch(routeOptions.sound_lookup) };
     // #ifdef MP-WEIXIN
     if (isWechatMiniProgram()) showWechatShareMenu();
     // #endif
@@ -765,6 +797,10 @@ export default {
       }
     },
     goCollections,
+    openSoundLookup() {
+      const { dialect } = this.productSwitchParams;
+      openPage(ROUTES.localTools, { tool: 'sounds', dialect: dialect === 'all' ? '' : dialect });
+    },
     shareKeyword() {
       // #ifdef H5 || APP-PLUS
       return sharePage(this.keywordShare, this.keywordShare?.filtered ? '查词结果链接已复制' : '关键词链接已复制');
@@ -920,6 +956,9 @@ export default {
     onSourceTypeChange(context = {}) {
       this.filters.sourceType = context.value?.[0] || '';
       this.sourcePickerVisible = false;
+    },
+    openCharacterReadings() {
+      openPage(ROUTES.characterReadings, { text: this.filters.keyword });
     },
   },
 };

@@ -12,6 +12,10 @@ export function listEntries(params = {}) {
   return request.get('/entries/', params, true, PAGE_LOAD_OPTIONS);
 }
 
+export function lookupCharacterReadings(text) {
+  return request.get('/entries/character-readings/', { text }, true, PAGE_LOAD_OPTIONS);
+}
+
 export function getEntry(id) {
   return request.get(`/entries/${id}/`, {}, true, PAGE_LOAD_OPTIONS);
 }

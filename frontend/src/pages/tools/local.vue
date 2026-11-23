@@ -76,6 +76,12 @@
           v-if="tool === 'pinyin'"
           :sections="material.content.sections"
         />
+        <SoundLookup
+          v-else-if="tool === 'sounds'"
+          :key="`${dialect}:${material.version}`"
+          :rows="material.content.sound_rows"
+          :dialect="dialect"
+        />
         <template v-else-if="tool === 'quiz'">
           <LocalQuiz
             :key="`${dialect}:${material.version}`"
@@ -121,6 +127,7 @@ import KinshipCalculator from '@/components/localtools/KinshipCalculator.vue';
 import LocalQuiz from '@/components/localtools/LocalQuiz.vue';
 import MaterialSource from '@/components/localtools/MaterialSource.vue';
 import PinyinGuide from '@/components/localtools/PinyinGuide.vue';
+import SoundLookup from '@/components/localtools/SoundLookup.vue';
 import PageShell from '@/components/PageShell.vue';
 import { requireAuth } from '@/services/authGuard';
 import { contentFeedbackParams } from '@/services/contentFeedback';
@@ -131,8 +138,9 @@ import {
 import { hasShareTarget, sharePage, showWechatShareMenu } from '@/services/pageShare';
 import { openPage, ROUTES } from '@/services/navigation';
 import { isWechatMiniProgram } from '@/services/platform';
-import { enabledLocalTools, loadProductProfile, LOCAL_TOOL_OPTIONS } from '@/services/productProfile';
+import { enabledLocalTools, loadProductProfile } from '@/services/productProfile';
 import { resolveSessionUserId } from '@/services/session';
+import { observeSharedOpen } from '@/services/shareObservation';
 import { getUserInfo } from '@/services/user';
 
 export default {
@@ -146,6 +154,7 @@ export default {
     MaterialSource,
     PageShell,
     PinyinGuide,
+    SoundLookup,
   },
   data() {
     return {
@@ -168,7 +177,10 @@ export default {
     };
   },
   computed: {
-    tools: enabledLocalTools,
+    tools() {
+      return enabledLocalTools().flatMap((tool) => (tool.id === 'pinyin'
+        ? [tool, { id: 'sounds', label: '声韵调查字' }] : [tool]));
+    },
     toolEnabled() {
       return this.tools.some(({ id }) => id === this.tool);
     },
@@ -181,7 +193,12 @@ export default {
       });
     },
     material() {
-      return this.toolEnabled ? this.packs[this.tool] : null;
+      if (!this.toolEnabled) return null;
+      if (this.tool === 'sounds') {
+        const guide = this.packs.pinyin;
+        return guide?.content?.sound_rows?.length ? guide : null;
+      }
+      return this.packs[this.tool];
     },
     shareMessage() {
       return this.tool === 'quiz'
@@ -193,6 +210,7 @@ export default {
     missingTitle() {
       if (!this.dialect) return '先选择一种方言';
       if (this.tool === 'quiz' && this.quizUnavailable) return '分享的这组题暂不可用';
+      if (this.tool === 'sounds') return '当前方言暂无可按声韵调查找的例字';
       const label = this.tools.find((item) => item.id === this.tool)?.label;
       return `当前方言暂无发布的${label}`;
     },
@@ -211,10 +229,11 @@ export default {
     this.quizVersion = readLocalParam(query.quiz);
     await loadProductProfile();
     if (generation !== this.generation) return;
-    this.tool = LOCAL_TOOL_OPTIONS.some((item) => item.id === query.tool)
+    this.tool = ['pinyin', 'sounds', 'quiz', 'kinship'].includes(query.tool)
       ? query.tool : (this.tools[0]?.id || '');
     this.userId = resolveSessionUserId();
-    if (this.userId && !this.quizVersion && query.tool !== 'pinyin') {
+    const requestedDialect = query.tool === 'pinyin' || (this.tool === 'sounds' && this.routeDialect);
+    if (this.userId && !this.quizVersion && !requestedDialect) {
       const cachedUser = getApp().globalData.userInfo;
       try {
         const user = cachedUser?.id === this.userId
@@ -265,9 +284,10 @@ export default {
         this.currentDialect = response.dialect;
         this.packs = response.packs || {};
         this.quizUnavailable = response.quiz_unavailable;
-        if (this.quizVersion && this.tool === 'quiz' && this.toolEnabled && this.packs.quiz) {
-          const shared = quizShareMessage(this.currentDialect.qualified_code, this.packs.quiz);
-          observeSharedOpen(shared?.path);
+        if (this.tool === 'quiz' && this.toolEnabled && this.quizVersion && !this.quizUnavailable
+          && this.currentDialect?.qualified_code === this.routeDialect
+          && this.packs.quiz?.version === this.quizVersion) {
+          observeSharedOpen(this.shareMessage?.path);
         }
       } catch {
         if (request === this.generation) this.error = true;
