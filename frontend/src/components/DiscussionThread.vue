@@ -313,6 +313,7 @@ export default {
     sheetPage: 1,
     sheetNext: null,
     sheetLoading: false,
+    sheetTailCount: null,
     sheetError: '',
     sheetRequestId: 0,
     sheetScrollTarget: '',
@@ -426,6 +427,7 @@ export default {
       this.sheetPage = 1;
       this.sheetNext = null;
       this.sheetLoading = false;
+      this.sheetTailCount = null;
       this.sheetScrollTarget = '';
       this.sheetRequestId += 1;
       this.replyDraft.body = '';
@@ -444,7 +446,9 @@ export default {
       const localReplies = this.sheetLocalReplies;
       this.sheetLoading = true;
       this.sheetError = '';
-      const page = refreshCurrent ? this.sheetPage : (more ? this.sheetPage + 1 : 1);
+      let page = 1;
+      if (refreshCurrent) page = this.sheetPage;
+      else if (more) page = this.sheetPage + 1;
       try {
         const response = await listComments(
           this.targetId,
@@ -471,6 +475,9 @@ export default {
       } finally {
         if (requestId === this.sheetRequestId) {
           this.sheetLoading = false;
+          const count = this.sheetTailCount;
+          this.sheetTailCount = null;
+          await this.recoverReplyTail(count);
         }
       }
     },
@@ -552,16 +559,22 @@ export default {
           pageSize: 1,
         });
         this.applyReplyCount(parent.id, count);
-        if (requestId === this.sheetRequestId
-          && this.sheet.parent?.id === parent.id
-          && !this.sheetNext
-          && Number.isInteger(count)
-          && count > this.sheetReplies.length) {
-          // 旧末页可能同时缺少并发追加的回复和新的下一页入口。
-          await this.loadSheetReplies(false, { refreshCurrent: true });
+        if (requestId === this.sheetRequestId && this.sheet.parent?.id === parent.id) {
+          await this.recoverReplyTail(count);
         }
       } catch (error) {
         // 已发送的回复可以继续查看，下次读取留言时会更新总数。
+      }
+    },
+    async recoverReplyTail(count) {
+      if (!Number.isInteger(count)) return;
+      if (this.sheetLoading) {
+        // 在途响应可能仍返回旧的末页，等它落地后再判断。
+        this.sheetTailCount = count;
+        return;
+      }
+      if (!this.sheetNext && count > this.sheetReplies.length) {
+        await this.loadSheetReplies(false, { refreshCurrent: true });
       }
     },
     applyReplyCount(parentId, count) {

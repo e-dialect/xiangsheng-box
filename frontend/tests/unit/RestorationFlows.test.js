@@ -370,6 +370,37 @@ describe('discussion replies sheet', () => {
     expect(detail.sheetNext).toBeNull();
   });
 
+  it('recovers a reply after a stale opening request finishes', async () => {
+    const first = Array.from({ length: 15 }, (_, index) => makeReply(index + 1, 1));
+    const sent = makeReply(17, 1);
+    const last = [makeReply(16, 1), sent];
+    let resolveOpening;
+    listComments
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOpening = resolve; }))
+      .mockResolvedValueOnce({ count: 17, results: [first[0]], next: 'count-next' })
+      .mockResolvedValueOnce({ count: 17, results: first, next: 'next-page' })
+      .mockResolvedValueOnce({ count: 17, results: last, next: null });
+    createComment.mockResolvedValueOnce(sent);
+    const parent = { id: 1, reply_count: 15, recent_replies: first.slice(0, 3) };
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    const open = detail.openReplies(parent);
+    detail.replyDraft.body = sent.body;
+    await detail.sendReply();
+    expect(listComments).toHaveBeenCalledTimes(2);
+    resolveOpening({ count: 15, results: first, next: null });
+    await open;
+    expect(parent.reply_count).toBe(17);
+    expect(detail.sheetNext).toBe('next-page');
+    expect(listComments).toHaveBeenCalledTimes(3);
+    await detail.loadSheetReplies(true);
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual([...first, ...last].map((item) => item.id));
+  });
+
   it('preserves a sent reply when an older first-page response arrives afterward', async () => {
     let resolveFirstPage;
     listComments
