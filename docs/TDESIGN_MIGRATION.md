@@ -1,5 +1,11 @@
 # TDesign UI migration tracker
 
+## 2026-11-25 · 讨论回复面板
+
+词条和录音详情的回复面板复用 PlatformScroll，保留通知跳转到指定回复的能力。一级留言的“回复”直接聚焦编辑框，“查看全部回复”用于浏览。关联 [#470](https://github.com/e-dialect/xiangsheng-box/issues/470)。
+
+390×844 H5 预览使用合成讨论数据，截图见[浅色](assets/ui-v2/issue-470/replies-light-390x844.png)和[暗色](assets/ui-v2/issue-470/replies-dark-390x844.png)。
+
 ## 2026-11-19 · 逐字查音
 
 查词页新增跨地区字音入口。逐字页复用 PageShell、BaseForm、BaseField、PronunciationForms 和公共状态组件，H5 与微信共用页面。[#673](https://github.com/e-dialect/xiangsheng-box/issues/673)

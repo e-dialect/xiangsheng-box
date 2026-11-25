@@ -15,6 +15,7 @@ const request = (await import('@/utils/request')).default;
 const dialects = await import('@/services/guantou');
 const mail = await import('@/services/mail');
 const following = await import('@/services/following');
+const discussion = await import('@/services/recordingSocial');
 const users = await import('@/services/user');
 
 describe('page-owned loading feedback', () => {
@@ -58,6 +59,20 @@ describe('page-owned loading feedback', () => {
       null,
       true,
       { loading: false },
+    );
+  });
+
+  it('keeps discussion list and bounded count reads silent', async () => {
+    await discussion.listComments(7, 2, 'recording', 9);
+    await discussion.listComments(11, 1, 'entry', 5, { pageSize: 1 });
+
+    expect(request.get).toHaveBeenNthCalledWith(
+      1, '/recording-comments/', { recording_id: 7, page: 2, parent_id: 9 }, true, { loading: false },
+    );
+    expect(request.get).toHaveBeenNthCalledWith(
+      2, '/entry-comments/', {
+        entry_id: 11, page: 1, parent_id: 5, page_size: 1,
+      }, true, { loading: false },
     );
   });
 

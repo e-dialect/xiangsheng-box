@@ -59,7 +59,7 @@
               size="small"
               variant="ghost"
               text="回复"
-              @click="openReplies(comment)"
+              @click="openReplies(comment, true)"
             />
             <BaseButton
               v-if="comment.editable"
@@ -91,11 +91,11 @@
         </view>
 
         <BaseButton
-          v-if="comment.reply_count > (comment.recent_replies || []).length"
+          v-if="comment.reply_count > 0 || comment.recent_replies?.length"
           class="more-replies"
           size="small"
           variant="ghost"
-          :text="`展示全部回复（${comment.reply_count}）`"
+          :text="comment.reply_count ? `查看全部回复（${comment.reply_count}）` : '查看全部回复'"
           @click="openReplies(comment)"
         />
       </view>
@@ -143,9 +143,8 @@
           全部回复
         </text>
       </view>
-      <scroll-view
-        scroll-y
-        class="reply-sheet__scroll"
+      <PlatformScroll
+        container-class="reply-sheet__scroll"
         :scroll-into-view="sheetScrollTarget"
       >
         <view class="reply-sheet__parent">
@@ -164,7 +163,7 @@
           v-else-if="sheetError"
           :title="sheetError"
           action-text="重试"
-          @action="loadSheetReplies"
+          @action="loadSheetReplies(Boolean(sheetNext))"
         />
         <view
           v-for="reply in sheetReplies"
@@ -220,9 +219,10 @@
           :disabled="sheetLoading"
           @click="loadSheetReplies(true)"
         />
-      </scroll-view>
+      </PlatformScroll>
       <BaseForm
         ref="replyForm"
+        class="reply-sheet__form"
         :data="replyDraft"
         :rules="rules"
       >
@@ -237,6 +237,7 @@
             size="small"
             variant="ghost"
             text="取消"
+            :disabled="sendingReply"
             @click="sheet.replyTarget = null"
           />
         </view>
@@ -248,6 +249,9 @@
             : `回复 ${sheet.parent.author_name}`"
           type="textarea"
           placeholder="写下你的回复…"
+          :disabled="sendingReply"
+          :focus="replyFocused"
+          @blur="replyFocused = false"
         />
         <BaseButton
           text="发送回复"
@@ -265,6 +269,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import PlatformScroll from '@/components/PlatformScroll.vue';
 import { pageResults } from '@/services/entryRecording';
 import {
   listComments, createComment, deleteComment, likeComment, commentRequestId,
@@ -275,7 +280,7 @@ import { notify, confirm } from '@/services/feedback';
 export default {
   name: 'DiscussionThread',
   components: {
-    BaseButton, BaseField, BaseForm, BaseLoading, EmptyState,
+    BaseButton, BaseField, BaseForm, BaseLoading, EmptyState, PlatformScroll,
   },
   props: {
     targetId: { type: [Number, String], required: true },
@@ -304,12 +309,14 @@ export default {
     requestSignature: '',
     sheet: { visible: false, parent: null, replyTarget: null },
     sheetReplies: [],
+    sheetLocalReplies: [],
     sheetPage: 1,
     sheetNext: null,
     sheetLoading: false,
     sheetError: '',
     sheetRequestId: 0,
     sheetScrollTarget: '',
+    replyFocused: false,
   }),
   mounted() {
     this.initializeDiscussion();
@@ -395,8 +402,11 @@ export default {
         await this.scrollToComment(commentId);
         return;
       }
-      await this.openReplies(root);
-      if (await this.loadSheetRepliesUntil(commentId)) {
+      const opening = this.openReplies(root);
+      const requestId = this.sheetRequestId;
+      await opening;
+      if (await this.loadSheetRepliesUntil(commentId, requestId)
+        && requestId === this.sheetRequestId) {
         this.sheetScrollTarget = `reply-${commentId}`;
       }
     },
@@ -409,25 +419,29 @@ export default {
         });
       }
     },
-    async openReplies(comment) {
+    async openReplies(comment, focusReply = false) {
       this.sheet = { visible: true, parent: comment, replyTarget: null };
       this.sheetReplies = [];
+      this.sheetLocalReplies = [];
       this.sheetPage = 1;
       this.sheetNext = null;
       this.sheetLoading = false;
       this.sheetScrollTarget = '';
       this.sheetRequestId += 1;
       this.replyDraft.body = '';
+      this.replyFocused = focusReply;
       await this.loadSheetReplies();
     },
     closeReplies() {
       this.sheetRequestId += 1;
       this.sheet = { visible: false, parent: null, replyTarget: null };
       this.sheetScrollTarget = '';
+      this.replyFocused = false;
     },
     async loadSheetReplies(more = false) {
       if (this.sheetLoading || !this.sheet.parent) return null;
       const requestId = this.sheetRequestId;
+      const localReplies = this.sheetLocalReplies;
       this.sheetLoading = true;
       this.sheetError = '';
       const page = more ? this.sheetPage + 1 : 1;
@@ -440,9 +454,15 @@ export default {
         );
         if (requestId !== this.sheetRequestId) return null;
         const rows = pageResults(response);
-        this.sheetReplies = page === 1 ? rows : [...this.sheetReplies, ...rows];
+        this.sheetReplies = this.mergeCommentRows(
+          page === 1 ? this.sheetLocalReplies : this.sheetReplies,
+          rows,
+        );
         this.sheetPage = page;
         this.sheetNext = response.next;
+        if (localReplies === this.sheetLocalReplies) {
+          this.applyReplyCount(this.sheet.parent.id, response.count);
+        }
         return rows;
       } catch (error) {
         if (requestId !== this.sheetRequestId) return null;
@@ -454,51 +474,15 @@ export default {
         }
       }
     },
-    async loadSheetRepliesUntil(targetId) {
+    async loadSheetRepliesUntil(targetId, requestId) {
+      if (requestId !== this.sheetRequestId) return false;
       if (this.sheetReplies.some((reply) => String(reply.id) === String(targetId))) {
         return true;
       }
       if (!this.sheetNext) return false;
       const rows = await this.loadSheetReplies(true);
       if (!rows?.length) return false;
-      return this.loadSheetRepliesUntil(targetId);
-    },
-    async reloadSheetReplies() {
-      if (!this.sheet.parent) return;
-      // 发帖后回到第一页会让第 16 条及以后的新回复从面板消失；
-      // 这里作废在途请求并整段重载，保证列表连续且包含刚发送的回复。
-      this.sheetRequestId += 1;
-      const requestId = this.sheetRequestId;
-      this.sheetReplies = [];
-      this.sheetPage = 1;
-      this.sheetNext = null;
-      this.sheetLoading = true;
-      this.sheetError = '';
-      try {
-        await this.loadSheetRepliesPage(1, requestId);
-      } catch (error) {
-        if (requestId !== this.sheetRequestId) return;
-        this.sheetError = '回复暂时无法读取';
-      } finally {
-        if (requestId === this.sheetRequestId) {
-          this.sheetLoading = false;
-        }
-      }
-    },
-    async loadSheetRepliesPage(page, requestId) {
-      const response = await listComments(
-        this.targetId,
-        page,
-        this.targetType,
-        this.sheet.parent.id,
-      );
-      if (requestId !== this.sheetRequestId) return;
-      this.sheetReplies = [...this.sheetReplies, ...pageResults(response)];
-      this.sheetPage = page;
-      this.sheetNext = response.next;
-      if (response.next) {
-        await this.loadSheetRepliesPage(page + 1, requestId);
-      }
+      return this.loadSheetRepliesUntil(targetId, requestId);
     },
     async sendTopLevel() {
       if (this.sendingTop || !this.auth()) return;
@@ -520,32 +504,62 @@ export default {
       }
     },
     replyToReply(reply) {
+      if (this.sendingReply) return;
       this.sheet.replyTarget = reply;
       this.replyDraft.body = '';
+      this.replyFocused = true;
     },
     async sendReply() {
       if (this.sendingReply || !this.auth() || !this.sheet.parent) return;
-      if (await this.$refs.replyForm.validate() !== true) return;
+      const { parent, replyTarget } = this.sheet;
+      const requestId = this.sheetRequestId;
       this.sendingReply = true;
       try {
-        await this.submitComment(
-          this.sheet.parent.id,
-          this.sheet.replyTarget?.id || null,
-        );
-        this.replyDraft.body = '';
-        this.sheet.replyTarget = null;
-        this.sheet.parent = {
-          ...this.sheet.parent,
-          reply_count: (this.sheet.parent.reply_count || 0) + 1,
-        };
-        await this.reloadSheetReplies();
-        await this.loadComments();
+        if (await this.$refs.replyForm.validate() !== true
+          || requestId !== this.sheetRequestId) return;
+        const reply = await this.submitComment(parent.id, replyTarget?.id || null);
+        this.addSentReply(parent, reply);
+        if (requestId === this.sheetRequestId) {
+          this.replyDraft.body = '';
+          this.sheet.replyTarget = null;
+          this.sheetScrollTarget = `reply-${reply.id}`;
+        }
         notify({ title: '回复已发送' });
+        await this.refreshReplyCount(parent);
       } catch (error) {
         notify({ title: error.message || '回复失败，文字已保留，可重试' });
       } finally {
         this.sendingReply = false;
       }
+    },
+    addSentReply(parent, reply) {
+      const isOpen = this.sheet.parent?.id === parent.id;
+      const root = this.comments.find((comment) => comment.id === parent.id)
+        || (isOpen ? this.sheet.parent : parent);
+      root.recent_replies = this.mergeCommentRows(root.recent_replies || [], [reply]).slice(0, 3);
+      if (isOpen) {
+        this.sheet.parent = root;
+        // 分页位置只由列表响应推进，本次回复可能在尚未读取的页。
+        this.sheetLocalReplies = this.mergeCommentRows(this.sheetLocalReplies, [reply]);
+        this.sheetReplies = this.mergeCommentRows(this.sheetReplies, [reply]);
+      }
+    },
+    async refreshReplyCount(parent) {
+      try {
+        // 重试可能返回已存在的回复，按服务端总数更新父评论。
+        const { count } = await listComments(this.targetId, 1, this.targetType, parent.id, {
+          pageSize: 1,
+        });
+        this.applyReplyCount(parent.id, count);
+      } catch (error) {
+        // 已发送的回复可以继续查看，下次读取留言时会更新总数。
+      }
+    },
+    applyReplyCount(parentId, count) {
+      if (!Number.isInteger(count)) return;
+      const root = this.comments.find((comment) => comment.id === parentId);
+      if (root) root.reply_count = count;
+      if (this.sheet.parent?.id === parentId) this.sheet.parent.reply_count = count;
     },
     async submitComment(parentId, replyToId = null) {
       const body = (parentId ? this.replyDraft.body : this.form.body).trim();
@@ -592,6 +606,9 @@ export default {
         if (this.sheet.parent && this.sheet.parent.id === comment.id) {
           this.closeReplies();
         } else if (this.sheet.visible) {
+          this.sheetLocalReplies = this.sheetLocalReplies.filter(
+            (row) => String(row.id) !== String(comment.id),
+          );
           await this.loadSheetReplies();
         }
       } catch (error) {
@@ -750,7 +767,7 @@ export default {
   font-weight: 800;
 }
 
-.reply-sheet__scroll {
+.reply-sheet :deep(.reply-sheet__scroll) {
   flex: 1;
   min-height: 0;
   padding: var(--space-3);
@@ -759,5 +776,12 @@ export default {
 
 .reply-sheet__scroll .reply-item {
   margin-bottom: var(--space-2);
+}
+
+.reply-sheet__form {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-color);
+  background: var(--surface-color);
 }
 </style>
