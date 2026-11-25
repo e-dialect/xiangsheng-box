@@ -438,13 +438,13 @@ export default {
       this.sheetScrollTarget = '';
       this.replyFocused = false;
     },
-    async loadSheetReplies(more = false) {
+    async loadSheetReplies(more = false, { refreshCurrent = false } = {}) {
       if (this.sheetLoading || !this.sheet.parent) return null;
       const requestId = this.sheetRequestId;
       const localReplies = this.sheetLocalReplies;
       this.sheetLoading = true;
       this.sheetError = '';
-      const page = more ? this.sheetPage + 1 : 1;
+      const page = refreshCurrent ? this.sheetPage : (more ? this.sheetPage + 1 : 1);
       try {
         const response = await listComments(
           this.targetId,
@@ -545,12 +545,21 @@ export default {
       }
     },
     async refreshReplyCount(parent) {
+      const requestId = this.sheetRequestId;
       try {
         // 重试可能返回已存在的回复，按服务端总数更新父评论。
         const { count } = await listComments(this.targetId, 1, this.targetType, parent.id, {
           pageSize: 1,
         });
         this.applyReplyCount(parent.id, count);
+        if (requestId === this.sheetRequestId
+          && this.sheet.parent?.id === parent.id
+          && !this.sheetNext
+          && Number.isInteger(count)
+          && count > this.sheetReplies.length) {
+          // 旧末页可能同时缺少并发追加的回复和新的下一页入口。
+          await this.loadSheetReplies(false, { refreshCurrent: true });
+        }
       } catch (error) {
         // 已发送的回复可以继续查看，下次读取留言时会更新总数。
       }

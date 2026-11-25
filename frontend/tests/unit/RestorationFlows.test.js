@@ -322,6 +322,54 @@ describe('discussion replies sheet', () => {
     expect(detail.sheetNext).toBeNull();
   });
 
+  it.each([14, 15, 29, 30])('recovers a concurrent reply after opening the tail with %i replies', async (initial) => {
+    const first = Array.from({ length: initial }, (_, index) => makeReply(index + 1, 1));
+    const concurrent = makeReply(initial + 1, 1);
+    const sent = makeReply(initial + 2, 1);
+    const all = [...first, concurrent, sent];
+    let posted = false;
+    listComments.mockImplementation(async (id, page, type, parentId, { pageSize = 15 } = {}) => {
+      const rows = posted ? all : first;
+      return {
+        count: rows.length,
+        results: rows.slice((page - 1) * pageSize, page * pageSize),
+        next: rows.length > page * pageSize ? (pageSize === 1 ? 'count-next' : 'next-page') : null,
+      };
+    });
+    createComment.mockImplementationOnce(async () => {
+      posted = true;
+      return sent;
+    });
+    const parent = { id: 1, reply_count: initial, recent_replies: first.slice(0, 3) };
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+
+    await detail.openReplies(parent);
+    const initialPages = initial > 15 ? [1, 2] : [1];
+    if (initialPages.length === 2) await detail.loadSheetReplies(true);
+    expect(detail.sheetNext).toBeNull();
+    detail.replyDraft.body = sent.body;
+    await detail.sendReply();
+
+    expect(parent.reply_count).toBe(all.length);
+    expect(detail.sheetReplies.map((item) => item.id)).toContain(sent.id);
+    expect(detail.sheetNext).toBe('next-page');
+    expect(listComments.mock.calls.map(([, page]) => page)).toEqual([
+      ...initialPages, 1, initialPages.length,
+    ]);
+    if (initial % 15 !== 0) {
+      expect(detail.sheetReplies.map((item) => item.id)).toContain(concurrent.id);
+    }
+
+    await detail.loadSheetReplies(true);
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual(all.map((item) => item.id));
+    expect(detail.sheetNext).toBeNull();
+  });
+
   it('preserves a sent reply when an older first-page response arrives afterward', async () => {
     let resolveFirstPage;
     listComments
