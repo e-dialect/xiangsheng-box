@@ -253,37 +253,324 @@ describe('discussion replies sheet', () => {
     expect(detail.sheetReplies[0].parent_id).toBe(2);
   });
 
-  it('keeps the newest reply visible after sending past the first page', async () => {
-    const firstPage = Array.from({ length: 15 }, (_, i) => makeReply(i + 1, 1));
-    listComments.mockImplementation(async (id, page, type, parentId) => (
-      page === 1
-        ? { results: firstPage, next: 'next-page' }
-        : { results: [makeReply(16, parentId)], next: null }
-    ));
-    createComment.mockResolvedValue({ id: 16, parent_id: 1, body: '回复16' });
+  it('prepares the composer for a direct reply and leaves it unfocused when browsing', async () => {
+    const parent = { id: 1, author_name: '楼主', body: '顶层留言' };
+    const detail = context(Detail, { targetId: 5, targetType: 'recording' });
+    listComments.mockResolvedValue({ results: [], next: null });
 
+    await detail.openReplies(parent, true);
+    expect(detail.replyFocused).toBe(true);
+    expect(detail.sheet.replyTarget).toBeNull();
+
+    detail.closeReplies();
+    expect(detail.replyFocused).toBe(false);
+    await detail.openReplies(parent);
+    expect(detail.replyFocused).toBe(false);
+  });
+
+  it('shows a sent reply with one count request and keeps intervening pages reachable', async () => {
+    const firstPage = Array.from({ length: 15 }, (_, i) => makeReply(i + 1, 1));
+    const secondPage = Array.from({ length: 15 }, (_, i) => makeReply(i + 16, 1));
+    const sentReply = makeReply(32, 1);
+    listComments
+      .mockResolvedValueOnce({ results: firstPage, next: 'page-2' })
+      .mockResolvedValueOnce({ count: 32, results: firstPage.slice(0, 1), next: 'count-next' })
+      .mockResolvedValueOnce({ results: secondPage, next: 'page-3' })
+      .mockResolvedValueOnce({ results: [makeReply(31, 1), sentReply], next: null });
+    createComment.mockResolvedValue(sentReply);
+
+    const parent = {
+      id: 1,
+      author_name: '楼主',
+      body: '顶层留言',
+      reply_count: 31,
+      recent_replies: firstPage.slice(0, 3),
+    };
     const detail = context(Detail, {
       targetId: 5,
       targetType: 'recording',
-      sheet: {
-        visible: true,
-        parent: {
-          id: 1, author_name: '楼主', body: '顶层留言', reply_count: 15,
-        },
-        replyTarget: null,
-      },
-      replyDraft: { body: '回复16' },
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    await detail.openReplies(parent, true);
+    detail.replyDraft.body = sentReply.body;
+    await detail.sendReply();
+
+    expect(createComment).toHaveBeenCalledWith(expect.objectContaining({
+      recording_id: 5, parent_id: 1, reply_to_id: null, body: '回复32',
+    }), 'recording');
+    expect(listComments).toHaveBeenCalledTimes(2);
+    expect(listComments).toHaveBeenLastCalledWith(5, 1, 'recording', 1, {
+      pageSize: 1,
+    });
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual([
+      ...firstPage.map((item) => item.id),
+      32,
+    ]);
+    expect(detail.sheetScrollTarget).toBe('reply-32');
+    expect(detail.sheetPage).toBe(1);
+    expect(detail.sheetNext).toBe('page-2');
+    expect(parent.reply_count).toBe(32);
+    expect(parent.recent_replies).toEqual(firstPage.slice(0, 3));
+
+    await detail.loadSheetReplies(true);
+    await detail.loadSheetReplies(true);
+    expect(listComments.mock.calls.map(([, page]) => page)).toEqual([1, 1, 2, 3]);
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual(
+      Array.from({ length: 32 }, (_, i) => i + 1),
+    );
+    expect(detail.sheetNext).toBeNull();
+  });
+
+  it.each([14, 15, 29, 30])('recovers a concurrent reply after opening the tail with %i replies', async (initial) => {
+    const first = Array.from({ length: initial }, (_, index) => makeReply(index + 1, 1));
+    const concurrent = makeReply(initial + 1, 1);
+    const sent = makeReply(initial + 2, 1);
+    const all = [...first, concurrent, sent];
+    let posted = false;
+    listComments.mockImplementation(async (id, page, type, parentId, { pageSize = 15 } = {}) => {
+      const rows = posted ? all : first;
+      return {
+        count: rows.length,
+        results: rows.slice((page - 1) * pageSize, page * pageSize),
+        next: rows.length > page * pageSize ? (pageSize === 1 ? 'count-next' : 'next-page') : null,
+      };
+    });
+    createComment.mockImplementationOnce(async () => {
+      posted = true;
+      return sent;
+    });
+    const parent = { id: 1, reply_count: initial, recent_replies: first.slice(0, 3) };
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      comments: [parent],
       $refs: { replyForm: { validate: async () => true } },
     });
 
+    await detail.openReplies(parent);
+    const initialPages = initial > 15 ? [1, 2] : [1];
+    if (initialPages.length === 2) await detail.loadSheetReplies(true);
+    expect(detail.sheetNext).toBeNull();
+    detail.replyDraft.body = sent.body;
     await detail.sendReply();
 
-    expect(detail.sheetReplies.map((item) => item.id)).toEqual([
-      ...firstPage.map((item) => item.id),
-      16,
+    expect(parent.reply_count).toBe(all.length);
+    expect(detail.sheetReplies.map((item) => item.id)).toContain(sent.id);
+    expect(detail.sheetNext).toBe('next-page');
+    expect(listComments.mock.calls.map(([, page]) => page)).toEqual([
+      ...initialPages, 1, initialPages.length,
     ]);
+    if (initial % 15 !== 0) {
+      expect(detail.sheetReplies.map((item) => item.id)).toContain(concurrent.id);
+    }
+
+    await detail.loadSheetReplies(true);
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual(all.map((item) => item.id));
     expect(detail.sheetNext).toBeNull();
-    expect(detail.sheet.parent.reply_count).toBe(16);
+  });
+
+  it('recovers a reply after a stale opening request finishes', async () => {
+    const first = Array.from({ length: 15 }, (_, index) => makeReply(index + 1, 1));
+    const sent = makeReply(17, 1);
+    const last = [makeReply(16, 1), sent];
+    let resolveOpening;
+    listComments
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOpening = resolve; }))
+      .mockResolvedValueOnce({ count: 17, results: [first[0]], next: 'count-next' })
+      .mockResolvedValueOnce({ count: 17, results: first, next: 'next-page' })
+      .mockResolvedValueOnce({ count: 17, results: last, next: null });
+    createComment.mockResolvedValueOnce(sent);
+    const parent = { id: 1, reply_count: 15, recent_replies: first.slice(0, 3) };
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    const open = detail.openReplies(parent);
+    detail.replyDraft.body = sent.body;
+    await detail.sendReply();
+    expect(listComments).toHaveBeenCalledTimes(2);
+    resolveOpening({ count: 15, results: first, next: null });
+    await open;
+    expect(parent.reply_count).toBe(17);
+    expect(detail.sheetNext).toBe('next-page');
+    expect(listComments).toHaveBeenCalledTimes(3);
+    await detail.loadSheetReplies(true);
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual([...first, ...last].map((item) => item.id));
+  });
+
+  it('preserves a sent reply when an older first-page response arrives afterward', async () => {
+    let resolveFirstPage;
+    listComments
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirstPage = resolve; }))
+      .mockResolvedValueOnce({ count: 2 });
+    const sentReply = makeReply(2, 1);
+    createComment.mockResolvedValue(sentReply);
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    const opening = detail.openReplies({ id: 1, reply_count: 1 }, true);
+    detail.replyDraft.body = sentReply.body;
+    await detail.sendReply();
+    expect(detail.sheetReplies).toEqual([sentReply]);
+
+    resolveFirstPage({ count: 1, results: [makeReply(1, 1)], next: null });
+    await opening;
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual([1, 2]);
+    expect(detail.sheet.parent.reply_count).toBe(2);
+  });
+
+  it('applies a late send only to the original parent after the sheet switches', async () => {
+    const first = { id: 1, reply_count: 1, recent_replies: [makeReply(10, 1)] };
+    const second = { id: 2, reply_count: 0, recent_replies: [] };
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'entry',
+      comments: [first, second],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    listComments.mockImplementation(async (id, page, type, parentId, options) => (
+      options?.pageSize ? { count: 2 } : { results: [], next: null }
+    ));
+    let resolveSend;
+    createComment.mockReturnValueOnce(new Promise((resolve) => { resolveSend = resolve; }));
+    await detail.openReplies(first);
+    detail.replyToReply(first.recent_replies[0]);
+    detail.replyDraft.body = '第一串回复';
+    const sending = detail.sendReply();
+    await Promise.resolve();
+    expect(createComment).toHaveBeenCalledWith(expect.objectContaining({
+      entry_id: 5, parent_id: 1, reply_to_id: 10, body: '第一串回复',
+    }), 'entry');
+
+    detail.closeReplies();
+    await detail.openReplies(second, true);
+    detail.replyDraft.body = '第二串草稿';
+    resolveSend(makeReply(11, 1));
+    await sending;
+
+    expect(first.reply_count).toBe(2);
+    expect(first.recent_replies.map((reply) => reply.id)).toEqual([10, 11]);
+    expect(detail.sheet.parent).toBe(second);
+    expect(second.reply_count).toBe(0);
+    expect(detail.replyDraft.body).toBe('第二串草稿');
+    expect(detail.sheetReplies).toEqual([]);
+    expect(detail.sheetScrollTarget).toBe('');
+  });
+
+  it('shows a late reply in the reopened parent sheet without resetting its new draft', async () => {
+    const parent = { id: 1, reply_count: 1, recent_replies: [makeReply(10, 1)] };
+    const sentReply = makeReply(11, 1);
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'entry',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    listComments
+      .mockResolvedValueOnce({ results: parent.recent_replies, next: null })
+      .mockResolvedValueOnce({ results: parent.recent_replies, next: null })
+      .mockResolvedValueOnce({ count: 2 });
+    let resolveSend;
+    createComment.mockReturnValueOnce(new Promise((resolve) => { resolveSend = resolve; }));
+    await detail.openReplies(parent);
+    detail.replyDraft.body = sentReply.body;
+    const sending = detail.sendReply();
+
+    await Promise.resolve();
+    detail.closeReplies();
+    await detail.openReplies(parent, true);
+    detail.replyDraft.body = '新草稿';
+    resolveSend(sentReply);
+    await sending;
+
+    expect(detail.sheetReplies.map((reply) => reply.id)).toEqual([10, 11]);
+    expect(parent.reply_count).toBe(2);
+    expect(detail.replyDraft.body).toBe('新草稿');
+    expect(detail.sheetScrollTarget).toBe('');
+  });
+
+  it('refreshes the parent count when a list response shows the reply before the send returns', async () => {
+    const parent = { id: 1, reply_count: 1, recent_replies: [makeReply(10, 1)] };
+    const sentReply = makeReply(11, 1);
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'entry',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    let resolveList;
+    listComments
+      .mockReturnValueOnce(new Promise((resolve) => { resolveList = resolve; }))
+      .mockResolvedValueOnce({ count: 2 });
+    let resolveSend;
+    createComment.mockReturnValueOnce(new Promise((resolve) => { resolveSend = resolve; }));
+    const opening = detail.openReplies(parent);
+    detail.replyDraft.body = sentReply.body;
+    const sending = detail.sendReply();
+    await Promise.resolve();
+    resolveList({ results: [...parent.recent_replies, sentReply], next: null });
+    await opening;
+    resolveSend(sentReply);
+    await sending;
+
+    expect(parent.reply_count).toBe(2);
+    expect(detail.sheetReplies.map((reply) => reply.id)).toEqual([10, 11]);
+  });
+
+  it('does not count an idempotent retry as a second reply when its page is still unloaded', async () => {
+    const parent = { id: 1, reply_count: 31, recent_replies: [makeReply(1, 1)] };
+    const sentReply = makeReply(31, 1);
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'entry',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    listComments
+      .mockResolvedValueOnce({ results: parent.recent_replies, next: 'page-2' })
+      .mockResolvedValueOnce({ count: 31 });
+    createComment.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(sentReply);
+    await detail.openReplies(parent);
+    detail.replyDraft.body = sentReply.body;
+    await detail.sendReply();
+    expect(detail.replyDraft.body).toBe(sentReply.body);
+    await detail.sendReply();
+
+    expect(createComment.mock.calls.at(-2)[0].client_id)
+      .toBe(createComment.mock.calls.at(-1)[0].client_id);
+    expect(parent.reply_count).toBe(31);
+    expect(detail.sheetReplies.map((reply) => reply.id)).toEqual([1, 31]);
+    expect(detail.sheetNext).toBe('page-2');
+  });
+
+  it('recovers a reply count from normal pagination after the count request fails', async () => {
+    const parent = { id: 1, reply_count: 0, recent_replies: [] };
+    const sentReply = makeReply(2, 1);
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'entry',
+      comments: [parent],
+      $refs: { replyForm: { validate: async () => true } },
+    });
+    listComments
+      .mockResolvedValueOnce({ count: 0, results: [], next: null })
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ count: 1, results: [sentReply], next: null });
+    createComment.mockResolvedValue(sentReply);
+    await detail.openReplies(parent);
+    detail.replyDraft.body = sentReply.body;
+    await detail.sendReply();
+    expect(parent.reply_count).toBe(0);
+    expect(detail.sheetReplies).toEqual([sentReply]);
+
+    detail.closeReplies();
+    await detail.openReplies(parent);
+    expect(parent.reply_count).toBe(1);
   });
 
   it('loads and focuses a top-level comment anchor from a later page', async () => {

@@ -1,10 +1,17 @@
 import request from '@/utils/request';
 
 export const likeRecording = (id, liked) => (liked ? request.put(`/recordings/${id}/like/`, {}) : request.del(`/recordings/${id}/like/`));
-export const listComments = (recordingId, page = 1, targetType = 'recording', parentId = null) => request.get(`/${targetType}-comments/`, {
+export const listComments = (
+  recordingId,
+  page = 1,
+  targetType = 'recording',
+  parentId = null,
+  { pageSize } = {},
+) => request.get(`/${targetType}-comments/`, {
   [`${targetType}_id`]: recordingId,
   page,
   ...(parentId ? { parent_id: parentId } : {}),
+  ...(pageSize ? { page_size: pageSize } : {}),
 }, true, {
   loading: false,
 });
