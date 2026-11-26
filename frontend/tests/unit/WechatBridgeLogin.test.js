@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WechatBridgeLogin from '@/pages/login/components/WechatBridgeLogin.vue';
 import { afterLogin } from '@/services/login';
+import { peekInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
 import { isH5Runtime } from '@/services/platform';
 import {
   bridgeChannel,
@@ -14,6 +15,11 @@ import {
   storeBridgeAttempt,
 } from '@/services/wechatBridge';
 
+vi.mock('@/services/authGuard', () => ({
+  clearInterceptIntent: vi.fn(),
+  peekInterceptIntent: vi.fn(() => null),
+  saveInterceptIntent: vi.fn(),
+}));
 vi.mock('@/services/login', () => ({ afterLogin: vi.fn() }));
 vi.mock('@/services/platform', () => ({ isH5Runtime: vi.fn() }));
 vi.mock('@/services/wechatBridge', () => ({
@@ -55,6 +61,7 @@ describe('WeChat login through the mini-program', () => {
     cancelBridge.mockResolvedValue({});
     exchangeBridge.mockResolvedValue({ status: 'pending' });
     readBridgeAttempt.mockReturnValue(null);
+    peekInterceptIntent.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -77,7 +84,9 @@ describe('WeChat login through the mini-program', () => {
   }
 
   it('shows the desktop QR then applies the login when the phone confirms', async () => {
+    const intent = { action: 'bookmark_entry', context: { entryId: 42 } };
     const attempt = { ...ticket(), qr_image: qr };
+    peekInterceptIntent.mockReturnValue(intent);
     startBridge.mockResolvedValue(attempt);
     await showLogin();
     await click('微信登录');
@@ -86,12 +95,13 @@ describe('WeChat login through the mini-program', () => {
     expect(wrapper.text()).toContain('123456');
     expect(wrapper.find('image').attributes('src')).toBe(qr);
     expect(openBridgeLink).not.toHaveBeenCalled();
-    expect(storeBridgeAttempt).toHaveBeenCalledWith({ ...attempt, channel: 'web_qr' });
+    expect(storeBridgeAttempt).toHaveBeenCalledWith({ ...attempt, channel: 'web_qr', intent });
 
     const result = { id: 7, token: 'example', isNew: true };
     exchangeBridge.mockResolvedValue(result);
     await vi.advanceTimersByTimeAsync(2000);
     expect(afterLogin).toHaveBeenCalledOnce();
+    expect(saveInterceptIntent).toHaveBeenCalledWith(intent);
     expect(afterLogin).toHaveBeenCalledWith(result, { isNew: true });
     expect(storeBridgeAttempt).toHaveBeenLastCalledWith(null);
   });
@@ -141,6 +151,7 @@ describe('WeChat login through the mini-program', () => {
     finishExchange({ id: 7, token: 'example', isNew: false });
     await flushPromises();
     expect(cancelBridge).toHaveBeenCalledOnce();
+    expect(wrapper.emitted('cancel')).toHaveLength(1);
     expect(afterLogin).not.toHaveBeenCalled();
   });
 });

@@ -46,6 +46,7 @@
       <WechatBridgeLogin
         ref="wechatBridge"
         :disabled="submitting"
+        @cancel="cancelBridgeLogin"
       />
       <!-- #endif -->
 
@@ -237,7 +238,7 @@ import PageShell from '@/components/PageShell.vue';
 import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import { actionLabel, peekInterceptIntent } from '@/services/authGuard';
-import { cancelLogin, canReturnToGuestPage } from '@/services/authJourney';
+import { cancelLogin, canReturnToGuestPage, guestReturnDestination } from '@/services/authJourney';
 import { CAPABILITIES, isCapabilityEnabled } from '@/services/capabilities';
 import { mpLogin, normalLogin } from '@/services/login';
 import { loginWithPhone, requestPhoneCode } from '@/services/phoneAuth';
@@ -303,7 +304,8 @@ export default {
       return `你刚才想${actionLabel(this.intent.action)}，验证身份后会回到原来的位置。`;
     },
     guestReturnLabel() {
-      return canReturnToGuestPage() ? '暂不登录，返回浏览' : '暂不登录，先去查词';
+      return canReturnToGuestPage() || guestReturnDestination(this.intent)
+        ? '暂不登录，返回浏览' : '暂不登录，先去查词';
     },
   },
   onLoad() {
@@ -316,7 +318,15 @@ export default {
     this.clearCountdown();
   },
   methods: {
-    cancelLogin,
+    cancelLogin() {
+      const bridge = this.$refs.wechatBridge;
+      const intent = bridge?.attempt?.intent;
+      bridge?.cancel();
+      cancelLogin(intent);
+    },
+    cancelBridgeLogin(intent) {
+      cancelLogin(intent);
+    },
     startWechatLogin() {
       this.wechatLoginAvailable = isCapabilityEnabled(CAPABILITIES.WECHAT_AUTH);
       if (!this.wechatLoginAvailable) {

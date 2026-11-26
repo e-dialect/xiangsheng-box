@@ -38,7 +38,7 @@
         block
         variant="ghost"
         text="取消微信登录"
-        @click="cancel"
+        @click="cancelFromButton"
       />
     </template>
     <view
@@ -54,6 +54,7 @@
 <script>
 /* eslint-env browser */
 import BaseButton from '@/components/BaseButton.vue';
+import { clearInterceptIntent, peekInterceptIntent, saveInterceptIntent } from '@/services/authGuard';
 import { afterLogin } from '@/services/login';
 import { isH5Runtime } from '@/services/platform';
 import {
@@ -74,6 +75,7 @@ export default {
   props: {
     disabled: { type: Boolean, default: false },
   },
+  emits: ['cancel'],
   data() {
     return {
       available: false,
@@ -140,11 +142,12 @@ export default {
     async begin() {
       if (this.starting || this.attempt || this.disabled) return;
       const sequence = this.startSequence;
+      const intent = peekInterceptIntent();
       this.starting = true;
       this.message = '';
       try {
         const channel = bridgeChannel();
-        const attempt = { ...await startBridge(channel), channel };
+        const attempt = { ...await startBridge(channel), channel, intent };
         if (this.disposed || sequence !== this.startSequence) {
           this.revoke(attempt);
           return;
@@ -187,6 +190,11 @@ export default {
         // The request will expire on the server if cancellation cannot be sent.
       });
     },
+    cancelFromButton() {
+      const intent = this.attempt?.intent;
+      this.cancel();
+      this.$emit('cancel', intent);
+    },
     cancel() {
       this.startSequence += 1;
       const { attempt } = this;
@@ -209,6 +217,8 @@ export default {
         if (attempt !== this.attempt || result.status === 'pending') return;
         this.message = '';
         this.clearAttempt();
+        if (attempt.intent) saveInterceptIntent(attempt.intent);
+        else if (attempt.intent === null) clearInterceptIntent();
         await afterLogin(result, { isNew: result.isNew });
       } catch (error) {
         if (attempt !== this.attempt) return;

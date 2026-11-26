@@ -13,7 +13,19 @@
   <dl>
     <dt>状态</dt><dd>{{ status }}</dd>
     <dt>默认查词范围</dt><dd>{{ profile.default_dialect|default:"不限" }}</dd>
-    <dt>地方工具</dt><dd>{{ profile.local_tools_dialect|default:"未配置" }}</dd>
+    <dt>工具默认方言</dt><dd>{{ profile.local_tools_dialect|default:"由访客选择" }}</dd>
+    <dt>首页栏目顺序</dt>
+    <dd>
+      <ol>
+        {% for label in home_section_labels %}
+          <li>{{ label }}</li>
+        {% empty %}
+          <li>无可选栏目</li>
+        {% endfor %}
+      </ol>
+    </dd>
+    <dt>启用工具</dt>
+    <dd>{{ enabled_tool_labels|join:"、"|default:"无" }}</dd>
     <dt>首页精选</dt>
     <dd>
       <ol>

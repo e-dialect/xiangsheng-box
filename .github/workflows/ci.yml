@@ -256,6 +256,8 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ./backend/guantou
+          platforms: linux/amd64
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           tags: guantou-backend:latest
           outputs: type=docker,dest=${{ runner.temp }}/guantou-backend.tar
           cache-from: type=gha,scope=backend
@@ -275,6 +277,7 @@ jobs:
         with:
           context: ./frontend
           platforms: linux/amd64
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           tags: guantou-frontend-production:latest
           build-args: |
             VITE_BACKEND_URL=
@@ -289,7 +292,31 @@ jobs:
           docker load --input "${RUNNER_TEMP}/guantou-frontend-production.tar"
 
       - name: Check real production runtime without external services
-        run: python3 scripts/check-production-runtime.py
+        shell: bash
+        run: python3 scripts/check-production-runtime.py | tee "${RUNNER_TEMP}/production-runtime.json"
+
+      # Dispatch CI on the candidate branch to retain the exact pair just tested.
+      - name: Prepare candidate image archives
+        id: candidate
+        if: github.event_name == 'workflow_dispatch' && github.ref_type == 'branch' && github.ref_name != github.event.repository.default_branch
+        run: |
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          cd "${RUNNER_TEMP}"
+          mkdir candidate-images
+          ln guantou-backend.tar guantou-frontend-production.tar production-runtime.json candidate-images/
+          cd candidate-images
+          printf '%s\n' "${GITHUB_SHA}" > SOURCE_SHA
+          sha256sum guantou-backend.tar guantou-frontend-production.tar production-runtime.json SOURCE_SHA > SHA256SUMS
+
+      - name: Upload accepted candidate images
+        if: steps.candidate.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-images-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate-images/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
 
       - name: Upload Docker images
         uses: actions/upload-artifact@v7

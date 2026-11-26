@@ -74,6 +74,17 @@ describe('mail send recipient', () => {
     expect(MailSendPage.inheritAttrs).toBe(false);
   });
 
+  it('lets a contributor describe a missing regional kinship term to an editor', () => {
+    const wrapper = mountPage();
+    MailSendPage.onLoad.call(wrapper.vm, {
+      id: '-1', object_type: 'kinship', object_id: '闽.莆仙',
+    });
+    expect(wrapper.vm.recipientId).toBe('-1');
+    expect(wrapper.vm.Notification.title).toBe('补充当地亲戚称谓');
+    expect(wrapper.vm.Notification.content).toContain('方言：闽.莆仙');
+    expect(wrapper.vm.Notification.content).toContain('适用地区和资料来源');
+  });
+
   it('resolves a route recipient into a recognizable identity', async () => {
     const wrapper = mountPage();
     await wrapper.vm.applyRecipient(9);
